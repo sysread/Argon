@@ -25,21 +25,6 @@ sub right  { (2 * $_[0]) + 2 }
 sub is_full  { $_[0]->{size} >= $_[0]->{limit} }
 sub is_empty { $_[0]->{size} == 0 }
 
-sub describe {
-    my ($self, $idx, $indent) = @_;    
-    $idx    ||= 0;
-    $indent ||= 0;
-    print "  " foreach (1 .. $indent);
-    
-    printf "<NODE %d>\n", $self->{data}[$idx]->priority;
-    
-    my $left = left($idx);
-    my $right = right($idx);
-    
-    $self->describe($left, $indent + 1) if exists $self->{data}[$left];
-    $self->describe($right, $indent + 1) if exists $self->{data}[$right];
-}
-
 sub put {
     my ($self, $msg) = @_;
     croak sprintf('Queue is full (%d/%d)', $self->{size}, $self->{limit}) if $self->is_full;
