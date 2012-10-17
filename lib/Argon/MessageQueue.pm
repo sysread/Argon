@@ -27,7 +27,7 @@ sub is_empty { $_[0]->{size} == 0 }
 
 sub put {
     my ($self, $msg) = @_;
-    croak sprintf('Queue is full (%d/%d)', $self->{size}, $self->{limit}) if $self->is_full;
+    croak 'Queue is full' if $self->is_full;
 
     my $data = $self->{data};
 
