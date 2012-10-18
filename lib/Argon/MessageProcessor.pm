@@ -71,7 +71,8 @@ sub msg_queue {
 #-------------------------------------------------------------------------------
 sub msg_assigned {
     my ($self, $msg) = @_;
-    $self->status->{$msg->id} = STATUS_ASSIGNED;
+    $self->message->{$msg->id} = $msg;
+    $self->status->{$msg->id}  = STATUS_ASSIGNED;
 }
 
 #-------------------------------------------------------------------------------
@@ -79,7 +80,8 @@ sub msg_assigned {
 #-------------------------------------------------------------------------------
 sub msg_complete {
     my ($self, $msg) = @_;
-    $self->status->{$msg->id} = STATUS_COMPLETE;
+    $self->message->{$msg->id} = $msg;
+    $self->status->{$msg->id}  = STATUS_COMPLETE;
 }
 
 #-------------------------------------------------------------------------------
@@ -88,8 +90,8 @@ sub msg_complete {
 #-------------------------------------------------------------------------------
 sub msg_clear {
     my ($self, $msg) = @_;
-    undef $self->status->{$msg->id};
     undef $self->message->{$msg->id};
+    undef $self->status->{$msg->id};
 }
 
 

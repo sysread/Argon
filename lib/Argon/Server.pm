@@ -15,7 +15,6 @@ has 'endline'       => (is => 'ro', isa => 'Str', default => EOL);
 has 'chunk_size'    => (is => 'ro', isa => 'Int', default => CHUNK_SIZE);
 has 'on_error'      => (is => 'rw', isa => 'CodeRef', required => 1);
 has 'callback'      => (is => 'rw', isa => 'HashRef', init_arg => undef, default => sub { {} });
-has 'condvar'       => (is => 'ro', init_arg => undef, default => sub { AnyEvent->condvar });
 has 'server'        => (is => 'rw', init_arg => undef);
 
 sub respond_to {
@@ -25,17 +24,11 @@ sub respond_to {
 
 sub start {
     my $self = shift;
-    $self->server(tcp_server $self->host, $self->port, sub { $self->accept(@_) }, sub { $self->initialized(@_) });
-    $self->condvar->recv;
+    $self->server(tcp_server $self->host, $self->port, sub { $self->accept(@_) });
 }
 
 sub stop {
     my $self = shift;
-    $self->condvar->send;
-}
-
-sub initialized {
-    my ($self, $fh, $host, $port) = @_;
 }
 
 sub accept {

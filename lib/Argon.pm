@@ -18,6 +18,7 @@ our %EXPORT_TAGS = (
         CHUNK_SIZE
         EOL
         MESSAGE_SEPARATOR
+        TRACK_MESSAGES
     /],
 
     # Priorities
@@ -46,6 +47,7 @@ use constant SOCKET_TIMEOUT     => 30;
 use constant CHUNK_SIZE         => 1024 * 4;
 use constant EOL                => "\015\012";
 use constant MESSAGE_SEPARATOR  => ' ';
+use constant TRACK_MESSAGES     => 10; # number of message times to track for computing avg processing time at a host
 
 #-------------------------------------------------------------------------------
 # Priorities
@@ -67,5 +69,7 @@ use constant CMD_PENDING  => 4;  # Response - message is in-progress
 use constant CMD_COMPLETE => 5;  # Response - message is complete
 use constant CMD_REJECTED => 6;  # Response - message was rejected
 use constant CMD_ERROR    => 7;  # Response - error processing message or invalid message format
+use constant CMD_ADD_NODE => 8;  # Add a node to a cluster
+use constant CMD_DEL_NODE => 9;  # Remove a node from a cluster
 
 1;

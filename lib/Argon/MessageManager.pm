@@ -9,7 +9,9 @@ package Argon::MessageManager;
 use Moose;
 use Carp;
 use namespace::autoclean;
-use Argon qw/:commands/;
+use Argon      qw/:commands TRACK_MESSAGES/;
+use List::Util qw/sum/;
+
 require Time::HiRes;
 require Argon::Client;
 
@@ -20,14 +22,6 @@ has 'servers' => (
     is       => 'rw',
     isa      => 'ListRef',
     default  => sub { [] },
-    init_arg => undef,
-);
-
-# Hash of msg id => last seen timestamp; used to track time spend at destination
-has 'sent' => (
-    is       => 'ro',
-    isa      => 'HashRef',
-    default  => sub { {} },
     init_arg => undef,
 );
 
@@ -68,15 +62,12 @@ has 'avg_processing_time' => (
 #-------------------------------------------------------------------------------
 sub add_server {
     my ($self, $client) = @_;
-
-    # Add tracking
-    push @{$self->servers}, $client;
-    $self->assignments->{$client}         = [];
-    $self->processing_times->{$client}    = [];
-    $self->avg_processing_time->{$client} = 0;
-
-    # Add callbacks
-    # TODO Add callbacks once they are written :)
+    $client->connect(sub {
+        push @{$self->servers}, $client;
+        $self->assignments->{$client}         = [];
+        $self->processing_times->{$client}    = [];
+        $self->avg_processing_time->{$client} = 0;
+    });
 }
 
 #-------------------------------------------------------------------------------
@@ -95,6 +86,7 @@ sub del_server {
     undef $self->assignments->{client};
     undef $self->processing_times->{$client};
     undef $self->avg_processing_time->{$client};
+    $client->destroy;
 }
 
 #-------------------------------------------------------------------------------
@@ -109,6 +101,7 @@ sub estimated_processing_time {
 
 #-------------------------------------------------------------------------------
 # Returns the next most available server.
+# TODO account for servers which may be inaccessible
 #-------------------------------------------------------------------------------
 sub next_server {
     my $self = shift;
@@ -124,6 +117,28 @@ sub next_server {
     }
 
     return $least;
+}
+
+#-------------------------------------------------------------------------------
+# Assigns a message to the selected server.
+#-------------------------------------------------------------------------------
+sub assign {
+    my ($self, $msg, $server) = @_;
+    push @{$self->assignments->{$server}}, $msg->id;
+
+    $self->msg_assigned($msg);
+    my $sent = Time::HiRes::time();
+
+    $server->send($msg, sub {
+        my $msg = shift;
+
+        push @{$self->processing_times->{$server}}, (Time::HiRes::time() - $sent);
+        shift @{$self->processing_times->{$server}}
+            if @{$self->processing_times->{$server}} > TRACK_MESSAGES;
+
+        $self->avg_processing_time->{$server} = sum(@{$self->processing_times->{$server}}) / TRACK_MESSAGES;
+        $self->msg_complete($msg);
+    });
 }
 
 __PACKAGE__->meta->make_immutable;
