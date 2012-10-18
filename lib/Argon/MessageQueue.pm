@@ -22,6 +22,8 @@ sub parent { floor(($_[0] - 1) / 2) }
 sub left   { (2 * $_[0]) + 1 }
 sub right  { (2 * $_[0]) + 2 }
 
+sub size     { $_[0]->{size} }
+sub fill     { ($_[0]->{size} / $_[0]->{limit}) * 100 }
 sub is_full  { $_[0]->{size} >= $_[0]->{limit} }
 sub is_empty { $_[0]->{size} == 0 }
 
@@ -37,7 +39,7 @@ sub put {
     my $idx    = $self->{size} - 1;
     my $parent = parent($idx);
 
-    while ($idx > 0 && $data->[$idx]->priority < $data->[$parent]->priority) {
+    while ($idx > 0 && $data->[$idx] > $data->[$parent]) {
         my $tmp = $data->[$parent];
         $data->[$parent] = $data->[$idx];
         $data->[$idx]    = $tmp;
@@ -75,12 +77,12 @@ sub get {
         } elsif ($right > $last_idx) {
             $min = $left;
         } else {
-            $min = ($data->[$left]->priority <= $data->[$right]->priority)
+            $min = ($data->[$left] >= $data->[$right])
                 ? $left
                 : $right;
         }
         
-        if ($data->[$idx]->priority > $data->[$min]->priority) {
+        if ($data->[$idx] < $data->[$min]) {
             my $tmp = $data->[$min];
             $data->[$min] = $data->[$idx];
             $data->[$idx] = $tmp;

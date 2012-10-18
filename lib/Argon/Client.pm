@@ -2,6 +2,7 @@ package Argon::Client;
 
 use Carp;
 use Moose;
+use namespace::autoclean;
 use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
@@ -54,7 +55,6 @@ sub send {
     });
 }
 
-no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;

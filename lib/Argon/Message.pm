@@ -2,15 +2,64 @@ package Argon::Message;
 
 use Moose;
 use Carp;
-use MIME::Base64    qw//;
-use Storable        qw//;
-use Argon           qw/:priorities NO_ID MESSAGE_SEPARATOR/;
+use namespace::autoclean;
+use Argon    qw/:priorities MESSAGE_SEPARATOR/;
+use overload '<=>'  => \&compare;
+use overload 'bool' => sub { defined $_[0] };
 
-has 'command'    => (is => 'ro', isa => 'Int', required => 1);
-has 'priority'   => (is => 'rw', isa => 'Int', default => PRI_NORMAL);
-has 'id'         => (is => 'ro', isa => 'Int', default => NO_ID);
-has 'decoded'    => (is => 'rw', init_arg => undef, clearer => 'clear_decoded', predicate => 'is_decoded');
-has 'encoded'    => (is => 'rw', init_arg => undef, clearer => 'clear_encoded', predicate => 'is_encoded');
+require Data::UUID;
+require Time::HiRes;
+require MIME::Base64;
+require Storable;
+
+# Time stamp, used to sort incoming messages
+has 'timestamp' => (
+    is       => 'rw',
+    isa      => 'Num',
+    default  => \&Time::HiRes::time,
+);
+
+# Message id, assigned at system entry point (UUID)
+has 'id' => (
+    is      => 'ro',
+    isa     => 'Str',
+    lazy    => 1,
+    default => sub { Data::UUID->new->create_str },
+);
+
+# Processing instruction
+has 'command' => (
+    is       => 'ro',
+    isa      => 'Int',
+    required => 1,
+);
+
+# Message priority (lower value is higher priority)
+has 'priority' => (
+    is      => 'rw',
+    isa     => 'Int',
+    default => PRI_NORMAL,
+);
+
+# Private - storage for encoded and decoded payloads
+has 'decoded' => (
+    is        => 'rw',
+    init_arg  => undef,
+    clearer   => 'clear_decoded',
+    predicate => 'is_decoded',
+);
+
+has 'encoded' => (
+    is        => 'rw',
+    init_arg  => undef,
+    clearer   => 'clear_encoded',
+    predicate => 'is_encoded',
+);
+
+
+sub update_timestamp {
+    shift->created(Time::HiRes::time());
+}
 
 sub payload {
     return @_ == 1 ? $_[0]->get_payload : $_[0]->set_payload($_[1]);
@@ -27,7 +76,7 @@ sub set_payload {
 
 sub get_payload {
     my $self = shift;
-    $self->is_encoded || croak 'Missing payload';
+    return unless $self->is_encoded;
 
     unless ($self->is_decoded) {
         my $image   = MIME::Base64::decode_base64($self->encoded);
@@ -40,18 +89,43 @@ sub get_payload {
 
 sub encode {
     my $self = shift;
-    $self->is_encoded || croak 'Missing payload';
-    return join(MESSAGE_SEPARATOR, $self->command, $self->priority, $self->id, $self->encoded);
+    return join(MESSAGE_SEPARATOR, $self->command, $self->priority, $self->id, $self->timestamp, $self->encoded);
 }
 
 sub decode {
-    my ($cmd, $pri, $id, $payload) = split MESSAGE_SEPARATOR, $_[0];
-    my $msg = Argon::Message->new(command => $cmd, priority => $pri, id => $id);
+    my ($cmd, $pri, $id, $timestamp, $payload) = split MESSAGE_SEPARATOR, $_[0];
+    my $msg = Argon::Message->new(command => $cmd, priority => $pri, id => $id, timestamp => $timestamp);
     $msg->encoded($payload);
     return $msg;
 }
 
-no Moose;
+#-------------------------------------------------------------------------------
+# Creates a new Message object with the command verb as a reply. If the second
+# optional argument is true (false by default), includes the message payload in
+# the reply.
+#-------------------------------------------------------------------------------
+sub reply {
+    my ($self, $cmd, $include_payload) = @_;
+    my $msg = Argon::Message->new(cmd => $cmd, id => $self->id, priority => $self->priority);
+    $msg->encoded($self->encoded) if $include_payload;
+    return $msg;
+}
+
+#-------------------------------------------------------------------------------
+# Compares two Messages and returns and the equivalent of the <=> operator.
+# Comparison is done based first on priority (lower priority is "higher" for
+# sorting) and second based on its timestamp.
+#-------------------------------------------------------------------------------
+sub compare {
+    my ($self, $other, $swap) = @_;
+    my ($x, $y) = $swap ? ($other, $self) : ($self, $other);
+    if ($x->priority != $y->priority) {
+        return $y->priority <=> $x->priority;
+    } else {
+        return $y->timestamp <=> $x->timestamp;
+    }
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

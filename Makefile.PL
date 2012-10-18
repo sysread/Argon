@@ -13,7 +13,11 @@ WriteMakefile(
       : ()),
     PL_FILES            => {},
     PREREQ_PM => {
-        'Test::More' => 0,
+        'Test::More'           => 0,
+        'Moose'                => 0,
+        'namespace::autoclean' => 0,
+        'AnyEvent'             => 0,
+        'Data::UUID'           => 0,
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean               => { FILES => 'Argon-*' },

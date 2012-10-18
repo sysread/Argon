@@ -33,7 +33,7 @@ until ($queue->is_empty) {
     ok($msg, sprintf('queue get (%d)', $msg->priority));
 
     if (defined $prev) {
-        ok($msg->priority >= $prev->priority, sprintf('queue gets in correct order (%d <= %d)', $msg->priority, $prev->priority));
+        ok($msg <= $prev, sprintf('queue gets in correct order (%d before %d)', $prev->priority, $msg->priority));
     }
 
     $prev = $msg;

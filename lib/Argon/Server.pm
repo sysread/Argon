@@ -1,7 +1,8 @@
 package Argon::Server;
 
-use Carp;
 use Moose;
+use Carp;
+use namespace::autoclean;
 use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
@@ -81,7 +82,6 @@ sub accept {
     });
 }
 
-no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;
