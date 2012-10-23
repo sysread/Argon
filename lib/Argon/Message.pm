@@ -16,7 +16,7 @@ require Storable;
 has 'timestamp' => (
     is       => 'rw',
     isa      => 'Num',
-    default  => \&Time::HiRes::time,
+    default  => sub { Time::HiRes::time() },
 );
 
 # Message id, assigned at system entry point (UUID)

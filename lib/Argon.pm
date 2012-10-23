@@ -34,6 +34,8 @@ our %EXPORT_TAGS = (
         CMD_PENDING
         CMD_COMPLETE
         CMD_ERROR
+        CMD_ADD_NODE
+        CMD_DEL_NODE
     /],
 );
 

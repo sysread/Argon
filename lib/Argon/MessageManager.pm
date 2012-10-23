@@ -60,7 +60,7 @@ has 'avg_processing_time' => (
 #-------------------------------------------------------------------------------
 # Adds a new client object to the manager.
 #-------------------------------------------------------------------------------
-sub add_server {
+sub add_client {
     my ($self, $client) = @_;
     $client->connect(sub {
         push @{$self->servers}, $client;
@@ -73,7 +73,7 @@ sub add_server {
 #-------------------------------------------------------------------------------
 # Removes a client object from the manager.
 #-------------------------------------------------------------------------------
-sub del_server {
+sub del_client {
     my ($self, $client) = @_;
 
     foreach my $id (@{$self->assignments->{$client}}) {

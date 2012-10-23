@@ -3,7 +3,7 @@ package Argon::MessageServer;
 use Moose::Role;
 use Carp;
 use namespace::autoclean;
-use Argon qw/:commands/;
+use Argon qw/:commands EOL CHUNK_SIZE/;
 use Argon::MessageProcessor;
 
 # Maps local msg status to a CMD_* reply (for msg_status)
@@ -11,6 +11,18 @@ my %STATUS_MAP = (
     Argon::MessageProcessor::STATUS_QUEUED,   CMD_PENDING,
     Argon::MessageProcessor::STATUS_ASSIGNED, CMD_PENDING,
     Argon::MessageProcessor::STATUS_COMPLETE, CMD_COMPLETE,
+);
+
+has 'endline' => (
+    is      => 'ro',
+    isa     => 'Str',
+    default => EOL,
+);
+
+has 'chunk_size' => (
+    is      => 'ro',
+    isa     => 'Int',
+    default => CHUNK_SIZE,
 );
 
 # Instance of Argon::Server used to accept messages
@@ -23,7 +35,7 @@ has 'server' => (
 # Configures the server, mapping commands to local methods.
 #-------------------------------------------------------------------------------
 sub build_protocol {
-    my ($self) = @_;
+    my $self = shift;
     $self->server->respond_to(CMD_QUEUE,  $self->reply_queue);
     $self->server->respond_to(CMD_STATUS, $self->reply_status);
 }
