@@ -9,13 +9,14 @@ package Argon::MessageManager;
 use Moose;
 use Carp;
 use namespace::autoclean;
-use Argon      qw/:commands TRACK_MESSAGES/;
 use List::Util qw/sum/;
+use AnyEvent   qw//;
+use Argon      qw/:commands TRACK_MESSAGES/;
 
-require Time::HiRes;
 require Argon::Client;
 
 extends 'Argon::MessageProcessor';
+with    'Argon::QueueManager';
 
 # List of Argon::Client instances
 has 'servers' => (
@@ -58,16 +59,28 @@ has 'avg_processing_time' => (
 );
 
 #-------------------------------------------------------------------------------
+# Required by the QueueManager role, this method processes queue items by
+# assigning them to the next available client.
+#-------------------------------------------------------------------------------
+sub process_message {
+    my ($self, $message) = @_;
+    $self->assign($message, $self->next_client);
+}
+
+#-------------------------------------------------------------------------------
 # Adds a new client object to the manager.
 #-------------------------------------------------------------------------------
 sub add_client {
     my ($self, $client) = @_;
+
     $client->connect(sub {
         push @{$self->servers}, $client;
         $self->assignments->{$client}         = [];
         $self->processing_times->{$client}    = [];
         $self->avg_processing_time->{$client} = 0;
     });
+
+    # TODO: add on_error handler
 }
 
 #-------------------------------------------------------------------------------
@@ -100,10 +113,10 @@ sub estimated_processing_time {
 }
 
 #-------------------------------------------------------------------------------
-# Returns the next most available server.
+# Returns the next most available client.
 # TODO account for servers which may be inaccessible
 #-------------------------------------------------------------------------------
-sub next_server {
+sub next_client {
     my $self = shift;
 
     my %time;
@@ -120,23 +133,23 @@ sub next_server {
 }
 
 #-------------------------------------------------------------------------------
-# Assigns a message to the selected server.
+# Assigns a message to the selected client.
 #-------------------------------------------------------------------------------
 sub assign {
-    my ($self, $msg, $server) = @_;
-    push @{$self->assignments->{$server}}, $msg->id;
+    my ($self, $msg, $client) = @_;
+    push @{$self->assignments->{$client}}, $msg->id;
 
     $self->msg_assigned($msg);
-    my $sent = Time::HiRes::time();
+    my $sent = AnyEvent->now;
 
-    $server->send($msg, sub {
-        my $msg = shift;
+    $client->send($msg, sub {
+        my ($client, $msg) = @_;
 
-        push @{$self->processing_times->{$server}}, (Time::HiRes::time() - $sent);
-        shift @{$self->processing_times->{$server}}
-            if @{$self->processing_times->{$server}} > TRACK_MESSAGES;
+        push @{$self->processing_times->{$client}}, (AnyEvent->now - $sent);
+        shift @{$self->processing_times->{$client}}
+            if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
 
-        $self->avg_processing_time->{$server} = sum(@{$self->processing_times->{$server}}) / TRACK_MESSAGES;
+        $self->avg_processing_time->{$client} = sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES;
         $self->msg_complete($msg);
     });
 }

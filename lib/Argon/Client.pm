@@ -9,12 +9,40 @@ use AnyEvent::Socket;
 use Argon qw/:defaults/;
 require Argon::Message;
 
-has 'port'          => (is => 'ro', isa => 'Int', required => 1);
-has 'host'          => (is => 'ro', isa => 'Str', required => 1);
-has 'endline'       => (is => 'ro', isa => 'Str', default => EOL);
-has 'chunk_size'    => (is => 'ro', isa => 'Int', default => CHUNK_SIZE);
-has 'on_error'      => (is => 'rw', isa => 'CodeRef');
-has 'handle'        => (is => 'rw', isa => 'AnyEvent::Handle', init_arg => undef);
+has 'port' => (
+    is       => 'ro',
+    isa      => 'Int',
+    required => 1,
+);
+
+has 'host' => (
+    is       => 'ro',
+    isa      => 'Str',
+    required => 1,
+);
+
+has 'endline' => (
+    is      => 'ro',
+    isa     => 'Str',
+    default => EOL,
+);
+
+has 'chunk_size' => (
+    is      => 'ro',
+    isa     => 'Int',
+    default => CHUNK_SIZE,
+);
+
+has 'on_error' => (
+    is  => 'rw',
+    isa => 'CodeRef',
+);
+
+has 'handle' => (
+    is       => 'rw',
+    isa      => 'AnyEvent::Handle',
+    init_arg => undef,
+);
 
 sub connect {
     my ($self, $cb) = @_;
@@ -42,7 +70,7 @@ sub send {
         $self->handle->push_read(line => sub {
             my ($handle, $line, $eol) = @_;
             my $message = Argon::Message::decode($line);
-            $cb->($message);
+            $cb->($self, $message);
         });
     });
 }

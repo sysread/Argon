@@ -27,18 +27,20 @@ has 'chunk_size' => (
 
 # Instance of Argon::Server used to accept messages
 has 'server' => (
-    is  => 'ro',
-    isa => 'Argon::Server',
+    is       => 'ro',
+    isa      => 'Argon::Server',
+    required => 1,
 );
 
 #-------------------------------------------------------------------------------
 # Configures the server, mapping commands to local methods.
 #-------------------------------------------------------------------------------
-sub build_protocol {
+sub BUILD {}
+after 'BUILD' => sub {
     my $self = shift;
     $self->server->respond_to(CMD_QUEUE,  $self->reply_queue);
     $self->server->respond_to(CMD_STATUS, $self->reply_status);
-}
+};
 
 #-------------------------------------------------------------------------------
 # Replies to request to queue a new message.

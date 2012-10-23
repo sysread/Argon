@@ -9,13 +9,44 @@ use AnyEvent::Socket;
 use Argon::Message;
 use Argon qw/:defaults/;
 
-has 'port'          => (is => 'ro', isa => 'Int');
-has 'host'          => (is => 'ro', isa => 'Str');
-has 'endline'       => (is => 'ro', isa => 'Str', default => EOL);
-has 'chunk_size'    => (is => 'ro', isa => 'Int', default => CHUNK_SIZE);
-has 'on_error'      => (is => 'rw', isa => 'CodeRef', required => 1);
-has 'callback'      => (is => 'rw', isa => 'HashRef', init_arg => undef, default => sub { {} });
-has 'server'        => (is => 'rw', init_arg => undef);
+has 'port' => (
+    is  => 'ro',
+    isa => 'Int',
+);
+
+has 'host' => (
+    is  => 'ro',
+    isa => 'Str',
+);
+
+has 'endline' => (
+    is      => 'ro',
+    isa     => 'Str',
+    default => EOL,
+);
+
+has 'chunk_size' => (
+    is      => 'ro',
+    isa     => 'Int',
+    default => CHUNK_SIZE,
+);
+
+has 'on_error' => (
+    is       => 'rw',
+    isa      => 'CodeRef',
+);
+
+has 'callback' => (
+    is       => 'rw',
+    isa      => 'HashRef',
+    init_arg => undef,
+    default  => sub { {} },
+);
+
+has 'server' => (
+    is       => 'rw',
+    init_arg => undef,
+);
 
 sub respond_to {
     my ($self, $command, $cb) = @_;

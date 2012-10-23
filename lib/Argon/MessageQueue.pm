@@ -61,13 +61,13 @@ sub get {
     # Replace root of heap with last element on the heap
     unshift @$data, pop @$data;
     --$self->{size};
-    
+
     # Sift down
     my $last_idx = $self->{size} - 1;
     my $idx      = 0;
     my $left     = left($idx);
     my $right    = right($idx);
-    
+
     while ($idx < $last_idx) {
         my $min;
         if ($left > $last_idx && $right > $last_idx) {
@@ -81,7 +81,7 @@ sub get {
                 ? $left
                 : $right;
         }
-        
+
         if ($data->[$idx] < $data->[$min]) {
             my $tmp = $data->[$min];
             $data->[$min] = $data->[$idx];
