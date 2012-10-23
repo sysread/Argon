@@ -36,6 +36,7 @@ our %EXPORT_TAGS = (
         CMD_ERROR
         CMD_ADD_NODE
         CMD_DEL_NODE
+        CMD_SHUTDOWN
     /],
 );
 
@@ -73,5 +74,6 @@ use constant CMD_REJECTED => 6;  # Response - message was rejected
 use constant CMD_ERROR    => 7;  # Response - error processing message or invalid message format
 use constant CMD_ADD_NODE => 8;  # Add a node to a cluster
 use constant CMD_DEL_NODE => 9;  # Remove a node from a cluster
+use constant CMD_SHUTDOWN => 10; # Shutdown a worker process
 
 1;
