@@ -23,6 +23,8 @@ our %EXPORT_TAGS = (
 
     # Priorities
     'priorities' => [qw/PRI_REAL PRI_HIGH PRI_NORMAL PRI_LOW PRI_IGNORE/],
+    
+    'statuses' => [qw/STATUS_QUEUED STATUS_ASSIGNED STATUS_COMPLETE/],
 
     # Command verbs and responses
     'commands'   => [qw/
@@ -60,6 +62,13 @@ use constant PRI_HIGH    => 1;
 use constant PRI_NORMAL  => 2;
 use constant PRI_LOW     => 3;
 use constant PRI_IGNORE  => 4;
+
+#-------------------------------------------------------------------------------
+# Message states
+#-------------------------------------------------------------------------------
+use constant STATUS_QUEUED   => 0;
+use constant STATUS_ASSIGNED => 1;
+use constant STATUS_COMPLETE => 2;
 
 #-------------------------------------------------------------------------------
 # Commands

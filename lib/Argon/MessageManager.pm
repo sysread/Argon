@@ -16,7 +16,6 @@ use Argon      qw/:commands TRACK_MESSAGES/;
 require Argon::Client;
 
 extends 'Argon::MessageProcessor';
-with    'Argon::QueueManager';
 
 # List of Argon::Client instances
 has 'servers' => (
@@ -59,12 +58,42 @@ has 'avg_processing_time' => (
 );
 
 #-------------------------------------------------------------------------------
-# Required by the QueueManager role, this method processes queue items by
-# assigning them to the next available client.
+# Alters the behavior of msg_accept to assign the message to the next available
+# client. If no client is available, returns false and does not accept the
+# message.
 #-------------------------------------------------------------------------------
-sub process_message {
-    my ($self, $message) = @_;
-    $self->assign($message, $self->next_client);
+around 'msg_accept' => sub {
+    my ($orig, $self, $msg) = @_;
+    my $client = $self->next_client;
+    if ($client) {
+        $self->$orig->($msg);
+        $self->assign_message($msg, $client);
+    } else {
+        croak 'No node is available to process the request';
+    }
+};
+
+#-------------------------------------------------------------------------------
+# Assigns a message to a client. By default, this method is called directly
+# from msg_accept.
+#-------------------------------------------------------------------------------
+sub assign_message {
+    my ($self, $msg, $client) = @_;
+
+    push @{$self->assignments->{$client}}, $msg->id;
+    $self->msg_assigned($msg);
+    my $sent = AnyEvent->now;
+
+    $client->send($msg, sub {
+        my ($client, $msg) = @_;
+
+        push @{$self->processing_times->{$client}}, (AnyEvent->now - $sent);
+        shift @{$self->processing_times->{$client}}
+            if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
+
+        $self->avg_processing_time->{$client} = sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES;
+        $self->msg_complete($msg);
+    });
 }
 
 #-------------------------------------------------------------------------------
@@ -130,28 +159,6 @@ sub next_client {
     }
 
     return $least;
-}
-
-#-------------------------------------------------------------------------------
-# Assigns a message to the selected client.
-#-------------------------------------------------------------------------------
-sub assign {
-    my ($self, $msg, $client) = @_;
-    push @{$self->assignments->{$client}}, $msg->id;
-
-    $self->msg_assigned($msg);
-    my $sent = AnyEvent->now;
-
-    $client->send($msg, sub {
-        my ($client, $msg) = @_;
-
-        push @{$self->processing_times->{$client}}, (AnyEvent->now - $sent);
-        shift @{$self->processing_times->{$client}}
-            if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
-
-        $self->avg_processing_time->{$client} = sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES;
-        $self->msg_complete($msg);
-    });
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -1,35 +1,15 @@
 #-------------------------------------------------------------------------------
-# MessageProcessors queue and track message status.
+# MessageProcessors track message status.
 #-------------------------------------------------------------------------------
 package Argon::MessageProcessor;
 
 use Moose;
 use Carp;
 use namespace::autoclean;
-use Argon qw/:commands/;
+use Argon qw/:commands :statuses/;
 
 require Argon::MessageQueue;
 require Argon::Message;
-
-use constant STATUS_QUEUED   => 0;
-use constant STATUS_ASSIGNED => 1;
-use constant STATUS_COMPLETE => 2;
-
-# Max number of messages that can be queued
-has 'queue_limit' => (
-    is       => 'ro',
-    isa      => 'Int',
-    required => 1,
-);
-
-# Incoming message queue
-has 'queue' => (
-    is       => 'ro',
-    isa      => 'Argon::MessageQueue',
-    init_arg => undef,
-    lazy     => 1,
-    default  => sub { Argon::MessageQueue->new(limit => $_[0]->queue_limit) },
-);
 
 # Hash of msg id => msg
 has 'message' => (
@@ -48,22 +28,12 @@ has 'status' => (
 );
 
 #-------------------------------------------------------------------------------
-# Adds a message to the queue and begins internal tracking.
+# When a message has been accepted, this method is called to updated tracking.
 #-------------------------------------------------------------------------------
-sub msg_queue {
+sub msg_accept {
     my ($self, $msg) = @_;
-
-    if ($self->queue->is_full) {
-        return 0;
-    } else {
-        $msg->update_timestamp;
-        $self->queue->put($msg);
-
-        $self->message->{$msg->id} = $msg;
-        $self->status->{$msg->id}  = STATUS_QUEUED;
-
-        return 1;
-    }
+    $self->message->{$msg->id} = $msg;
+    $self->status->{$msg->id}  = STATUS_QUEUED;
 }
 
 #-------------------------------------------------------------------------------
@@ -93,7 +63,6 @@ sub msg_clear {
     undef $self->message->{$msg->id};
     undef $self->status->{$msg->id};
 }
-
 
 __PACKAGE__->meta->make_immutable;
 

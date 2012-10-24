@@ -3,14 +3,17 @@ package Argon::MessageServer;
 use Moose::Role;
 use Carp;
 use namespace::autoclean;
-use Argon qw/:commands EOL CHUNK_SIZE/;
+use Argon qw/:commands :statuses EOL CHUNK_SIZE/;
 use Argon::MessageProcessor;
+
+requires 'msg_accept';
+requires 'status';
 
 # Maps local msg status to a CMD_* reply (for msg_status)
 my %STATUS_MAP = (
-    Argon::MessageProcessor::STATUS_QUEUED,   CMD_PENDING,
-    Argon::MessageProcessor::STATUS_ASSIGNED, CMD_PENDING,
-    Argon::MessageProcessor::STATUS_COMPLETE, CMD_COMPLETE,
+    STATUS_QUEUED,   CMD_PENDING,
+    STATUS_ASSIGNED, CMD_PENDING,
+    STATUS_COMPLETE, CMD_COMPLETE,
 );
 
 has 'endline' => (
@@ -43,11 +46,20 @@ after 'BUILD' => sub {
 };
 
 #-------------------------------------------------------------------------------
-# Replies to request to queue a new message.
+# Replies to request to accept/queue a new message.
 #-------------------------------------------------------------------------------
 sub reply_queue {
     my ($self, $msg) = @_;
-    return $msg->reply($self->msg_queue($msg) ? CMD_ACK : CMD_REJECTED);
+    eval { $self->msg_accept($msg) };
+    if ($@) {
+        my $error = $@;
+        my $reply = $msg->reply(CMD_REJECTED);
+        $reply->set_payload($error);
+        return $reply;
+    } else {
+        return $msg->reply(CMD_ACK);
+    }
+    return $msg->reply($self->msg_accept($msg) ? CMD_ACK : CMD_REJECTED);
 }
 
 #-------------------------------------------------------------------------------
@@ -55,8 +67,13 @@ sub reply_queue {
 #-------------------------------------------------------------------------------
 sub reply_status {
     my ($self, $msg) = @_;
-    return $msg->reply(CMD_ERROR) if !exists $self->status->{$msg->id};
-    return $msg->reply($STATUS_MAP{$self->status->{$msg->id}});
+    if (exists $self->status->{$msg->id}) {
+        return $msg->reply($STATUS_MAP{$self->status->{$msg->id}});
+    } else {
+        my $reply = $msg->reply(CMD_ERROR);
+        $reply->set_payload('Unknown message ID');
+        return $reply;
+    }
 }
 
 __PACKAGE__->meta->make_immutable;
