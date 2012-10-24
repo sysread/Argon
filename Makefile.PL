@@ -17,6 +17,7 @@ WriteMakefile(
         'Moose'                => 0,
         'namespace::autoclean' => 0,
         'AnyEvent'             => 0,
+        'AnyEvent::Subprocess' => 0,
         'Data::UUID'           => 0,
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },

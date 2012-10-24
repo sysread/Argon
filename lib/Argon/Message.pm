@@ -3,8 +3,8 @@ package Argon::Message;
 use Moose;
 use Carp;
 use namespace::autoclean;
-use AnyEvent qw//;
-use Argon    qw/:priorities MESSAGE_SEPARATOR/;
+use Argon       qw/:priorities MESSAGE_SEPARATOR/;
+use Time::HiRes qw/time/;
 use overload '<=>'  => \&compare;
 use overload 'bool' => sub { defined $_[0] };
 
@@ -16,7 +16,7 @@ require Storable;
 has 'timestamp' => (
     is       => 'rw',
     isa      => 'Num',
-    default  => sub { AnyEvent->now },
+    default  => sub { time },
 );
 
 # Message id, assigned at system entry point (UUID)
@@ -58,7 +58,7 @@ has 'encoded' => (
 
 
 sub update_timestamp {
-    $_[0]->created(AnyEvent->new);
+    $_[0]->created(time);
 }
 
 sub payload {

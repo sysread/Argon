@@ -14,6 +14,7 @@ package Argon::Worker;
 use Moose;
 use Carp;
 use namespace::autoclean;
+use Data::Dumper   qw//;
 use Argon          qw/:commands EOL/;
 use Argon::Message qw//;
 
@@ -45,6 +46,7 @@ sub _build_dispatch_table {
     my $self = shift;
     return { 
         CMD_SHUTDOWN, 'handle_shutdown',
+        CMD_QUEUE,    'handle_queue',
     };
 }
 
@@ -71,12 +73,20 @@ sub dispatch {
     my $method  = $self->can($handler);
 
     if ($method) {
-        return $self->$method->($message);
+        my $result = eval { $self->$method->($message) };
+        if ($@) {
+            my $error = $@;
+            my $reply = $message->reply(CMD_ERROR);
+            $reply->set_payload($error);
+            return $reply;
+        } else {
+            return $result;
+        }
     } else {
         my $error = sprintf 'Command not handled: %s', $message->command;
-        my $response = $method->reply(CMD_ERROR);
-        $response->set_payload($error);
-        return $response;
+        my $reply = $method->reply(CMD_ERROR);
+        $reply->set_payload($error);
+        return $reply;
     }
 }
 
@@ -84,8 +94,28 @@ sub dispatch {
 # Configures worker to exit the work loop.
 #-------------------------------------------------------------------------------
 sub handle_shutdown {
-    my $self = shift;
+    my ($self, $message) = @_;
     $self->shutdown(1);
+    return $message->reply(CMD_ACK);
+}
+
+#-------------------------------------------------------------------------------
+# Processes a message as a work unit. A work unit is defined as an instance of
+# a class supporting a "run" method.
+#-------------------------------------------------------------------------------
+sub handle_queue {
+    my ($self, $message) = @_;
+    my $payload = $message->get_payload;
+    my $result  = eval { $payload->run };
+    
+    if ($@) {
+        my $error = $@;
+        my $reply = $message->reply(CMD_ERROR);
+        $reply->set_payload($error);
+        return $reply;
+    } else {
+        return $result;
+    }
 }
 
 __PACKAGE__->meta->make_immutable;
