@@ -25,7 +25,6 @@ has 'workers' => (
     is       => 'rw',
     isa      => 'ArrayRef',
     init_arg => undef,
-    default  => sub {[]},
     lazy     => 1,
     builder  => 'initialize_workers',
 );
