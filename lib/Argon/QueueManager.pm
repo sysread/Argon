@@ -48,8 +48,15 @@ after 'BEGIN' => sub {
         after => 0,
         cb => sub {
             until ($self->queue->is_empty) {
-                $self->assign_message($self->queue->get)
-                    or last;
+                # Attempt to assign the message at the top of the queue. If
+                # successful, remove from the queue. Otherwise, stop processing
+                # messages.
+                my $msg = $self->queue->top;
+                if ($self->assign_message($msg)) {
+                    $self->queue->get;
+                } else {
+                    last;
+                }
             }
         }
     ));

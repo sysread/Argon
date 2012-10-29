@@ -27,6 +27,15 @@ sub fill     { ($_[0]->{size} / $_[0]->{limit}) * 100 }
 sub is_full  { $_[0]->{size} >= $_[0]->{limit} }
 sub is_empty { $_[0]->{size} == 0 }
 
+#-------------------------------------------------------------------------------
+# Returns the topmost item in the queue without removing it from the queue.
+#-------------------------------------------------------------------------------
+sub top {
+    my $self = shift;
+    croak 'Queue is empty' if $self->is_empty;
+    return $self->{data}[0];
+}
+
 sub put {
     my ($self, $msg) = @_;
     croak 'Queue is full' if $self->is_full;
