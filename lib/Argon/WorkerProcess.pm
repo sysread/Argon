@@ -13,7 +13,7 @@ use AnyEvent::Handle     qw//;
 use AnyEvent::Subprocess qw//;
 use IPC::Open3           qw/open3/;
 use Symbol               qw/gensym/;
-use Argon                qw/:commands EOL/;
+use Argon                qw/:commands LOG EOL/;
 use Argon::Worker        qw//;
 
 has 'endline' => (
@@ -28,7 +28,17 @@ has 'process' => (
     init_arg => undef,
 );
 
-has 'delegate' => (
+has 'stdin' => (
+    is       => 'rw',
+    init_arg => undef,
+);
+
+has 'stdout' => (
+    is       => 'rw',
+    init_arg => undef,
+);
+
+has 'stderr' => (
     is       => 'rw',
     init_arg => undef,
 );
@@ -42,26 +52,37 @@ has 'pending' => (
 );
 
 sub spawn {
-    my ($self, %param) = @_;
-    my $on_success     = $param{on_success};
-    my $on_error       = $param{on_error};
-    my $eol            = $self->eol;
+    my $self = shift;
+    my $eol  = $self->endline;
 
     my $proc = AnyEvent::Subprocess->new(
         delegates => [qw/StandardHandles/],
-        on_completion => sub {
-            my $cb = $_[0]->is_success ? $on_success : $on_error;
-            $cb->($self) if ref $cb eq 'CODE';
-        },
-        code => sub {
+        code      => sub {
             my $worker = Argon::Worker->new(eol => $eol);
             $worker->loop;
             exit 0;
         },
     );
 
+    my $run = $proc->run;
     $self->process($proc);
-    $self->delegate($proc->run);
+    $self->stdin($run->delegate('stdin')->handle);
+    $self->stdout($run->delegate('stdout')->handle);
+    $self->stderr($run->delegate('stderr')->handle); # TODO add listener and LOG messages
+
+    $self->stderr->on_read(sub {
+        my @start_request;
+
+        @start_request = (
+            line => sub {
+                my ($handle, $line, $eol) = @_;
+                warn "$line\n";
+                $self->stderr->push_read(@start_request);
+            }
+        );
+
+        $self->stderr->push_read(@start_request);
+    });
 }
 
 #-------------------------------------------------------------------------------
@@ -73,14 +94,18 @@ sub spawn {
 sub send {
     my ($self, $message, $callback) = @_;
     croak 'Worker is busy' if $self->pending;
-    $self->pending->($message->{id});
-    $self->delegate->('stdin')->push_write($message->encode . $self->eol);
-    $self->delegate->('stdout')->push_read(line => sub {
+
+    $self->pending($message->id);
+
+    $self->stdout->push_read(line => sub {
         my ($handle, $line, $eol) = @_;
+        LOG("Worker response: %s", $line);
         my $response = Argon::Message::decode($line);
         $self->clear_pending; # TODO check that response message id matches pending
         $callback->($response);
     });
+
+    $self->stdin->push_write($message->encode . $self->endline);
 }
 
 

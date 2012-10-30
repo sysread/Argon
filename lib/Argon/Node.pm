@@ -8,6 +8,7 @@ package Argon::Node;
 use Moose;
 use Carp;
 use namespace::autoclean;
+use Argon;
 
 require Argon::WorkerProcess;
 
@@ -25,8 +26,7 @@ has 'workers' => (
     is       => 'rw',
     isa      => 'ArrayRef',
     init_arg => undef,
-    lazy     => 1,
-    builder  => 'initialize_workers',
+    default  => sub { [] },
 );
 
 #-------------------------------------------------------------------------------
@@ -46,17 +46,11 @@ sub spawn_worker {
 #      is unsuccessful. Is this behavior different from an error spawning a
 #      worker process when already running?
 #-------------------------------------------------------------------------------
-sub initialize_workers {
+sub initialize {
     my $self = shift;
     for (1 .. $self->concurrency) {
-        $self->spawn_worker(
-            on_success => sub {
-                push @{$self->workers}, shift;
-            },
-            on_error => sub {
-                warn "Bad exit status when spawning worker process.";
-            },
-        );
+        LOG("Spawning worker #%d", $_);
+        push @{$self->workers}, $self->spawn_worker();
     }
 }
 
@@ -68,7 +62,13 @@ sub assign_message {
     my ($self, $message) = @_;
     foreach my $worker (@{$self->workers}) {
         unless ($worker->has_pending) {
-            $worker->send($message, sub { $self->msg_complete(shift) });
+            $worker->send($message, sub {
+                my $msg = shift;
+                LOG("Message complete: %s", $msg->id);
+                $self->msg_complete($msg);
+            });
+
+            LOG("Message assigned: %s", $message->id);
             return 1;
         }
     }

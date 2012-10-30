@@ -7,7 +7,7 @@ use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
 use Argon::Message;
-use Argon qw/:defaults/;
+use Argon qw/LOG :defaults/;
 
 has 'port' => (
     is  => 'ro',
@@ -54,8 +54,14 @@ sub respond_to {
 }
 
 sub start {
-    my $self = shift;
-    $self->server(tcp_server $self->host, $self->port, sub { $self->accept(@_) });
+    my $self   = shift;
+    my $server = tcp_server(
+        $self->host,
+        $self->port,
+        sub { $self->accept(@_) },
+        sub { LOG("Listening on port %d", $self->port) }
+    );
+    $self->server($server);
 }
 
 sub stop {
@@ -64,16 +70,16 @@ sub stop {
 
 sub accept {
     my ($self, $fh, $host, $port) = @_;
-    warn "-client connected from $host:$port\n";
+    LOG("client connected from %s:%d", $host, $port);
 
     my $handle = AnyEvent::Handle->new(
         fh       => $fh,
         on_eof   => sub {
-            warn "-client disconnected\n";
+            LOG("client disconnected");
         },
         on_error => sub {
             my $msg = $_[2];
-            warn "-error: $msg\n";
+            LOG("error: $msg");
         },
     );
 
@@ -85,7 +91,7 @@ sub accept {
                 my ($handle, $line, $eol) = @_;
                 my $message = Argon::Message::decode($line);
                 my ($response, $error);
-
+                
                 if (exists $self->callback->{$message->command}) {
                     $response = eval { $self->callback->{$message->command}->($message) };
                     $error = sprintf('Application Error: %s', $@)
@@ -94,8 +100,13 @@ sub accept {
                     $error = sprintf('Protocol Error: command not recognized [%s]', $message->command);
                 }
 
-                $response = $self->on_error->($error, $message)
-                    if $error;
+                if ($error) {
+                    if ($self->on_error) {
+                        $response = $self->on_error->($error, $message);
+                    } else {
+                        LOG("an error occurred: %s", $error);
+                    }
+                }
 
                 $handle->push_write($response->encode . $self->endline);
                 $handle->push_read(@start_request);

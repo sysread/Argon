@@ -5,13 +5,13 @@
 #    1) the queue is empty
 #    2) process_message returns false
 #-------------------------------------------------------------------------------
-package QueueManager;
+package Argon::QueueManager;
 
 use Moose::Role;
 use Carp;
 use namespace::autoclean;
 use AnyEvent qw//;
-use Argon    qw/:statuses/;
+use Argon    qw/LOG :statuses/;
 
 requires 'assign_message';
 requires 'msg_accept';
@@ -33,15 +33,15 @@ has 'queue' => (
 );
 
 has 'queue_timer' => (
-    is       => 'ro',
+    is       => 'rw',
     init_arg => undef,
 );
 
 #-------------------------------------------------------------------------------
 # Adds a timer that polls the queue and attempts to assign any queued tasks.
 #-------------------------------------------------------------------------------
-sub BEGIN {};
-after 'BEGIN' => sub {
+sub BUILD {}
+after 'BUILD' => sub {
     my $self = shift;
     $self->queue_timer(AnyEvent->timer(
         interval => 0.25,
@@ -68,16 +68,13 @@ after 'BEGIN' => sub {
 #-------------------------------------------------------------------------------
 around 'msg_accept' => sub {
     my ($orig, $self, $msg) = @_;
-    
-    if ($self->queue->is_full) {
+    if ($self->queue->is_full || !$self->$orig($msg)) {
         return 0;
     } else {
         $msg->update_timestamp;
         $self->queue->put($msg);
-        $self->$orig->($msg);
+        return 1;
     }
 };
-
-__PACKAGE__->meta->make_immutable;
 
 1;

@@ -15,7 +15,7 @@ use Moose;
 use Carp;
 use namespace::autoclean;
 use Data::Dumper   qw//;
-use Argon          qw/:commands EOL/;
+use Argon          qw/:commands LOG EOL/;
 use Argon::Message qw//;
 
 has 'endline' => (
@@ -26,7 +26,7 @@ has 'endline' => (
 
 has 'shutdown' => (
     is       => 'rw',
-    isa      => 'Boolean',
+    isa      => 'Bool',
     default  => 0,
     init_arg => undef,
 );
@@ -56,10 +56,21 @@ sub _build_dispatch_table {
 sub loop {
     my $self = shift;
     local $| = 1; # enable auto-flush
+    LOG("Worker PID %d started", $$);
+ 
     until ($self->shutdown) {
-        my $message = Argon::Message::decode(<STDIN>);
-        my $result  = $self->dispatch($message);
-        print $result->encode . $self->endline;
+        my $line     = <STDIN>;
+        my $message  = Argon::Message::decode($line);
+        my $response = eval { $self->dispatch($message) };
+        
+        if ($@) {
+            my $error = $@;
+            LOG($error);
+            $response = $message->reply(CMD_ERROR);
+            $response->set_payload($error);
+        }
+        
+        print $response->encode . $self->endline;
     }
 }
 
@@ -68,26 +79,16 @@ sub loop {
 #-------------------------------------------------------------------------------
 sub dispatch {
     my ($self, $message) = @_;
+    LOG("Dispatching message: %s", $message->id);
+
     my $command = $message->command;
     my $handler = $self->handler->{$command};
-    my $method  = $self->can($handler);
+    LOG("Handler: $handler");
 
-    if ($method) {
-        my $result = eval { $self->$method->($message) };
-        if ($@) {
-            my $error = $@;
-            my $reply = $message->reply(CMD_ERROR);
-            $reply->set_payload($error);
-            return $reply;
-        } else {
-            return $result;
-        }
-    } else {
-        my $error = sprintf 'Command not handled: %s', $message->command;
-        my $reply = $method->reply(CMD_ERROR);
-        $reply->set_payload($error);
-        return $reply;
-    }
+    croak(sprintf 'Command not handled: %s', $message->command)
+        unless $handler;
+
+    return $self->$handler($message);
 }
 
 #-------------------------------------------------------------------------------
@@ -102,11 +103,17 @@ sub handle_shutdown {
 #-------------------------------------------------------------------------------
 # Processes a message as a work unit. A work unit is defined as an instance of
 # a class supporting a "run" method.
+# TODO create WorkUnit class or similar to encapsulate work format of [class, [args, ...]]
 #-------------------------------------------------------------------------------
 sub handle_queue {
     my ($self, $message) = @_;
     my $payload = $message->get_payload;
-    my $result  = eval { $payload->run };
+    my ($class, $params) = @$payload;
+    
+    my $result = eval {
+        require $class;
+        $class->new(@$params)->run;
+    };
     
     if ($@) {
         my $error = $@;
@@ -114,7 +121,9 @@ sub handle_queue {
         $reply->set_payload($error);
         return $reply;
     } else {
-        return $result;
+        my $reply = $message->reply(CMD_COMPLETE);
+        $reply->set_payload($result);
+        return $reply;
     }
 }
 

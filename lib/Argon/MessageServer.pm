@@ -3,7 +3,7 @@ package Argon::MessageServer;
 use Moose::Role;
 use Carp;
 use namespace::autoclean;
-use Argon qw/:commands :statuses EOL CHUNK_SIZE/;
+use Argon qw/:commands :statuses LOG EOL CHUNK_SIZE/;
 use Argon::MessageProcessor;
 
 requires 'msg_accept';
@@ -41,8 +41,8 @@ has 'server' => (
 sub BUILD {}
 after 'BUILD' => sub {
     my $self = shift;
-    $self->server->respond_to(CMD_QUEUE,  $self->reply_queue);
-    $self->server->respond_to(CMD_STATUS, $self->reply_status);
+    $self->server->respond_to(CMD_QUEUE,  sub { $self->reply_queue(@_)  });
+    $self->server->respond_to(CMD_STATUS, sub { $self->reply_status(@_) });
 };
 
 #-------------------------------------------------------------------------------
@@ -50,16 +50,17 @@ after 'BUILD' => sub {
 #-------------------------------------------------------------------------------
 sub reply_queue {
     my ($self, $msg) = @_;
-    eval { $self->msg_accept($msg) };
+    my $accepted = eval { $self->msg_accept($msg) };
     if ($@) {
         my $error = $@;
+        LOG("Error accepting message %s: %s", $msg->id, $error);
         my $reply = $msg->reply(CMD_REJECTED);
         $reply->set_payload($error);
         return $reply;
     } else {
-        return $msg->reply(CMD_ACK);
+        my $reply = $msg->reply($accepted ? CMD_ACK : CMD_REJECTED);
+        return $reply;
     }
-    return $msg->reply($self->msg_accept($msg) ? CMD_ACK : CMD_REJECTED);
 }
 
 #-------------------------------------------------------------------------------
@@ -75,7 +76,5 @@ sub reply_status {
         return $reply;
     }
 }
-
-__PACKAGE__->meta->make_immutable;
 
 1;

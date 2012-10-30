@@ -3,7 +3,7 @@ package Argon::Message;
 use Moose;
 use Carp;
 use namespace::autoclean;
-use Argon       qw/:priorities MESSAGE_SEPARATOR/;
+use Argon       qw/:priorities LOG MESSAGE_SEPARATOR/;
 use Time::HiRes qw/time/;
 use overload '<=>'  => \&compare;
 use overload 'bool' => sub { defined $_[0] };
@@ -58,7 +58,8 @@ has 'encoded' => (
 
 
 sub update_timestamp {
-    $_[0]->created(time);
+    my $self = shift;
+    $self->timestamp(time);
 }
 
 sub payload {
@@ -89,13 +90,14 @@ sub get_payload {
 
 sub encode {
     my $self = shift;
-    return join(MESSAGE_SEPARATOR, $self->command, $self->priority, $self->id, $self->timestamp, $self->encoded);
+    my $payload = $self->encoded || '-';
+    return join(MESSAGE_SEPARATOR, $self->command, $self->priority, $self->id, $self->timestamp, $payload);
 }
 
 sub decode {
     my ($cmd, $pri, $id, $timestamp, $payload) = split MESSAGE_SEPARATOR, $_[0];
     my $msg = Argon::Message->new(command => $cmd, priority => $pri, id => $id, timestamp => $timestamp);
-    $msg->encoded($payload);
+    $msg->encoded($payload) if $payload ne '-';
     return $msg;
 }
 
@@ -106,7 +108,7 @@ sub decode {
 #-------------------------------------------------------------------------------
 sub reply {
     my ($self, $cmd, $include_payload) = @_;
-    my $msg = Argon::Message->new(cmd => $cmd, id => $self->id, priority => $self->priority);
+    my $msg = Argon::Message->new(command => $cmd, id => $self->id, priority => $self->priority);
     $msg->encoded($self->encoded) if $include_payload;
     return $msg;
 }

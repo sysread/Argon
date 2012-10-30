@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use Carp;
 use namespace::autoclean;
+use POSIX qw/strftime/;
 
 require Exporter;
 use base qw/Exporter/;
@@ -43,6 +44,14 @@ our %EXPORT_TAGS = (
 );
 
 our @EXPORT_OK = map { @$_ } values %EXPORT_TAGS;
+our @EXPORT    = qw/LOG/;
+
+sub LOG {
+    my ($format, @args) = @_;
+    chomp $format;
+    my $ts = strftime("%Y-%m-%d %H:%M:%S", localtime);
+    warn sprintf("[%d] [%s] $format\n", $$, $ts, @args);
+}
 
 #-------------------------------------------------------------------------------
 # Defaults

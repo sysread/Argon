@@ -6,7 +6,7 @@ package Argon::MessageProcessor;
 use Moose;
 use Carp;
 use namespace::autoclean;
-use Argon qw/:commands :statuses/;
+use Argon qw/LOG :commands :statuses/;
 
 require Argon::MessageQueue;
 require Argon::Message;
@@ -34,6 +34,7 @@ sub msg_accept {
     my ($self, $msg) = @_;
     $self->message->{$msg->id} = $msg;
     $self->status->{$msg->id}  = STATUS_QUEUED;
+    return 1;
 }
 
 #-------------------------------------------------------------------------------
@@ -43,6 +44,7 @@ sub msg_assigned {
     my ($self, $msg) = @_;
     $self->message->{$msg->id} = $msg;
     $self->status->{$msg->id}  = STATUS_ASSIGNED;
+    return 1;
 }
 
 #-------------------------------------------------------------------------------
@@ -52,6 +54,7 @@ sub msg_complete {
     my ($self, $msg) = @_;
     $self->message->{$msg->id} = $msg;
     $self->status->{$msg->id}  = STATUS_COMPLETE;
+    return 1;
 }
 
 #-------------------------------------------------------------------------------
@@ -62,6 +65,7 @@ sub msg_clear {
     my ($self, $msg) = @_;
     undef $self->message->{$msg->id};
     undef $self->status->{$msg->id};
+    return 1;
 }
 
 __PACKAGE__->meta->make_immutable;
