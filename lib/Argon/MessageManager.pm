@@ -85,7 +85,7 @@ sub assign_message {
     my $sent = AnyEvent->now;
 
     $client->send($msg, sub {
-        my ($client, $msg) = @_;
+        my $msg = shift;
 
         push @{$self->processing_times->{$client}}, (AnyEvent->now - $sent);
         shift @{$self->processing_times->{$client}}

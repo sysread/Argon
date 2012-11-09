@@ -59,13 +59,14 @@ sub msg_complete {
 
 #-------------------------------------------------------------------------------
 # When a complete message is collected, this method is called to clear tracking
-# data.
+# data. Returns the last stored version of the message.
 #-------------------------------------------------------------------------------
 sub msg_clear {
     my ($self, $msg) = @_;
+    my $result = $self->message->{$msg->id};
     undef $self->message->{$msg->id};
     undef $self->status->{$msg->id};
-    return 1;
+    return $result;
 }
 
 __PACKAGE__->meta->make_immutable;

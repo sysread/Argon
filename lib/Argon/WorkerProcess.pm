@@ -76,7 +76,7 @@ sub spawn {
         @start_request = (
             line => sub {
                 my ($handle, $line, $eol) = @_;
-                warn "$line\n";
+                warn "$line\n"; # re-emit stderr lines
                 $self->stderr->push_read(@start_request);
             }
         );
@@ -94,12 +94,15 @@ sub spawn {
 sub send {
     my ($self, $message, $callback) = @_;
     croak 'Worker is busy' if $self->pending;
+    
+    unless ($message) {
+        Carp::confess;
+    }
 
     $self->pending($message->id);
 
     $self->stdout->push_read(line => sub {
         my ($handle, $line, $eol) = @_;
-        LOG("Worker response: %s", $line);
         my $response = Argon::Message::decode($line);
         $self->clear_pending; # TODO check that response message id matches pending
         $callback->($response);

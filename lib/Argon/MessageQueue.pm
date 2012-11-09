@@ -1,4 +1,5 @@
 package Argon::MessageQueue;
+# TODO Pre-size data array for queue max length
 
 use strict;
 use warnings;
@@ -68,7 +69,8 @@ sub get {
     my $msg  = shift @$data;
 
     # Replace root of heap with last element on the heap
-    unshift @$data, pop @$data;
+    # unless the heap is now empty.
+    unshift @$data, pop @$data unless !@$data;
     --$self->{size};
 
     # Sift down

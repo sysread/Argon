@@ -16,6 +16,7 @@ sub new {
 
 sub run {
     my $self = shift;
+    sleep 0.5;
     return $self->{value} * 2;
 }
 

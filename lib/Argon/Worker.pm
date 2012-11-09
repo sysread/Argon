@@ -79,11 +79,8 @@ sub loop {
 #-------------------------------------------------------------------------------
 sub dispatch {
     my ($self, $message) = @_;
-    LOG("Dispatching message: %s", $message->id);
-
     my $command = $message->command;
     my $handler = $self->handler->{$command};
-    LOG("Handler: $handler");
 
     croak(sprintf 'Command not handled: %s', $message->command)
         unless $handler;
@@ -111,7 +108,7 @@ sub handle_queue {
     my ($class, $params) = @$payload;
     
     my $result = eval {
-        require $class;
+        require "$class.pm";
         $class->new(@$params)->run;
     };
     

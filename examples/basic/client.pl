@@ -17,12 +17,13 @@ my $client = Argon::Client->new(
 
 $client->connect(sub {
     warn "Connected!\n";
-    my $msg = Argon::Message->new(command => CMD_QUEUE);
-    $msg->set_payload(['SampleJob', [10]]);
-    $client->send($msg, sub {
-        my ($client, $response) = @_;
-        LOG(Dumper($response));
-    });
+    
+    $client->process('SampleJob', [10],
+        class      => 'SampleJob',
+        args       => [10],
+        on_error   => sub { LOG('ERROR: [%s]',    shift), exit 0; },
+        on_success => sub { LOG('COMPLETE: [%s]', shift), exit 0; },
+    );
 });
 
 EV::run;

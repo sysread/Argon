@@ -5,7 +5,7 @@
 #    1) the queue is empty
 #    2) process_message returns false
 #-------------------------------------------------------------------------------
-package Argon::QueueManager;
+package Argon::Role::QueueManager;
 
 use Moose::Role;
 use Carp;
@@ -45,8 +45,8 @@ after 'BUILD' => sub {
     my $self = shift;
     $self->queue_timer(AnyEvent->timer(
         interval => 0.25,
-        after => 0,
-        cb => sub {
+        after    => 0,
+        cb       => sub {
             until ($self->queue->is_empty) {
                 # Attempt to assign the message at the top of the queue. If
                 # successful, remove from the queue. Otherwise, stop processing
@@ -73,6 +73,7 @@ around 'msg_accept' => sub {
     } else {
         $msg->update_timestamp;
         $self->queue->put($msg);
+        LOG("Queued message %s", $msg->id);
         return 1;
     }
 };

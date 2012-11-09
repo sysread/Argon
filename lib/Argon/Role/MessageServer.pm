@@ -1,4 +1,4 @@
-package Argon::MessageServer;
+package Argon::Role::MessageServer;
 
 use Moose::Role;
 use Carp;
@@ -58,6 +58,7 @@ sub reply_queue {
         $reply->set_payload($error);
         return $reply;
     } else {
+        LOG("Message accepted: %s", $msg->id);
         my $reply = $msg->reply($accepted ? CMD_ACK : CMD_REJECTED);
         return $reply;
     }
@@ -68,7 +69,13 @@ sub reply_queue {
 #-------------------------------------------------------------------------------
 sub reply_status {
     my ($self, $msg) = @_;
+    LOG("Message status: %s => %d", $msg->id, $self->status->{$msg->id});
     if (exists $self->status->{$msg->id}) {
+        if ($self->status->{$msg->id} eq STATUS_COMPLETE) {
+            return $self->msg_clear($msg);
+        } else {
+            return $msg->reply(CMD_PENDING);
+        }
         return $msg->reply($STATUS_MAP{$self->status->{$msg->id}});
     } else {
         my $reply = $msg->reply(CMD_ERROR);

@@ -12,7 +12,7 @@ use Argon qw/:commands/;
 require Argon::Client;
 
 extends 'Argon::MessageManager';
-with    'Argon::MessageServer';
+with    'Argon::Role::MessageServer';
 
 has 'nodes' => (
     is       => 'ro',

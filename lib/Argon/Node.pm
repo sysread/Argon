@@ -13,8 +13,8 @@ use Argon;
 require Argon::WorkerProcess;
 
 extends 'Argon::MessageProcessor';
-with    'Argon::MessageServer';
-with    'Argon::QueueManager';
+with    'Argon::Role::MessageServer';
+with    'Argon::Role::QueueManager';
 
 has 'concurrency' => (
     is       => 'ro',
