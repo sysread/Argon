@@ -59,13 +59,18 @@ sub start {
     my $server = tcp_server(
         $self->host,
         $self->port,
+        # Accept callback
         sub {
             my ($fh, $host, $port) = @_;
             $self->host($host);
             $self->port($port);
             $self->accept(@_);
         },
-        sub { LOG("Listening on port %d", $self->port) }
+        # Prepare callback (returns listen queue size)
+        sub {
+            LOG("Listening on port %d", $self->port);
+            return LISTEN_QUEUE_SIZE;
+        },
     );
     $self->server($server);
 }

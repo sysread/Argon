@@ -69,9 +69,8 @@ around 'msg_accept' => sub {
     my ($orig, $self, $msg) = @_;
     my $client = $self->next_client;
     if ($client) {
-        my $result = $self->$orig($msg);
+        $self->$orig($msg);
         $self->assign_message($msg, $client);
-        return $result;
     } else {
         croak 'No node is available to process the request';
     }

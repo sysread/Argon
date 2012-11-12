@@ -8,18 +8,20 @@ require Argon::Server;
 require Argon::Node;
 
 my %opt;
-getopt('pc', \%opt);
+getopt('pcm', \%opt);
 
 my $port   = $opt{p} || 8888;
+my $conc   = $opt{c} || 4;
+my $queue  = 4 * $conc;
 my $server = Argon::Server->new(port => $port, host => '127.0.0.1');
 my $node   = Argon::Node->new(
     server      => $server,
-    concurrency => 2,
-    queue_limit => 100,
+    concurrency => $conc,
+    queue_limit => $queue,
 );
 
-if ($opt{c}) {
-    $node->add_manager(split ':', $opt{c});
+if ($opt{m}) {
+    $node->add_manager(split ':', $opt{m});
 }
 
 $server->start;

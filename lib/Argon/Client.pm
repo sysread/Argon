@@ -159,14 +159,14 @@ sub _poll {
 #
 #-------------------------------------------------------------------------------
 sub poll {
-    my ($self, $msgid, $on_success, $on_error) = @_;
+    my ($self, $msg, $on_success, $on_error) = @_;
 
     my $respond = Argon::Respond->new;
     $respond->to(CMD_ERROR,    sub { $on_error->(shift)   }) if $on_error;
     $respond->to(CMD_COMPLETE, sub { $on_success->(shift) }) if $on_success;
-    $respond->to(CMD_PENDING,  sub { $self->respond_set($msgid => $respond) });
+    $respond->to(CMD_PENDING,  sub { $self->respond_set($msg->id => $respond) });
 
-    $self->respond_set($msgid => $respond);
+    $self->respond_set($msg->id, $respond);
 }
 
 #-------------------------------------------------------------------------------
@@ -212,7 +212,9 @@ sub queue {
     $self->send($msg, sub {
         my $reply = shift;
         if ($reply->command == CMD_ACK) {
-            $self->poll($reply->id, $on_success, $on_error);
+            $self->poll($reply, sub { $on_success->($_[0])}, sub { $on_error->($_[0]) });
+        } elsif ($reply->command == CMD_REJECTED) {
+            $self->queue($msg, $on_success, $on_error);
         } else {
             $on_error->($reply);
         }

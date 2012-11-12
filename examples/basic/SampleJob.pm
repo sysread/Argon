@@ -3,7 +3,7 @@ package SampleJob;
 use strict;
 use warnings;
 use Carp;
-use Argon;
+use Argon  qw/LOG/;
 
 use fields qw/value/;
 
@@ -16,7 +16,7 @@ sub new {
 
 sub run {
     my $self = shift;
-    sleep 0.5;
+    LOG("Doubling %04d", $self->{value});
     return $self->{value} * 2;
 }
 

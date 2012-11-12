@@ -35,7 +35,6 @@ sub msg_accept {
     $self->message->{$msg->id} = $msg;
     $self->status->{$msg->id}  = STATUS_QUEUED;
     LOG('Accepted: %s', $msg->id);
-    return 1;
 }
 
 #-------------------------------------------------------------------------------
@@ -46,7 +45,6 @@ sub msg_assigned {
     $self->message->{$msg->id} = $msg;
     $self->status->{$msg->id}  = STATUS_ASSIGNED;
     LOG('Assigned: %s', $msg->id);
-    return 1;
 }
 
 #-------------------------------------------------------------------------------
@@ -57,7 +55,6 @@ sub msg_complete {
     $self->message->{$msg->id} = $msg;
     $self->status->{$msg->id}  = STATUS_COMPLETE;
     LOG('Complete: %s', $msg->id);
-    return 1;
 }
 
 #-------------------------------------------------------------------------------

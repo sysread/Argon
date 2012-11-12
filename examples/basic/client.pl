@@ -21,16 +21,27 @@ my $client = Argon::Client->new(
 
 my $count = 0;
 my $total = $opt{c} || 10;
+
+sub inc {
+    if (++$count == $total) {
+        LOG('All results are in. Bye!');
+        exit 0;
+    }   
+}
+
 sub on_complete {
     my $num = shift;
     return sub {
-        my $result = shift;
-        LOG('COMPLETE (%d): %s', $num, $result);
-        
-        if (++$count == $total) {
-            LOG('All results are in. Bye!');
-            exit 0;
-        }
+        LOG('COMPLETE (%4d): %4d', $num, shift);
+        inc;
+    }
+}
+
+sub on_error {
+    my $num = shift;
+    return sub {
+        LOG('ERROR (%4d): %s', $num, shift);
+        inc;
     }
 }
 
@@ -41,7 +52,7 @@ $client->connect(sub {
             class      => 'SampleJob',
             args       => [$i],
             on_success => on_complete($i),
-            on_error   => on_complete($i),
+            on_error   => on_error($i),
         );
     }
 });

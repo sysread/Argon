@@ -43,15 +43,14 @@ after 'BUILD' => sub {
 #-------------------------------------------------------------------------------
 sub reply_queue {
     my ($self, $msg) = @_;
-    my $accepted = eval { $self->msg_accept($msg) };
+    eval { $self->msg_accept($msg) };
     if ($@) {
         my $error = $@;
-        LOG("Error accepting message %s: %s", $msg->id, $error);
         my $reply = $msg->reply(CMD_REJECTED);
         $reply->set_payload($error);
         return $reply;
     } else {
-        my $reply = $msg->reply($accepted ? CMD_ACK : CMD_REJECTED);
+        my $reply = $msg->reply(CMD_ACK);
         return $reply;
     }
 }

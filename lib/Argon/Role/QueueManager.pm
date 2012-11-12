@@ -11,7 +11,7 @@ use Moose::Role;
 use Carp;
 use namespace::autoclean;
 use AnyEvent qw//;
-use Argon    qw/LOG :statuses/;
+use Argon    qw/LOG :defaults :statuses/;
 
 requires 'assign_message';
 requires 'msg_accept';
@@ -43,8 +43,9 @@ has 'queue_timer' => (
 sub BUILD {}
 after 'BUILD' => sub {
     my $self = shift;
+    LOG('Queue limit is %d', $self->queue_limit);
     $self->queue_timer(AnyEvent->timer(
-        interval => 0.25,
+        interval => POLL_INTERVAL,
         after    => 0,
         cb       => sub {
             until ($self->queue->is_empty) {
@@ -69,11 +70,10 @@ after 'BUILD' => sub {
 around 'msg_accept' => sub {
     my ($orig, $self, $msg) = @_;
     if ($self->queue->is_full || !$self->$orig($msg)) {
-        return 0;
+        croak 'Queue is full';
     } else {
         $msg->update_timestamp;
         $self->queue->put($msg);
-        return 1;
     }
 };
 
