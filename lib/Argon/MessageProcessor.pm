@@ -14,7 +14,7 @@ require Argon::Message;
 # Hash of msg id => msg
 has 'message' => (
     is       => 'ro',
-    isa      => 'HashRef',
+    isa      => 'HashRef[Argon::Message]',
     init_arg => undef,
     default  => sub { {} },
 );
@@ -22,7 +22,7 @@ has 'message' => (
 # Hash of msg id => STATUS_*
 has 'status' => (
     is       => 'ro',
-    isa      => 'HashRef',
+    isa      => 'HashRef[Int]',
     init_arg => undef,
     default  => sub { {} },
 );

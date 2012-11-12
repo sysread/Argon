@@ -3,6 +3,9 @@
 # as a pool of client objects. The targets may be any kind of MessageServer
 # service. Managers track the speed and responsiveness of their servers and
 # route tasks to the most available server.
+#
+# TODO Track message stats with a time slice rather than the last n messages
+# TODO Higher resolution in tracking to deal with very small/fast jobs
 #-------------------------------------------------------------------------------
 package Argon::MessageManager;
 
@@ -20,7 +23,7 @@ extends 'Argon::MessageProcessor';
 # List of Argon::Client instances
 has 'servers' => (
     is       => 'rw',
-    isa      => 'ArrayRef',
+    isa      => 'ArrayRef[Argon::Client]',
     default  => sub { [] },
     init_arg => undef,
 );
@@ -28,7 +31,7 @@ has 'servers' => (
 # Hash of msg id => server; tracks what messages are assigned where
 has 'assigned_to' => (
     is       => 'ro',
-    isa      => 'HashRef',
+    isa      => 'HashRef[Argon::Server]',
     default  => sub { {} },
     init_arg => undef,
 );
@@ -36,7 +39,7 @@ has 'assigned_to' => (
 # Hash of server => list of msg ids; tracks assignments to a server
 has 'assignments' => (
     is       => 'ro',
-    isa      => 'HashRef',
+    isa      => 'HashRef[Str]',
     default  => sub { {} },
     init_arg => undef,
 );
@@ -44,7 +47,7 @@ has 'assignments' => (
 # Hash of server => list of last N processing times
 has 'processing_times' => (
     is       => 'ro',
-    isa      => 'HashRef',
+    isa      => 'HashRef[ArrayRef[Num]]',
     default  => sub { {} },
     init_arg => undef,
 );
@@ -52,7 +55,7 @@ has 'processing_times' => (
 # Hash of server => precalculated avg processing time
 has 'avg_processing_time' => (
     is       => 'ro',
-    isa      => 'HashRef',
+    isa      => 'HashRef[Num]',
     default  => sub { {} },
     init_arg => undef,
 );

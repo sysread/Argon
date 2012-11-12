@@ -12,22 +12,36 @@ require Argon::Message;
 require SampleJob;
 
 my %opt;
-getopt('hp', \%opt);
+getopt('hpc', \%opt);
 
 my $client = Argon::Client->new(
     host => $opt{h},
     port => $opt{p},
 );
 
+my $count = 0;
+my $total = $opt{c} || 10;
+sub on_complete {
+    my $num = shift;
+    return sub {
+        my $result = shift;
+        LOG('COMPLETE (%d): %s', $num, $result);
+        
+        if (++$count == $total) {
+            LOG('All results are in. Bye!');
+            exit 0;
+        }
+    }
+}
+
 $client->connect(sub {
     warn "Connected!\n";
-    
-    foreach my $i (1 .. 10) {
-        $client->process('SampleJob', [$i],
+    foreach my $i (1 .. $total) {
+        $client->process(
             class      => 'SampleJob',
-            args       => [10],
-            on_error   => sub { my $reply = shift; LOG('ERROR (%d): [%s]', $i, $reply); },
-            on_success => sub { LOG('COMPLETE (%d): [%s]', $i, shift); },
+            args       => [$i],
+            on_success => on_complete($i),
+            on_error   => on_complete($i),
         );
     }
 });

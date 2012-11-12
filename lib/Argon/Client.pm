@@ -56,7 +56,7 @@ has 'handle' => (
 # Stores the next callback to be called for a given message id
 has 'pending' => (
     is        => 'rw',
-    isa       => 'HashRef',
+    isa       => 'HashRef[CodeRef]',
     init_arg  => undef,
     default   => sub {{}},
 );

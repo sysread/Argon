@@ -10,7 +10,7 @@ use Argon qw/LOG/;
 
 has 'callback' => (
     is       => 'rw',
-    isa      => 'HashRef',
+    isa      => 'HashRef[CodeRef]',
     init_arg => undef,
     default  => sub {{}},
 );

@@ -33,7 +33,7 @@ has 'shutdown' => (
 
 has 'handler' => (
     is       => 'ro',
-    isa      => 'HashRef',
+    isa      => 'HashRef[Str]',
     builder  => '_build_dispatch_table',
     init_arg => undef,
 );

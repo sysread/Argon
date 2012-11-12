@@ -38,13 +38,14 @@ has 'on_error' => (
 
 has 'callback' => (
     is       => 'rw',
-    isa      => 'HashRef',
+    isa      => 'HashRef[CodeRef]',
     init_arg => undef,
     default  => sub { {} },
 );
 
 has 'server' => (
     is       => 'rw',
+    isa      => 'AnyEvent::Util::guard',
     init_arg => undef,
 );
 
@@ -54,7 +55,7 @@ sub respond_to {
 }
 
 sub start {
-    my $self   = shift;
+    my $self = shift;
     my $server = tcp_server(
         $self->host,
         $self->port,

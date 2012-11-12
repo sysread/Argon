@@ -14,9 +14,13 @@ require Argon::Client;
 extends 'Argon::MessageManager';
 with    'Argon::Role::MessageServer';
 
+#-------------------------------------------------------------------------------
+# Re-references Argon::Client nodes by host:port so that they may be removed by
+# command later (also stored in Argon::MessageManager->servers.
+#-------------------------------------------------------------------------------
 has 'nodes' => (
     is       => 'ro',
-    isa      => 'HashRef',
+    isa      => 'HashRef[Argon::Client]',
     init_arg => undef,
     default  => sub {{}},
 );

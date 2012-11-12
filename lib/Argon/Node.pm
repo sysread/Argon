@@ -26,14 +26,14 @@ has 'concurrency' => (
 
 has 'workers' => (
     is       => 'rw',
-    isa      => 'ArrayRef',
+    isa      => 'ArrayRef[Argon::WorkerProcess]',
     init_arg => undef,
     default  => sub { [] },
 );
 
 has 'managers' => (
     is       => 'rw',
-    isa      => 'ArrayRef',
+    isa      => 'ArrayRef[ArrayRef]',
     init_arg => undef,
     default  => sub { [] },
 );
