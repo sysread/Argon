@@ -98,7 +98,22 @@ sub on_connect {
     my ($self, $cb, $fh, $host, $port, $retry) = @_;
     croak 'Failure connecting to remote host' unless defined $fh;
     
-    $self->handle(AnyEvent::Handle->new(fh => $fh));
+    my $handle;
+    $handle = AnyEvent::Handle->new(
+        fh => $fh,
+        on_eof => sub {
+            LOG('Disconnected to remote host %s:%d.', $self->host, $self->port);
+            $self->connect(sub {
+                LOG('Reconnected to remote host %s:%d.', $self->host, $self->port);
+            });
+        },
+        on_error => sub {
+            my $msg = $_[2];
+            LOG("Error: $msg");
+        },
+    );
+    
+    $self->handle($handle);
 
     # Configure continuous reader callback
     $self->handle->on_read(sub { $self->on_message(@_) });

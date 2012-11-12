@@ -38,6 +38,9 @@ has 'managers' => (
     default  => sub { [] },
 );
 
+has 'int_handler'  => ( is => 'rw', init_arg => undef );
+has 'term_handler' => ( is => 'rw', init_arg => undef );
+
 #-------------------------------------------------------------------------------
 # Spawns a single worker process and returns the Argon::WorkerProcess instance.
 # Passes parameters unchanged to Argon::WorkerProcess->spawn.
@@ -61,12 +64,22 @@ sub initialize {
         LOG("Spawning worker #%d", $_);
         push @{$self->workers}, $self->spawn_worker();
     }
-    
+
     $self->notify;
+
+    # Add signal handlers
+    $self->int_handler(AnyEvent->signal(signal => 'INT',  cb => sub { $self->shutdown }));
+    $self->term_handler(AnyEvent->signal(signal => 'INT', cb => sub { $self->shutdown }));
+}
+
+sub shutdown {
+    my $self = shift;
+    LOG('Shutting down.');
+    exit 0;
 }
 
 #-------------------------------------------------------------------------------
-#
+# Selects a remote host to use as the manager for this node.
 #-------------------------------------------------------------------------------
 sub add_manager {
     my ($self, $host, $port) = @_;

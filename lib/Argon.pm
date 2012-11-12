@@ -1,6 +1,10 @@
 #-------------------------------------------------------------------------------
 # TODO
 #   * Debug levels (higher levels log less, remove stack traces from warnings, etc.)
+#   * Fault tolerance
+#   * Clearing out completed messages that were never picked up
+#   * Chaos monkey
+#   * Auto-restarting worker nodes after configured number of tasks
 #-------------------------------------------------------------------------------
 package Argon;
 
@@ -66,8 +70,8 @@ use constant SOCKET_TIMEOUT     => 30;
 use constant CHUNK_SIZE         => 1024 * 4;
 use constant EOL                => "\015\012";
 use constant MESSAGE_SEPARATOR  => ' ';
-use constant TRACK_MESSAGES     => 10;  # number of message times to track for computing avg processing time at a host
-use constant POLL_INTERVAL      => 0.2; # seconds between polls for task results
+use constant TRACK_MESSAGES     => 10;   # number of message times to track for computing avg processing time at a host
+use constant POLL_INTERVAL      => 0.20; # seconds between polls for task results
 
 #-------------------------------------------------------------------------------
 # Priorities

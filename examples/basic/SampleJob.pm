@@ -3,7 +3,8 @@ package SampleJob;
 use strict;
 use warnings;
 use Carp;
-use Argon  qw/LOG/;
+use Argon       qw/LOG/;
+use Time::HiRes qw/sleep/;
 
 use fields qw/value/;
 
@@ -17,6 +18,7 @@ sub new {
 sub run {
     my $self = shift;
     LOG("Doubling %04d", $self->{value});
+    sleep 0.3;
     return $self->{value} * 2;
 }
 
