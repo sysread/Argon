@@ -12,9 +12,9 @@ package Argon::MessageManager;
 use Moose;
 use Carp;
 use namespace::autoclean;
-use List::Util qw/sum/;
-use AnyEvent   qw//;
-use Argon      qw/:commands LOG TRACK_MESSAGES/;
+use List::Util  qw/sum reduce/;
+use Time::HiRes qw/time/;
+use Argon       qw/:commands LOG TRACK_MESSAGES/;
 
 require Argon::Client;
 
@@ -85,12 +85,12 @@ sub assign_message {
 
     push @{$self->assignments->{$client}}, $msg->id;
     $self->msg_assigned($msg);
-    my $sent = AnyEvent->now;
+    my $sent = time;
     
     my $on_success = sub {
         my $reply = shift;
 
-        push @{$self->processing_times->{$client}}, (AnyEvent->now - $sent);
+        push @{$self->processing_times->{$client}}, time - $sent;
         shift @{$self->processing_times->{$client}}
             if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
 
@@ -117,7 +117,9 @@ sub add_client {
         push @{$self->servers}, $client;
         $self->assignments->{$client}         = [];
         $self->processing_times->{$client}    = [];
-        $self->avg_processing_time->{$client} = 0;
+        $self->avg_processing_time->{$client} = 0.001;
+        # Note: an arbitrary value is used for avg_processing_time to allow
+        # the ranking algorithm to properly evaluate brand new clients.
     });
 
     # TODO: add on_error handler
@@ -145,12 +147,12 @@ sub del_client {
 
 #-------------------------------------------------------------------------------
 # Calculates the amount of processing time required by a tracked service to
-# process all items currently assigned to it.
+# process all items currently assigned to it (+1 for a newly assigned task).
 #-------------------------------------------------------------------------------
 sub estimated_processing_time {
     my ($self, $client) = @_;
     return $self->avg_processing_time->{$client}
-         * scalar(@{$self->assignments->{$client}});
+         * (1 + scalar(@{$self->assignments->{$client}}));
 }
 
 #-------------------------------------------------------------------------------
@@ -161,16 +163,10 @@ sub next_client {
     my $self = shift;
 
     my %time;
-    $time{$_} = $self->estimated_processing_time($_) foreach @{$self->servers};
+    $time{$_} = $self->estimated_processing_time($_)
+        foreach @{$self->servers};
 
-    my $least;
-    foreach my $server (@{$self->servers}) {
-        if (!defined $least || $time{$server} < $time{$least}) {
-            $least = $server;
-        }
-    }
-
-    return $least;
+    return reduce { $time{$a} < $time{$b} ? $a : $b } @{$self->servers};
 }
 
 __PACKAGE__->meta->make_immutable;
