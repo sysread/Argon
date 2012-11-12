@@ -9,13 +9,6 @@ use Argon::MessageProcessor;
 requires 'msg_accept';
 requires 'status';
 
-# Maps local msg status to a CMD_* reply (for msg_status)
-my %STATUS_MAP = (
-    STATUS_QUEUED,   CMD_PENDING,
-    STATUS_ASSIGNED, CMD_PENDING,
-    STATUS_COMPLETE, CMD_COMPLETE,
-);
-
 has 'endline' => (
     is      => 'ro',
     isa     => 'Str',
@@ -58,7 +51,6 @@ sub reply_queue {
         $reply->set_payload($error);
         return $reply;
     } else {
-        LOG("Message accepted: %s", $msg->id);
         my $reply = $msg->reply($accepted ? CMD_ACK : CMD_REJECTED);
         return $reply;
     }
@@ -69,14 +61,12 @@ sub reply_queue {
 #-------------------------------------------------------------------------------
 sub reply_status {
     my ($self, $msg) = @_;
-    LOG("Message status: %s => %d", $msg->id, $self->status->{$msg->id});
     if (exists $self->status->{$msg->id}) {
         if ($self->status->{$msg->id} eq STATUS_COMPLETE) {
             return $self->msg_clear($msg);
         } else {
             return $msg->reply(CMD_PENDING);
         }
-        return $msg->reply($STATUS_MAP{$self->status->{$msg->id}});
     } else {
         my $reply = $msg->reply(CMD_ERROR);
         $reply->set_payload('Unknown message ID');

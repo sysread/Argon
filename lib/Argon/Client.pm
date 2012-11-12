@@ -1,3 +1,9 @@
+#-------------------------------------------------------------------------------
+# TODO Reconnection scheme
+# TODO Prevent duplicate poll queries (e.g. poll x, start another poll before
+#      x's poll gets a result
+# TODO Provide on-error callback for initial connection
+#-------------------------------------------------------------------------------
 package Argon::Client;
 
 use Carp;
@@ -11,58 +17,69 @@ require Argon::Message;
 require Argon::Respond;
 
 has 'port' => (
-    is       => 'ro',
-    isa      => 'Int',
-    required => 1,
+    is        => 'ro',
+    isa       => 'Int',
+    required  => 1,
 );
 
 has 'host' => (
-    is       => 'ro',
-    isa      => 'Str',
-    required => 1,
+    is        => 'ro',
+    isa       => 'Str',
+    required  => 1,
 );
 
 has 'endline' => (
-    is      => 'ro',
-    isa     => 'Str',
-    default => EOL,
+    is        => 'ro',
+    isa       => 'Str',
+    default   => EOL,
 );
 
 has 'chunk_size' => (
-    is      => 'ro',
-    isa     => 'Int',
-    default => CHUNK_SIZE,
+    is        => 'ro',
+    isa       => 'Int',
+    default   => CHUNK_SIZE,
 );
 
 has 'on_error' => (
-    is  => 'rw',
-    isa => 'CodeRef',
+    is        => 'rw',
+    isa       => 'CodeRef',
 );
 
 has 'handle' => (
-    is       => 'rw',
-    isa      => 'AnyEvent::Handle',
-    init_arg => undef,
+    is        => 'rw',
+    isa       => 'AnyEvent::Handle',
+    init_arg  => undef,
+    clearer   => 'disconnect',
+    predicate => 'is_connected',
 );
 
 # Stores the next callback to be called for a given message id
 has 'pending' => (
-    is       => 'rw',
-    isa      => 'HashRef',
-    init_arg => undef,
-    default  => sub {{}},
+    is        => 'rw',
+    isa       => 'HashRef',
+    init_arg  => undef,
+    default   => sub {{}},
 );
 
 has 'respond' => (
-    is       => 'rw',
-    isa      => 'HashRef',
-    init_arg => undef,
-    default  => sub {{}},
+    traits    => ['Hash'],
+    is        => 'ro',
+    isa       => 'HashRef[Argon::Respond]',
+    init_arg  => undef,
+    default   => sub {{}},
+    handles   => {
+        respond_get    => 'get',
+        respond_set    => 'set',
+        respond_keys   => 'keys',
+        respond_delete => 'delete',
+    },
 );
 
 has 'poll_timer' => (
-    is       => 'rw',
-    init_arg => undef,
+    is        => 'rw',
+    init_arg  => undef,
+    clearer   => 'stop_polling',
+    predicate => 'is_polling',
 );
 
 sub connect {
@@ -70,12 +87,17 @@ sub connect {
     tcp_connect $self->host, $self->port, sub { $self->on_connect($cb, @_) };
 }
 
-sub stop {
+sub close {
     my $self = shift;
+    $self->handle->destroy;
+    $self->disconnect;
+    $self->stop_polling;
 }
 
 sub on_connect {
     my ($self, $cb, $fh, $host, $port, $retry) = @_;
+    croak 'Failure connecting to remote host' unless defined $fh;
+    
     $self->handle(AnyEvent::Handle->new(fh => $fh));
 
     # Configure continuous reader callback
@@ -98,7 +120,6 @@ sub on_message {
         line => sub {
             my ($handle, $line, $eol) = @_;
             my $message = Argon::Message::decode($line);
-            LOG("RECEIVED RESPONSE: %s => %d", $message->id, $message->command);
 
             if ($self->pending->{$message->id}) {
                 my $cb = $self->pending->{$message->id};
@@ -106,7 +127,8 @@ sub on_message {
                 $cb->($message);
             }
 
-            $self->handle->push_read(@start_request);
+            $self->handle->push_read(@start_request)
+                if $self->is_connected;
         }
     );
 
@@ -114,18 +136,21 @@ sub on_message {
 }
 
 #-------------------------------------------------------------------------------
-#
+# 
 #-------------------------------------------------------------------------------
 sub _poll {
     my $self = shift;
-    my @pending_ids = keys %{$self->respond};
+    my @pending_ids = $self->respond_keys;
     foreach my $id (@pending_ids) {
         my $msg = Argon::Message->new(command => CMD_STATUS, id => $id);
         $self->send($msg, sub {
             my $response = shift;
-            my $callback = $self->respond->{$id};
-            undef $self->respond->{$id};
-            $callback->dispatch($response);
+            my $callback = $self->respond_get($id);
+            $self->respond_delete($id);
+            my @ids = $self->respond_keys;
+            # Callback may be undefined if the successful response was in-bound
+            # from the last poll while this send was being performed.
+            $callback->dispatch($response) if defined $callback;
         });
     }
 }
@@ -137,12 +162,11 @@ sub poll {
     my ($self, $msgid, $on_success, $on_error) = @_;
 
     my $respond = Argon::Respond->new;
-    $respond->to(CMD_ERROR,    sub { $on_error->(shift->payload)   }) if $on_error;
-    $respond->to(CMD_COMPLETE, sub { $on_success->(shift->payload) }) if $on_success;
-    $respond->to(CMD_PENDING,  sub { $self->respond->{$msgid} = $respond; LOG("HERE") });
+    $respond->to(CMD_ERROR,    sub { $on_error->(shift)   }) if $on_error;
+    $respond->to(CMD_COMPLETE, sub { $on_success->(shift) }) if $on_success;
+    $respond->to(CMD_PENDING,  sub { $self->respond_set($msgid => $respond) });
 
-    $self->respond->{$msgid} = $respond;
-    LOG("Polling: %s (%s)", $msgid, $respond);
+    $self->respond_set($msgid => $respond);
 }
 
 #-------------------------------------------------------------------------------
@@ -174,7 +198,25 @@ sub process {
 
     my $msg = Argon::Message->new(command => CMD_QUEUE);
     $msg->set_payload([$job_class, $job_args]);
-    $self->send($msg, sub { $self->poll($msg->id, $on_success, $on_error) });
+    $self->queue($msg, sub { $on_success->(shift->payload) }, sub { $on_error->(shift->payload) });
+}
+
+#-------------------------------------------------------------------------------
+# Queues a message on the remote host and polls for the result.
+#-------------------------------------------------------------------------------
+sub queue {
+    my ($self, $msg, $on_success, $on_error) = @_;
+    Carp::confess 'Inappropriate message status (expected QUEUE)'
+        unless $msg->command() == CMD_QUEUE;
+
+    $self->send($msg, sub {
+        my $reply = shift;
+        if ($reply->command == CMD_ACK) {
+            $self->poll($reply->id, $on_success, $on_error);
+        } else {
+            $on_error->($reply);
+        }
+    });
 }
 
 __PACKAGE__->meta->make_immutable;

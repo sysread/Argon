@@ -11,7 +11,7 @@ use Carp;
 use namespace::autoclean;
 use List::Util qw/sum/;
 use AnyEvent   qw//;
-use Argon      qw/:commands TRACK_MESSAGES/;
+use Argon      qw/:commands LOG TRACK_MESSAGES/;
 
 require Argon::Client;
 
@@ -20,7 +20,7 @@ extends 'Argon::MessageProcessor';
 # List of Argon::Client instances
 has 'servers' => (
     is       => 'rw',
-    isa      => 'ListRef',
+    isa      => 'ArrayRef',
     default  => sub { [] },
     init_arg => undef,
 );
@@ -66,8 +66,9 @@ around 'msg_accept' => sub {
     my ($orig, $self, $msg) = @_;
     my $client = $self->next_client;
     if ($client) {
-        $self->$orig->($msg);
+        my $result = $self->$orig($msg);
         $self->assign_message($msg, $client);
+        return $result;
     } else {
         croak 'No node is available to process the request';
     }
@@ -83,17 +84,24 @@ sub assign_message {
     push @{$self->assignments->{$client}}, $msg->id;
     $self->msg_assigned($msg);
     my $sent = AnyEvent->now;
-
-    $client->send($msg, sub {
-        my $msg = shift;
+    
+    my $on_success = sub {
+        my $reply = shift;
 
         push @{$self->processing_times->{$client}}, (AnyEvent->now - $sent);
         shift @{$self->processing_times->{$client}}
             if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
 
         $self->avg_processing_time->{$client} = sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES;
-        $self->msg_complete($msg);
-    });
+        $self->msg_complete($reply);
+    };
+    
+    my $on_error = sub {
+        my $reply = shift;
+        $self->msg_complete($reply);
+    };
+    
+    $client->queue($msg, $on_success, $on_error);
 }
 
 #-------------------------------------------------------------------------------
@@ -103,6 +111,7 @@ sub add_client {
     my ($self, $client) = @_;
 
     $client->connect(sub {
+        LOG("Remote host %s:%d connected.", $client->host, $client->port);
         push @{$self->servers}, $client;
         $self->assignments->{$client}         = [];
         $self->processing_times->{$client}    = [];
@@ -122,13 +131,14 @@ sub del_client {
         my $msg   = $self->message->{$id};
         my $reply = $msg->reply(CMD_ERROR);
         $self->msg_complete($reply);
+        LOG("Remote host %s:%d disconnected.", $client->host, $client->port);
     }
 
     $self->servers([ map {$_ ne $client} @{$self->servers} ]);
     undef $self->assignments->{client};
     undef $self->processing_times->{$client};
     undef $self->avg_processing_time->{$client};
-    $client->destroy;
+    $client->close;
 }
 
 #-------------------------------------------------------------------------------

@@ -44,7 +44,7 @@ has 'handler' => (
 #-------------------------------------------------------------------------------
 sub _build_dispatch_table {
     my $self = shift;
-    return { 
+    return {
         CMD_SHUTDOWN, 'handle_shutdown',
         CMD_QUEUE,    'handle_queue',
     };
@@ -57,19 +57,19 @@ sub loop {
     my $self = shift;
     local $| = 1; # enable auto-flush
     LOG("Worker PID %d started", $$);
- 
+
     until ($self->shutdown) {
         my $line     = <STDIN>;
         my $message  = Argon::Message::decode($line);
         my $response = eval { $self->dispatch($message) };
-        
+
         if ($@) {
             my $error = $@;
             LOG($error);
             $response = $message->reply(CMD_ERROR);
             $response->set_payload($error);
         }
-        
+
         print $response->encode . $self->endline;
     }
 }
@@ -106,12 +106,12 @@ sub handle_queue {
     my ($self, $message) = @_;
     my $payload = $message->get_payload;
     my ($class, $params) = @$payload;
-    
+
     my $result = eval {
         require "$class.pm";
         $class->new(@$params)->run;
     };
-    
+
     if ($@) {
         my $error = $@;
         my $reply = $message->reply(CMD_ERROR);

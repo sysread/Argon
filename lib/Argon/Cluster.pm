@@ -8,7 +8,7 @@ package Argon::Cluster;
 use Moose;
 use Carp;
 use namespace::autoclean;
-use Argon qw/:commands/;
+use Argon qw/LOG :commands/;
 require Argon::Client;
 
 extends 'Argon::MessageManager';
@@ -23,8 +23,8 @@ has 'nodes' => (
 
 sub BUILD {
     my $self = shift;
-    $self->server->respond_to(CMD_ADD_NODE, $self->add_node);
-    $self->server->respond_to(CMD_DEL_NODE, $self->del_node);
+    $self->server->respond_to(CMD_ADD_NODE, sub { $self->add_node(@_) });
+    $self->server->respond_to(CMD_DEL_NODE, sub { $self->del_node(@_) });
 }
 
 sub add_node {
@@ -39,6 +39,8 @@ sub add_node {
 
     $self->nodes->{"$host:$port"} = $client;
     $self->add_client($client);
+    
+    return $msg->reply(CMD_ACK);
 }
 
 sub del_node {
@@ -49,6 +51,8 @@ sub del_node {
         undef $self->nodes->{"$host:$port"};
         $self->del_client($client);
     }
+
+    return $msg->reply(CMD_ACK);
 }
 
 __PACKAGE__->meta->make_immutable;

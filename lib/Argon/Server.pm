@@ -10,12 +10,12 @@ use Argon::Message;
 use Argon qw/LOG :defaults/;
 
 has 'port' => (
-    is  => 'ro',
+    is  => 'rw',
     isa => 'Int',
 );
 
 has 'host' => (
-    is  => 'ro',
+    is  => 'rw',
     isa => 'Str',
 );
 
@@ -58,7 +58,12 @@ sub start {
     my $server = tcp_server(
         $self->host,
         $self->port,
-        sub { $self->accept(@_) },
+        sub {
+            my ($fh, $host, $port) = @_;
+            $self->host($host);
+            $self->port($port);
+            $self->accept(@_);
+        },
         sub { LOG("Listening on port %d", $self->port) }
     );
     $self->server($server);
@@ -79,7 +84,7 @@ sub accept {
         },
         on_error => sub {
             my $msg = $_[2];
-            LOG("error: $msg");
+            LOG("error: $msg") unless $msg eq 'Broken pipe';
         },
     );
 
@@ -91,7 +96,7 @@ sub accept {
                 my ($handle, $line, $eol) = @_;
                 my $message = Argon::Message::decode($line);
                 my ($response, $error);
-                
+
                 if (exists $self->callback->{$message->command}) {
                     $response = eval { $self->callback->{$message->command}->($message) };
                     $error = sprintf('Application Error: %s', $@)

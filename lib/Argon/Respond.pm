@@ -29,7 +29,6 @@ sub to {
 #-------------------------------------------------------------------------------
 sub dispatch {
     my ($self, $msg) = @_;
-    LOG("Dispatch message: %s => %d", $msg->id, $msg->command);
     $self->callback->{$msg->command}->($msg)
         if exists $self->callback->{$msg->command};
 }

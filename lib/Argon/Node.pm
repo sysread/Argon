@@ -8,9 +8,11 @@ package Argon::Node;
 use Moose;
 use Carp;
 use namespace::autoclean;
-use Argon;
+use Sys::Hostname;
+use Argon qw/LOG :commands/;
 
 require Argon::WorkerProcess;
+require Argon::Client;
 
 extends 'Argon::MessageProcessor';
 with    'Argon::Role::MessageServer';
@@ -23,6 +25,13 @@ has 'concurrency' => (
 );
 
 has 'workers' => (
+    is       => 'rw',
+    isa      => 'ArrayRef',
+    init_arg => undef,
+    default  => sub { [] },
+);
+
+has 'managers' => (
     is       => 'rw',
     isa      => 'ArrayRef',
     init_arg => undef,
@@ -52,6 +61,42 @@ sub initialize {
         LOG("Spawning worker #%d", $_);
         push @{$self->workers}, $self->spawn_worker();
     }
+    
+    $self->notify;
+}
+
+#-------------------------------------------------------------------------------
+#
+#-------------------------------------------------------------------------------
+sub add_manager {
+    my ($self, $host, $port) = @_;
+    push @{$self->managers}, [$host, $port];
+}
+
+#-------------------------------------------------------------------------------
+# Registers node with configured upstream managers.
+#-------------------------------------------------------------------------------
+sub notify {
+    my $self = shift;
+    my $port = $self->server->port;
+    my $host = $self->server->host || hostname;
+    my $node = [$host, $port];
+
+    foreach my $manager (@{$self->managers}) {
+        my ($host, $port) = @$manager;
+        my $client = Argon::Client->new(host => $host, port => $port);
+        my $msg    = Argon::Message->new(command => CMD_ADD_NODE);
+        $msg->set_payload($node);
+
+        LOG("Connecting to manager %s:%d", $host, $port);
+        $client->connect(sub {
+            LOG("Sent notification to manager %s:%d", $host, $port);
+            $client->send($msg, sub {
+                LOG("Registration complete with manager %s:%d", $host, $port);
+                $client->close;
+            });
+        });
+    }
 }
 
 #-------------------------------------------------------------------------------
@@ -64,11 +109,9 @@ sub assign_message {
         unless ($worker->has_pending) {
             $worker->send($message, sub {
                 my $msg = shift;
-                LOG("Message complete: %s", $msg->id);
                 $self->msg_complete($msg);
             });
 
-            LOG("Message assigned: %s", $message->id);
             return 1;
         }
     }

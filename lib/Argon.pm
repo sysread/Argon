@@ -1,3 +1,7 @@
+#-------------------------------------------------------------------------------
+# TODO
+#   * Debug levels (higher levels log less, remove stack traces from warnings, etc.)
+#-------------------------------------------------------------------------------
 package Argon;
 
 our $VERSION = '0.001';
@@ -25,7 +29,7 @@ our %EXPORT_TAGS = (
 
     # Priorities
     'priorities' => [qw/PRI_REAL PRI_HIGH PRI_NORMAL PRI_LOW PRI_IGNORE/],
-    
+
     'statuses' => [qw/STATUS_QUEUED STATUS_ASSIGNED STATUS_COMPLETE/],
 
     # Command verbs and responses
@@ -85,15 +89,14 @@ use constant STATUS_COMPLETE => 2;
 # Commands
 #-------------------------------------------------------------------------------
 use constant CMD_ACK      => 0;  # Acknowledgement (respond OK)
-use constant CMD_ID       => 1;  # Get a unique ID for a message
-use constant CMD_QUEUE    => 2;  # Queue a message
-use constant CMD_STATUS   => 3;  # Poll a message status
-use constant CMD_PENDING  => 4;  # Response - message is in-progress
-use constant CMD_COMPLETE => 5;  # Response - message is complete
-use constant CMD_REJECTED => 6;  # Response - message was rejected
-use constant CMD_ERROR    => 7;  # Response - error processing message or invalid message format
-use constant CMD_ADD_NODE => 8;  # Add a node to a cluster
-use constant CMD_DEL_NODE => 9;  # Remove a node from a cluster
-use constant CMD_SHUTDOWN => 10; # Shutdown a worker process
+use constant CMD_QUEUE    => 1;  # Queue a message
+use constant CMD_STATUS   => 2;  # Poll a message status
+use constant CMD_PENDING  => 3;  # Response - message is in-progress
+use constant CMD_COMPLETE => 4;  # Response - message is complete
+use constant CMD_REJECTED => 5;  # Response - message was rejected
+use constant CMD_ERROR    => 6;  # Response - error processing message or invalid message format
+use constant CMD_ADD_NODE => 7;  # Add a node to a cluster
+use constant CMD_DEL_NODE => 8;  # Remove a node from a cluster
+use constant CMD_SHUTDOWN => 9;  # Shutdown a worker process
 
 1;
