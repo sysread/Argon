@@ -73,7 +73,6 @@ around 'msg_accept' => sub {
     } else {
         $msg->update_timestamp;
         $self->queue->put($msg);
-        LOG("Queued message %s", $msg->id);
         return 1;
     }
 };
