@@ -18,6 +18,7 @@ WriteMakefile(
         'namespace::autoclean' => 0,
         'AnyEvent'             => 0,
         'AnyEvent::Subprocess' => 0,
+        'AnyEvent::Worker'     => 0,
         'Data::UUID'           => 0,
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
