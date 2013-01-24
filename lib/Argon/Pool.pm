@@ -122,6 +122,7 @@ sub stop_worker {
 #-------------------------------------------------------------------------------
 sub start {
     my $self = shift;
+    LOG('Starting %d workers (%d max requests)', $self->concurrency, $self->max_requests);
     $self->start_worker foreach (1 .. $self->concurrency);
     $self->is_running(1);
     $self->assign_pending;
@@ -156,21 +157,24 @@ sub assign_pending {
 
     $worker->do($message, sub {
         # ARGS: worker, Message reply
-        my $response = Argon::Message::decode($_[1]);
-        my $result   = $response->get_payload;
+        $worker  = shift;
+        $message = Argon::Message::decode(shift);
 
         # Call task callback
-        eval { $callback->($result) };
+        eval { $callback->($message->get_payload) };
         $@ && carp $@;
 
         if ($self->is_running) {
             # Check if worker ought to be restarted
-            #$worker->kill_child
-            #    if $self->max_requests != 0
-            #    && $worker->inc > $self->max_requests;
+            $worker->inc;
+            if ($worker->request_count >= $self->max_requests) {
+                $self->stop_worker($worker);
+                $worker = $self->start_worker; # implicitly checks in new workers
+            } else {
+                $self->checkin($worker);
+            }
 
-            # Check worker back in and trigger assign_pending again
-            $self->checkin($worker);
+            # Trigger assign_pending again
             $self->assign_pending;
         } else {
             # System is shut down - stop worker
