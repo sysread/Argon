@@ -4,50 +4,51 @@
 package Argon::Pool;
 
 use Moose;
+use Moose::Util::TypeConstraints;
 use Carp;
 use namespace::autoclean;
-use Argon qw/CMD_COMPLETE CMD_ERROR/;
-require AnyEvent::Worker;
+use Argon qw/LOG CMD_COMPLETE CMD_ERROR/;
+require Argon::Pool::Worker;
+require Argon::Message;
 
+# Subtype describing a tuple of an Argon::Message and a CodeRef. See
+# 'pending' below.
+subtype 'PendingItem'
+    => as 'ArrayRef',
+    => where { $_->[0]->isa('Argon::Message') && ref $_->[1] eq 'CODE' },
+    => message { 'Expected tuple of Argon::Message and CodeRef' };
+
+# The number of worker processes to maintain.
 has 'concurrency' => (
     is       => 'ro',
     isa      => 'Int',
     required => 1,
 );
 
-#-------------------------------------------------------------------------------
 # The maximum number of requests that may be handled by any individual worker
 # process before the process is terminated and replaced with a fresh process.
 # If not specified (or set to zero), processes will not be restarted.
-#-------------------------------------------------------------------------------
 has 'max_requests' => (
     is       => 'ro',
     isa      => 'Int',
     default  => 0,
 );
 
-#-------------------------------------------------------------------------------
-# Tracks the number of requests each process has handled. Counts are indexed
-# to each workers PID (AnyEvent::Worker->{child_pid}).
-#-------------------------------------------------------------------------------
-has 'request_count' => (
-    is       => 'rw',
-    isa      => 'HashRef[Int]',
-    init_arg => undef,
-    default  => sub { {} },
-);
-
+# Flags the pool as currently running.
 has 'is_running' => (
     is       => 'rw',
-    isa      => 'Int',
+    isa      => 'Bool',
     init_arg => undef,
     default  => 0,
 );
 
+# Array of worker instances. Workers are checked in and out as they are
+# assigned to tasks, leaving the pool array empty when no workers are
+# available.
 has 'pool' => (
     traits   => ['Array'],
     is       => 'rw',
-    isa      => 'ArrayRef[AnyEvent::Worker]',
+    isa      => 'ArrayRef[Argon::Pool::Worker]',
     init_arg => undef,
     default  => sub { [] },
     handles  => {
@@ -59,10 +60,11 @@ has 'pool' => (
     },
 );
 
+# FIFO queue of pending items.
 has 'pending' => (
     traits   => ['Array'],
     is       => 'rw',
-    isa      => 'ArrayRef[ArrayRef[Argon::Message, CodeRef]]',
+    isa      => 'ArrayRef[PendingItem]',
     init_arg => undef,
     default  => sub { [] },
     handles  => {
@@ -78,10 +80,10 @@ has 'pending' => (
 #-------------------------------------------------------------------------------
 sub start_worker {
     my $self = shift;
-    my $worker = AnyEvent::Worker->new(sub {
-        my ($self, $message) = @_;
+    my $worker = Argon::Pool::Worker->new(sub {
+        my $message = shift;
         my ($class, $params) = @{$message->get_payload};
-
+        
         my $result = eval {
             require "$class.pm";
             $class->new(@$params)->run;
@@ -97,7 +99,8 @@ sub start_worker {
             $reply->set_payload($result);
         }
 
-        return $reply;
+        my $r = $reply->encode();
+        return $r;
     });
 
     $self->checkin($worker);
@@ -111,8 +114,6 @@ sub start_worker {
 #-------------------------------------------------------------------------------
 sub stop_worker {
     my ($self, $worker) = @_;
-    my $pid = $worker->{child_pid};
-    undef $self->request_count->{$pid};
     $worker->kill_child;
 }
 
@@ -154,19 +155,19 @@ sub assign_pending {
     my $worker = $self->checkout;
 
     $worker->do($message, sub {
-        eval { $callback->(shift) };
+        # ARGS: worker, Message reply
+        my $response = Argon::Message::decode($_[1]);
+        my $result   = $response->get_payload;
+
+        # Call task callback
+        eval { $callback->($result) };
         $@ && carp $@;
 
         if ($self->is_running) {
             # Check if worker ought to be restarted
-            if ($self->max_requests != 0) {
-                my $pid = $worker->{child_pid};
-                $self->request_count->{$pid} ||= 0; # init count if necessary
-                if (++$self->request_count->{$pid} >= $self->max_requests) {
-                    undef $self->request_count->{$pid};
-                    $worker->kill_child;
-                }
-            }
+            #$worker->kill_child
+            #    if $self->max_requests != 0
+            #    && $worker->inc > $self->max_requests;
 
             # Check worker back in and trigger assign_pending again
             $self->checkin($worker);
@@ -188,6 +189,7 @@ sub assign {
     $self->assign_pending;
 }
 
+no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;

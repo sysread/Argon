@@ -14,9 +14,12 @@ require SampleJob;
 my %opt;
 getopt('hpc', \%opt);
 
+my $host = $opt{h} || 'localhost';
+my $port = $opt{p} || 8888;
+
 my $client = Argon::Client->new(
-    host => $opt{h},
-    port => $opt{p},
+    host => $host,
+    port => $port,
 );
 
 my $count = 0;
@@ -50,7 +53,7 @@ $client->connect(sub {
     foreach my $i (1 .. $total) {
         $client->process(
             class      => 'SampleJob',
-            args       => [$i],
+            args       => [$i, 0.1],
             on_success => on_complete($i),
             on_error   => on_error($i),
         );

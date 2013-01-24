@@ -190,9 +190,7 @@ sub poll {
 #-------------------------------------------------------------------------------
 sub send {
     my ($self, $message, $cb) = @_;
-    if (exists $self->pending->{$message->id} && $self->pending->{$message->id}) {
-        Carp::confess 'Request/response cycle error';
-    } else {
+    unless (exists $self->pending->{$message->id} && $self->pending->{$message->id}) {
         $self->handle->push_write($message->encode . $self->endline);
         $self->pending->{$message->id} = $cb;
     }

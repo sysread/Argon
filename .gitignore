@@ -2,3 +2,5 @@
 .includepath
 .project
 /Makefile.old
+
+*.swp

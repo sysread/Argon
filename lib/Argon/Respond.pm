@@ -16,7 +16,7 @@ has 'callback' => (
 );
 
 #-------------------------------------------------------------------------------
-# Registers a callback, deleting any existing callback for a command.
+# Registers a callback, overriding any existing callback for a command.
 #-------------------------------------------------------------------------------
 sub to {
     my ($self, $cmd, $cb) = @_;

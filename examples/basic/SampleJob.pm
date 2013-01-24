@@ -6,19 +6,20 @@ use Carp;
 use Argon       qw/LOG/;
 use Time::HiRes qw/sleep/;
 
-use fields qw/value/;
+use fields qw/value sleep/;
 
 sub new {
-    my ($class, $value) = @_;
+    my ($class, $value, $sleep) = @_;
     my $self = fields::new($class);
-    $self->{value} = $value;
+    $self->{value} = $value || croak 'Expected value for first argument';
+    $self->{sleep} = $sleep || 0;
     return $self;
 }
 
 sub run {
     my $self = shift;
     LOG("Doubling %04d", $self->{value});
-    sleep 0.3;
+    sleep $self->{sleep} if $self->{sleep};
     return $self->{value} * 2;
 }
 

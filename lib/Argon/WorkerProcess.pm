@@ -94,10 +94,7 @@ sub spawn {
 sub send {
     my ($self, $message, $callback) = @_;
     croak 'Worker is busy' if $self->pending;
-
-    unless ($message) {
-        Carp::confess;
-    }
+    Carp::confess unless $message;
 
     $self->pending($message->id);
 

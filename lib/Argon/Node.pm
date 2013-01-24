@@ -24,11 +24,19 @@ has 'concurrency' => (
     required => 1,
 );
 
-has 'workers' => (
-    is       => 'rw',
+has 'worker_pool' => (
+	traits   => ['Array'],
+    is       => 'ro',
     isa      => 'ArrayRef[Argon::WorkerProcess]',
     init_arg => undef,
     default  => sub { [] },
+    handles  => {
+        'workers'    => 'elements',
+        'checkout'   => 'shift',
+        'checkin'    => 'push',
+        'idle'       => 'count',
+        'clear_pool' => 'clear',
+    },
 );
 
 has 'managers' => (
@@ -62,7 +70,7 @@ sub initialize {
     my $self = shift;
     for (1 .. $self->concurrency) {
         LOG("Spawning worker #%d", $_);
-        push @{$self->workers}, $self->spawn_worker();
+		$self->checkin($self->spawn_worker());
     }
 
     $self->notify;
@@ -73,7 +81,6 @@ sub initialize {
 }
 
 sub shutdown {
-    my $self = shift;
     LOG('Shutting down.');
     exit 0;
 }
@@ -118,18 +125,15 @@ sub notify {
 #-------------------------------------------------------------------------------
 sub assign_message {
     my ($self, $message) = @_;
-    foreach my $worker (@{$self->workers}) {
-        unless ($worker->has_pending) {
-            $worker->send($message, sub {
-                my $msg = shift;
-                $self->msg_complete($msg);
-            });
+	return if $self->idle == 0;
 
-            return 1;
-        }
-    }
+	my $worker = $self->checkout;
+    $worker->send($message, sub {
+		$self->msg_complete(shift);
+		$self->checkin($worker);
+	});
 
-    return 0;
+    return 1;
 }
 
 __PACKAGE__->meta->make_immutable;
