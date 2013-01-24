@@ -14,8 +14,9 @@ require SampleJob;
 my %opt;
 getopt('hpc', \%opt);
 
-my $host = $opt{h} || 'localhost';
-my $port = $opt{p} || 8888;
+my $total = $opt{c} || 10;
+my $host  = $opt{h} || 'localhost';
+my $port  = $opt{p} || 8888;
 
 my $client = Argon::Client->new(
     host => $host,
@@ -23,7 +24,6 @@ my $client = Argon::Client->new(
 );
 
 my $count = 0;
-my $total = $opt{c} || 10;
 
 sub inc {
     if (++$count == $total) {

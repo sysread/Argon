@@ -22,7 +22,8 @@ foreach my $i (1 .. $count) {
     $msg->set_payload(['SampleJob', [$i, $wait]]);
 
     $pool->assign($msg, sub {
-        my $result = shift;
+        my $response = shift;
+        my $result   = $response->get_payload;
         LOG('%d * 2 = %d', $i, $result);
 
         if (--$count == 0) {

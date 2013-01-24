@@ -11,33 +11,16 @@ use namespace::autoclean;
 use Sys::Hostname;
 use Argon qw/LOG :commands/;
 
-require Argon::WorkerProcess;
 require Argon::Client;
+require Argon::Pool;
 
 extends 'Argon::MessageProcessor';
 with    'Argon::Role::MessageServer';
 with    'Argon::Role::QueueManager';
 
-has 'concurrency' => (
-    is       => 'ro',
-    isa      => 'Int',
-    required => 1,
-);
-
-has 'worker_pool' => (
-	traits   => ['Array'],
-    is       => 'ro',
-    isa      => 'ArrayRef[Argon::WorkerProcess]',
-    init_arg => undef,
-    default  => sub { [] },
-    handles  => {
-        'workers'    => 'elements',
-        'checkout'   => 'shift',
-        'checkin'    => 'push',
-        'idle'       => 'count',
-        'clear_pool' => 'clear',
-    },
-);
+# These are used to configure the Argon::Pool
+has 'concurrency'  => (is => 'ro', isa => 'Int', required => 1);
+has 'max_requests' => (is => 'ro', isa => 'Int', default  => 0);
 
 has 'managers' => (
     is       => 'rw',
@@ -46,33 +29,36 @@ has 'managers' => (
     default  => sub { [] },
 );
 
+has 'pool' => (
+    is       => 'ro',
+    isa      => 'Argon::Pool',
+    init_arg => undef,
+    lazy     => 1,
+    default  => sub {
+        my $self = shift;
+        my $pool = Argon::Pool->new(
+            concurrency  => $self->concurrency,
+            max_requests => $self->max_requests,
+        );
+
+        $pool->start;
+        return $pool;
+    }
+);
+
 has 'int_handler'  => ( is => 'rw', init_arg => undef );
 has 'term_handler' => ( is => 'rw', init_arg => undef );
 
 #-------------------------------------------------------------------------------
-# Spawns a single worker process and returns the Argon::WorkerProcess instance.
-# Passes parameters unchanged to Argon::WorkerProcess->spawn.
-#-------------------------------------------------------------------------------
-sub spawn_worker {
-    my $self   = shift;
-    my $worker = Argon::WorkerProcess->new(endline => $self->endline);
-    $worker->spawn(@_);
-    return $worker;
-}
-
-#-------------------------------------------------------------------------------
-# Initializes by starting workers processes.
-# TODO Determine and implement correct behavior when spawning initial processes
-#      is unsuccessful. Is this behavior different from an error spawning a
-#      worker process when already running?
+# Initializes the node
 #-------------------------------------------------------------------------------
 sub initialize {
     my $self = shift;
-    for (1 .. $self->concurrency) {
-        LOG("Spawning worker #%d", $_);
-		$self->checkin($self->spawn_worker());
-    }
 
+    # Force creation of pool
+    $self->pool->start;
+
+    # Notify upstream managers
     $self->notify;
 
     # Add signal handlers
@@ -80,8 +66,13 @@ sub initialize {
     $self->term_handler(AnyEvent->signal(signal => 'INT', cb => sub { $self->shutdown }));
 }
 
+#-------------------------------------------------------------------------------
+# Shuts down
+#-------------------------------------------------------------------------------
 sub shutdown {
+    my $self = shift;
     LOG('Shutting down.');
+    $self->pool->shutdown;
     exit 0;
 }
 
@@ -125,17 +116,11 @@ sub notify {
 #-------------------------------------------------------------------------------
 sub assign_message {
     my ($self, $message) = @_;
-	return if $self->idle == 0;
-
-	my $worker = $self->checkout;
-    $worker->send($message, sub {
-		$self->msg_complete(shift);
-		$self->checkin($worker);
-	});
-
+    $self->pool->assign($message, sub { $self->msg_complete(shift) });
     return 1;
 }
 
+no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;

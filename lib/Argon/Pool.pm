@@ -50,7 +50,7 @@ has 'pool' => (
     is       => 'rw',
     isa      => 'ArrayRef[Argon::Pool::Worker]',
     init_arg => undef,
-    default  => sub { [] },
+    default  => sub {[]},
     handles  => {
         'workers'    => 'elements',
         'checkout'   => 'shift',
@@ -82,9 +82,9 @@ sub start_worker {
     my $self = shift;
     my $worker = Argon::Pool::Worker->new(sub {
         my $message = shift;
-        my ($class, $params) = @{$message->get_payload};
-        
+
         my $result = eval {
+            my ($class, $params) = @{$message->get_payload};
             require "$class.pm";
             $class->new(@$params)->run;
         };
@@ -122,7 +122,6 @@ sub stop_worker {
 #-------------------------------------------------------------------------------
 sub start {
     my $self = shift;
-    LOG('Starting %d workers (%d max requests)', $self->concurrency, $self->max_requests);
     $self->start_worker foreach (1 .. $self->concurrency);
     $self->is_running(1);
     $self->assign_pending;
@@ -161,13 +160,13 @@ sub assign_pending {
         $message = Argon::Message::decode(shift);
 
         # Call task callback
-        eval { $callback->($message->get_payload) };
+        eval { $callback->($message) };
         $@ && carp $@;
 
         if ($self->is_running) {
             # Check if worker ought to be restarted
-            $worker->inc;
-            if ($worker->request_count >= $self->max_requests) {
+            if ($self->max_requests != 0
+             && $worker->inc >= $self->max_requests) {
                 $self->stop_worker($worker);
                 $worker = $self->start_worker; # implicitly checks in new workers
             } else {
