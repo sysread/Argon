@@ -70,6 +70,7 @@ sub msg_clear {
     return $result;
 }
 
+no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;

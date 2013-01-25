@@ -169,6 +169,7 @@ sub next_client {
     return reduce { $time{$a} < $time{$b} ? $a : $b } @{$self->servers};
 }
 
+no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;

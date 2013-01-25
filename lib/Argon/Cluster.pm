@@ -59,6 +59,7 @@ sub del_node {
     return $msg->reply(CMD_ACK);
 }
 
+no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;
