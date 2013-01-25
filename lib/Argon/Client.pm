@@ -82,6 +82,31 @@ has 'poll_timer' => (
     predicate => 'is_polling',
 );
 
+has 'backlog' => (
+    is        => 'rw',
+    isa       => 'ArrayRef',
+    init_arg  => undef,
+    default   => sub {[]},
+);
+
+has 'backlog_timer' => (
+    is        => 'rw',
+    init_arg  => undef,
+);
+
+sub BUILD {
+    my $self = shift;
+    $self->backlog_timer(AnyEvent->timer(
+        interval => POLL_INTERVAL,
+        after    => 0,
+        cb       => sub {
+            while (my $item = pop @{$self->backlog}) {
+                $self->queue(@$item);
+            }
+        }
+    ));
+}
+
 sub connect {
     my ($self, $cb) = @_;
     tcp_connect $self->host, $self->port, sub { $self->on_connect($cb, @_) };
@@ -119,7 +144,7 @@ sub on_connect {
     $self->handle->on_read(sub { $self->on_message(@_) });
 
     # Run poll timer
-    $self->poll_timer(AnyEvent->timer(after => 0, interval => POLL_INTERVAL, cb => sub { $self->_poll }));
+    #$self->poll_timer(AnyEvent->timer(after => 0, interval => POLL_INTERVAL, cb => sub { $self->_poll }));
 
     $cb->($self);
 }
@@ -139,7 +164,13 @@ sub on_message {
             if ($self->pending->{$message->id}) {
                 my $cb = $self->pending->{$message->id};
                 undef $self->pending->{$message->id};
-                $cb->($message);
+
+                if (ref $cb eq 'Argon::Respond') {
+                    $cb->dispatch($message);
+                } else {
+                    $cb->($message);
+
+                }
             }
 
             $self->handle->push_read(@start_request)
@@ -151,29 +182,10 @@ sub on_message {
 }
 
 #-------------------------------------------------------------------------------
-# 
+# Registers callback (an instance of Argon::Respond) for tasks that have been
+# accepted and are awaiting a result.
 #-------------------------------------------------------------------------------
-sub _poll {
-    my $self = shift;
-    my @pending_ids = $self->respond_keys;
-    foreach my $id (@pending_ids) {
-        my $msg = Argon::Message->new(command => CMD_STATUS, id => $id);
-        $self->send($msg, sub {
-            my $response = shift;
-            my $callback = $self->respond_get($id);
-            $self->respond_delete($id);
-            my @ids = $self->respond_keys;
-            # Callback may be undefined if the successful response was in-bound
-            # from the last poll while this send was being performed.
-            $callback->dispatch($response) if defined $callback;
-        });
-    }
-}
-
-#-------------------------------------------------------------------------------
-#
-#-------------------------------------------------------------------------------
-sub poll {
+sub await {
     my ($self, $msg, $on_success, $on_error) = @_;
 
     my $respond = Argon::Respond->new;
@@ -185,15 +197,13 @@ sub poll {
 }
 
 #-------------------------------------------------------------------------------
-# Sends a single message to the remote host and executes callback $cb to the
-# response.
+# Sends a single message to the remote host and executes callback $cb if the
+# server responds.
 #-------------------------------------------------------------------------------
 sub send {
     my ($self, $message, $cb) = @_;
-    unless (exists $self->pending->{$message->id} && $self->pending->{$message->id}) {
-        $self->handle->push_write($message->encode . $self->endline);
-        $self->pending->{$message->id} = $cb;
-    }
+    $self->handle->push_write($message->encode . $self->endline);
+    $self->pending->{$message->id} = $cb;
 }
 
 #-------------------------------------------------------------------------------
@@ -222,14 +232,19 @@ sub queue {
     Carp::confess 'Inappropriate message status (expected QUEUE)'
         unless $msg->command() == CMD_QUEUE;
 
+    $self->await($msg, $on_success, $on_error);
+
     $self->send($msg, sub {
         my $reply = shift;
-        if ($reply->command == CMD_ACK) {
-            $self->poll($reply, sub { $on_success->($_[0])}, sub { $on_error->($_[0]) });
-        } elsif ($reply->command == CMD_REJECTED) {
-            $self->queue($msg, $on_success, $on_error);
+        if ($reply->command == CMD_REJECTED) {
+            push @{$self->backlog}, [$msg, $on_success, $on_error];
         } else {
-            $on_error->($reply);
+            my $callback = $self->respond_get($reply->id);
+            $self->respond_delete($reply->id);
+            # Callback may be undefined if the successful response was in-bound
+            # from the last poll while this send was being performed.
+            $callback->dispatch($reply)
+                if defined $callback;
         }
     });
 }

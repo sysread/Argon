@@ -12,9 +12,9 @@ require Argon::Message;
 require SampleJob;
 
 my %opt;
-getopt('hpc', \%opt);
+getopt('hpn', \%opt);
 
-my $total = $opt{c} || 10;
+my $total = $opt{n} || 10;
 my $host  = $opt{h} || 'localhost';
 my $port  = $opt{p} || 8888;
 

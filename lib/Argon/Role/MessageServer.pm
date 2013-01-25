@@ -50,6 +50,7 @@ sub reply_queue {
         $reply->set_payload($error);
         return $reply;
     } else {
+        return;
         my $reply = $msg->reply(CMD_ACK);
         return $reply;
     }
@@ -72,5 +73,13 @@ sub reply_status {
         return $reply;
     }
 }
+
+around 'msg_complete' => sub {
+    my ($orig, $self, $msg) = @_;
+    $self->$orig($msg);
+    $self->server->send_reply($msg);
+};
+
+no Moose;
 
 1;

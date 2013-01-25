@@ -34,7 +34,7 @@ sub msg_accept {
     my ($self, $msg) = @_;
     $self->message->{$msg->id} = $msg;
     $self->status->{$msg->id}  = STATUS_QUEUED;
-    LOG('Accepted: %s', $msg->id);
+    return 1;
 }
 
 #-------------------------------------------------------------------------------
@@ -44,7 +44,7 @@ sub msg_assigned {
     my ($self, $msg) = @_;
     $self->message->{$msg->id} = $msg;
     $self->status->{$msg->id}  = STATUS_ASSIGNED;
-    LOG('Assigned: %s', $msg->id);
+    return 1;
 }
 
 #-------------------------------------------------------------------------------
@@ -54,7 +54,7 @@ sub msg_complete {
     my ($self, $msg) = @_;
     $self->message->{$msg->id} = $msg;
     $self->status->{$msg->id}  = STATUS_COMPLETE;
-    LOG('Complete: %s', $msg->id);
+    return 1;
 }
 
 #-------------------------------------------------------------------------------
@@ -66,7 +66,6 @@ sub msg_clear {
     my $result = $self->message->{$msg->id};
     undef $self->message->{$msg->id};
     undef $self->status->{$msg->id};
-    LOG('Cleared: %s', $msg->id);
     return $result;
 }
 
