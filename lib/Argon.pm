@@ -4,7 +4,6 @@
 #   * Fault tolerance
 #   * Clearing out completed messages that were never picked up
 #   * Chaos monkey
-#   * Auto-restarting worker nodes after configured number of tasks
 #-------------------------------------------------------------------------------
 package Argon;
 
