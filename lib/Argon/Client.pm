@@ -40,25 +40,12 @@ has 'chunk_size' => (
     default   => CHUNK_SIZE,
 );
 
-has 'on_error' => (
-    is        => 'rw',
-    isa       => 'CodeRef',
-);
-
 has 'handle' => (
     is        => 'rw',
     isa       => 'AnyEvent::Handle',
     init_arg  => undef,
     clearer   => 'disconnect',
     predicate => 'is_connected',
-);
-
-# Stores the next callback to be called for a given message id
-has 'pending' => (
-    is        => 'rw',
-    isa       => 'HashRef[CodeRef]',
-    init_arg  => undef,
-    default   => sub {{}},
 );
 
 has 'respond' => (
@@ -73,13 +60,6 @@ has 'respond' => (
         respond_keys   => 'keys',
         respond_delete => 'delete',
     },
-);
-
-has 'poll_timer' => (
-    is        => 'rw',
-    init_arg  => undef,
-    clearer   => 'stop_polling',
-    predicate => 'is_polling',
 );
 
 has 'backlog' => (
@@ -143,9 +123,6 @@ sub on_connect {
     # Configure continuous reader callback
     $self->handle->on_read(sub { $self->on_message(@_) });
 
-    # Run poll timer
-    #$self->poll_timer(AnyEvent->timer(after => 0, interval => POLL_INTERVAL, cb => sub { $self->_poll }));
-
     $cb->($self);
 }
 
@@ -161,16 +138,10 @@ sub on_message {
             my ($handle, $line, $eol) = @_;
             my $message = Argon::Message::decode($line);
 
-            if ($self->pending->{$message->id}) {
-                my $cb = $self->pending->{$message->id};
-                undef $self->pending->{$message->id};
-
-                if (ref $cb eq 'Argon::Respond') {
-                    $cb->dispatch($message);
-                } else {
-                    $cb->($message);
-
-                }
+            my $respond = $self->respond_get($message->id);
+            if ($respond) {
+                $respond->dispatch($message);
+                $self->respond_delete($message);
             }
 
             $self->handle->push_read(@start_request)
@@ -182,28 +153,13 @@ sub on_message {
 }
 
 #-------------------------------------------------------------------------------
-# Registers callback (an instance of Argon::Respond) for tasks that have been
-# accepted and are awaiting a result.
-#-------------------------------------------------------------------------------
-sub await {
-    my ($self, $msg, $on_success, $on_error) = @_;
-
-    my $respond = Argon::Respond->new;
-    $respond->to(CMD_ERROR,    sub { $on_error->(shift)   }) if $on_error;
-    $respond->to(CMD_COMPLETE, sub { $on_success->(shift) }) if $on_success;
-    $respond->to(CMD_PENDING,  sub { $self->respond_set($msg->id => $respond) });
-
-    $self->respond_set($msg->id, $respond);
-}
-
-#-------------------------------------------------------------------------------
-# Sends a single message to the remote host and executes callback $cb if the
-# server responds.
+# Sends a single message to the remote host and dispatches Argon::Respond
+# $respond with the server's reply.
 #-------------------------------------------------------------------------------
 sub send {
-    my ($self, $message, $cb) = @_;
+    my ($self, $message, $respond) = @_;
+    $self->respond_set($message->id, $respond);
     $self->handle->push_write($message->encode . $self->endline);
-    $self->pending->{$message->id} = $cb;
 }
 
 #-------------------------------------------------------------------------------
@@ -232,21 +188,14 @@ sub queue {
     Carp::confess 'Inappropriate message status (expected QUEUE)'
         unless $msg->command() == CMD_QUEUE;
 
-    $self->await($msg, $on_success, $on_error);
+    my $respond = Argon::Respond->new;
+    $respond->to(CMD_ERROR,    sub { $on_error->(shift)   }) if $on_error;
+    $respond->to(CMD_COMPLETE, sub { $on_success->(shift) }) if $on_success;
+    $respond->to(CMD_PENDING,  sub { $self->respond_set($msg->id => $respond) });
+    $respond->to(CMD_REJECTED, sub { push @{$self->backlog}, [$msg, $on_success, $on_error] });
 
-    $self->send($msg, sub {
-        my $reply = shift;
-        if ($reply->command == CMD_REJECTED) {
-            push @{$self->backlog}, [$msg, $on_success, $on_error];
-        } else {
-            my $callback = $self->respond_get($reply->id);
-            $self->respond_delete($reply->id);
-            # Callback may be undefined if the successful response was in-bound
-            # from the last poll while this send was being performed.
-            $callback->dispatch($reply)
-                if defined $callback;
-        }
-    });
+    $self->respond_set($msg->id, $respond);
+    $self->handle->push_write($msg->encode . $self->endline);
 }
 
 no Moose;
