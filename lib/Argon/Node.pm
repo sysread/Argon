@@ -2,6 +2,9 @@
 # Nodes manage a pool of Worker processes. Like a Cluster, they route tasks to
 # Workers (without worrying about each processes' speed, since they are local),
 # and store the results.
+#
+# TODO
+#   * Reconnect/register to manager if disconnected
 #-------------------------------------------------------------------------------
 package Argon::Node;
 
@@ -99,13 +102,23 @@ sub notify {
         my $msg    = Argon::Message->new(command => CMD_ADD_NODE);
         $msg->set_payload($node);
 
+        my $respond = Argon::Respond->new();
+
+        $respond->to(CMD_ACK, sub {
+            LOG("Registration complete with manager %s:%d", $host, $port);
+            $client->close;
+        });
+
+        $respond->to(CMD_ERROR, sub {
+            LOG("Unable to register with manager %s:%d - %s", $host, $port, shift);
+            $client->close;
+           
+        });
+
         LOG("Connecting to manager %s:%d", $host, $port);
         $client->connect(sub {
             LOG("Sent notification to manager %s:%d", $host, $port);
-            $client->send($msg, sub {
-                LOG("Registration complete with manager %s:%d", $host, $port);
-                $client->close;
-            });
+            $client->send($msg, $respond);
         });
     }
 }

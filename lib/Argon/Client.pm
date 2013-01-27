@@ -1,8 +1,5 @@
 #-------------------------------------------------------------------------------
 # TODO Reconnection scheme
-# TODO Prevent duplicate poll queries (e.g. poll x, start another poll before
-#      x's poll gets a result
-# TODO Provide on-error callback for initial connection
 #-------------------------------------------------------------------------------
 package Argon::Client;
 
@@ -96,7 +93,6 @@ sub close {
     my $self = shift;
     $self->handle->destroy;
     $self->disconnect;
-    $self->stop_polling;
 }
 
 sub on_connect {
@@ -194,8 +190,7 @@ sub queue {
     $respond->to(CMD_PENDING,  sub { $self->respond_set($msg->id => $respond) });
     $respond->to(CMD_REJECTED, sub { push @{$self->backlog}, [$msg, $on_success, $on_error] });
 
-    $self->respond_set($msg->id, $respond);
-    $self->handle->push_write($msg->encode . $self->endline);
+    $self->send($msg, $respond);
 }
 
 no Moose;
