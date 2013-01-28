@@ -27,9 +27,16 @@ has 'max_requests' => (is => 'ro', isa => 'Int', default  => 0);
 
 has 'managers' => (
     is       => 'rw',
-    isa      => 'ArrayRef[ArrayRef]',
+    isa      => 'HashRef[ArrayRef]',
     init_arg => undef,
-    default  => sub { [] },
+    default  => sub {{}},
+);
+
+has 'manager' => (
+    is       => 'rw',
+    isa      => 'HashRef[Argon::Client]',
+    init_arg => undef,
+    default  => sub {{}},
 );
 
 has 'pool' => (
@@ -84,7 +91,7 @@ sub shutdown {
 #-------------------------------------------------------------------------------
 sub add_manager {
     my ($self, $host, $port) = @_;
-    push @{$self->managers}, [$host, $port];
+    $self->managers->{"$host:$port"} = [$host, $port];
 }
 
 #-------------------------------------------------------------------------------
@@ -96,8 +103,8 @@ sub notify {
     my $host = $self->server->host || hostname;
     my $node = [$host, $port];
 
-    foreach my $manager (@{$self->managers}) {
-        my ($host, $port) = @$manager;
+    foreach my $manager (keys %{$self->managers}) {
+        my ($host, $port) = @{$self->managers->{$manager}};
         my $client = Argon::Client->new(host => $host, port => $port);
         my $msg    = Argon::Message->new(command => CMD_ADD_NODE);
         $msg->set_payload($node);
@@ -106,18 +113,18 @@ sub notify {
 
         $respond->to(CMD_ACK, sub {
             LOG("Registration complete with manager %s:%d", $host, $port);
-            $client->close;
+            $self->manager->{$manager} = $client;
         });
 
         $respond->to(CMD_ERROR, sub {
             LOG("Unable to register with manager %s:%d - %s", $host, $port, shift);
             $client->close;
-           
+            del $self->managers->{$manager};
         });
 
-        LOG("Connecting to manager %s:%d", $host, $port);
+        LOG("Connecting to manager %s", $manager);
         $client->connect(sub {
-            LOG("Sent notification to manager %s:%d", $host, $port);
+            LOG("Notification sent to manager %s", $manager);
             $client->send($msg, $respond);
         });
     }

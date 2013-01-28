@@ -81,6 +81,27 @@ has 'backlog_timer' => (
     init_arg  => undef,
 );
 
+has 'connection_attempts' => (
+    traits    => ['Counter'],
+    is        => 'ro',
+    isa       => 'Int',
+    default   => 0,
+    init_arg  => undef,
+    handles   => {
+        inc_connection_attempts   => 'inc',
+        reset_connection_attempts => 'reset',
+    },
+);
+
+# Attempts to reconnect after the connection to the server is unexpectedly broken.
+has 'connection_timer' => (
+    is        => 'rw',
+    init_arg  => undef,
+    clearer   => 'clear_connection_timer',
+    predicate => 'is_reconnecting',
+);
+
+
 sub BUILD {
     my $self = shift;
     $self->backlog_timer(AnyEvent->timer(
@@ -105,31 +126,59 @@ sub close {
     $self->disconnect;
 }
 
+sub next_reconnect_attempt {
+    my $self = shift;
+    my $n = $self->connection_attempts ** 2;
+    return $n < 1 ? 1 : log($n);
+}
+
+sub reconnect {
+    my $self = shift;
+    unless ($self->is_reconnecting) {
+        LOG("Reconnect in %fs", $self->next_reconnect_attempt);
+
+        $self->connection_timer(AnyEvent->timer(
+            after    => $self->next_reconnect_attempt,
+            cb       => sub {
+                $self->clear_connection_timer;
+                $self->inc_connection_attempts;
+                $self->connect;
+            },
+        ));
+    }
+}
+
+sub stop_reconnecting {
+    my $self = shift;
+    $self->clear_connection_timer;
+}
+
 sub on_connect {
     my ($self, $cb, $fh, $host, $port, $retry) = @_;
-    croak 'Failure connecting to remote host' unless defined $fh;
-    
-    my $handle;
-    $handle = AnyEvent::Handle->new(
-        fh => $fh,
-        on_eof => sub {
-            LOG('Disconnected to remote host %s:%d.', $self->host, $self->port);
-            $self->connect(sub {
-                LOG('Reconnected to remote host %s:%d.', $self->host, $self->port);
-            });
-        },
-        on_error => sub {
-            my $msg = $_[2];
-            LOG("Error: $msg");
-        },
-    );
-    
-    $self->handle($handle);
 
-    # Configure continuous reader callback
-    $self->handle->on_read(sub { $self->on_message(@_) });
+    if (!defined $fh) {
+        LOG('Failure connecting to remote host %s:%d.', $self->host, $self->port);
+        $self->reconnect;
+    } else {
+        LOG('Connected to remote host %s:%d.', $self->host, $self->port);
+        $self->stop_reconnecting;
+        $self->reset_connection_attempts;
 
-    $cb->($self);
+        my $handle = AnyEvent::Handle->new(
+            fh       => $fh,
+            on_eof   => sub { $self->reconnect },
+            on_error => sub { $self->reconnect },
+        );
+
+        $self->handle($handle);
+
+        # Configure continuous reader callback
+        $self->handle->on_read(sub { $self->on_message(@_) });
+
+        if (ref $cb eq 'CODE') {
+            $cb->($self);
+        }
+    }
 }
 
 #-------------------------------------------------------------------------------
