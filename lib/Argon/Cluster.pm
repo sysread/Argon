@@ -16,6 +16,7 @@ require Argon::Client;
 
 extends 'Argon::MessageManager';
 with    'Argon::Role::MessageServer';
+with    'Argon::Role::ManagedServer';
 
 #-------------------------------------------------------------------------------
 # Re-references Argon::Client nodes by host:port so that they may be removed by

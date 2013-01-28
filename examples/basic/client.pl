@@ -54,7 +54,7 @@ $client->connect(sub {
     foreach my $i (1 .. $total) {
         $client->process(
             class      => 'SampleJob',
-            args       => [$i, $sleep],
+            args       => [value => $i, sleep_for => $sleep],
             on_success => on_complete($i),
             on_error   => on_error($i),
         );
