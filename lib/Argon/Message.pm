@@ -60,7 +60,6 @@ has 'encoded' => (
     predicate => 'is_encoded',
 );
 
-
 sub update_timestamp {
     my $self = shift;
     $self->timestamp(time);

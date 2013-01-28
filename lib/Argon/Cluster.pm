@@ -46,7 +46,7 @@ sub add_node {
 
     $self->nodes->{"$host:$port"} = $client;
     $self->add_client($client);
-    
+
     return $msg->reply(CMD_ACK);
 }
 

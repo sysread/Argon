@@ -101,7 +101,6 @@ has 'connection_timer' => (
     predicate => 'is_reconnecting',
 );
 
-
 sub BUILD {
     my $self = shift;
     $self->backlog_timer(AnyEvent->timer(

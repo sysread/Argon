@@ -19,7 +19,7 @@ my $pool  = Argon::Pool->new('concurrency' => $conc, max_requests => $reqs);
 
 foreach my $i (1 .. $count) {
     my $msg = Argon::Message->new(command => CMD_QUEUE);
-    $msg->set_payload(['SampleJob', [$i, $wait]]);
+    $msg->set_payload(['SampleJob', [value => $i, sleep_for => $wait]]);
 
     $pool->assign($msg, sub {
         my $response = shift;

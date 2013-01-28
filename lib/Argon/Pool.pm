@@ -79,30 +79,8 @@ has 'pending' => (
 # tasks.
 #-------------------------------------------------------------------------------
 sub start_worker {
-    my $self = shift;
-    my $worker = Argon::Pool::Worker->new(sub {
-        my $message = shift;
-
-        my $result = eval {
-            my ($class, $params) = @{$message->get_payload};
-            require "$class.pm";
-            $class->new(@$params)->run;
-        };
-
-        my $reply;
-        if ($@) {
-            my $error = $@;
-            $reply = $message->reply(CMD_ERROR);
-            $reply->set_payload($error);
-        } else {
-            $reply = $message->reply(CMD_COMPLETE);
-            $reply->set_payload($result);
-        }
-
-        my $r = $reply->encode();
-        return $r;
-    });
-
+    my $self   = shift;
+    my $worker = Argon::Pool::Worker->new();
     $self->checkin($worker);
     return $worker;
 }
