@@ -1,5 +1,6 @@
 #-------------------------------------------------------------------------------
 # TODO Reconnection scheme
+# TODO Error handler for handle/socket errors
 #-------------------------------------------------------------------------------
 package Argon::Client;
 
@@ -59,6 +60,14 @@ has 'respond' => (
     },
 );
 
+# Flags whether or not to backlog rejected tasks for resubmission.
+has 'has_backlog' => (
+    is        => 'ro',
+    isa       => 'Bool',
+    default   => 1,
+);
+
+# Stores rejected tasks for resubmission.
 has 'backlog' => (
     is        => 'rw',
     isa       => 'ArrayRef',
@@ -66,6 +75,7 @@ has 'backlog' => (
     default   => sub {[]},
 );
 
+# Checks for backlogged tasks and resubmits them.
 has 'backlog_timer' => (
     is        => 'rw',
     init_arg  => undef,
@@ -188,7 +198,12 @@ sub queue {
     $respond->to(CMD_ERROR,    sub { $on_error->(shift)   }) if $on_error;
     $respond->to(CMD_COMPLETE, sub { $on_success->(shift) }) if $on_success;
     $respond->to(CMD_PENDING,  sub { $self->respond_set($msg->id => $respond) });
-    $respond->to(CMD_REJECTED, sub { push @{$self->backlog}, [$msg, $on_success, $on_error] });
+
+    if ($self->has_backlog) {
+        $respond->to(CMD_REJECTED, sub { push @{$self->backlog}, [$msg, $on_success, $on_error] });
+    } else {
+        $respond->to(CMD_REJECTED, sub { $on_success->(shift) }) if $on_success;
+    }
 
     $self->send($msg, $respond);
 }

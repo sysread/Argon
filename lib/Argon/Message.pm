@@ -2,11 +2,15 @@ package Argon::Message;
 
 use Moose;
 use Carp;
-use namespace::autoclean;
+#use namespace::autoclean;
 use Argon       qw/:priorities LOG MESSAGE_SEPARATOR/;
 use Time::HiRes qw/time/;
-use overload '<=>'  => \&compare;
-use overload 'bool' => sub { defined $_[0] };
+use overload 
+    '<=>'  => 'compare',
+    '>'    => sub { compare($_[0], $_[1])  > 0 },
+    '<'    => sub { compare($_[0], $_[1])  < 0 },
+    '='    => sub { compare($_[0], $_[1]) == 0 },
+    'bool' => sub { $_[0] };
 
 require Data::UUID;
 require MIME::Base64;

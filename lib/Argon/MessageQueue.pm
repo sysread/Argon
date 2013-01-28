@@ -6,6 +6,7 @@ use warnings;
 use Carp;
 use POSIX      qw/floor/;
 use List::Util qw/max/;
+use Argon      qw/LOG/;
 
 use fields qw/limit size data/;
 
@@ -49,7 +50,7 @@ sub put {
     my $idx    = $self->{size} - 1;
     my $parent = parent($idx);
 
-    while ($idx > 0 && $data->[$idx] > $data->[$parent]) {
+    while ($idx > 0 && ($data->[$idx] > $data->[$parent])) {
         my $tmp = $data->[$parent];
         $data->[$parent] = $data->[$idx];
         $data->[$idx]    = $tmp;

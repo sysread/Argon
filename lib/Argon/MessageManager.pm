@@ -36,10 +36,10 @@ has 'assigned_to' => (
     init_arg => undef,
 );
 
-# Hash of server => list of msg ids; tracks assignments to a server
+# Hash of server => msg id => 1; tracks assignments to a server
 has 'assignments' => (
     is       => 'ro',
-    isa      => 'HashRef[Str]',
+    isa      => 'HashRef[Argon::Message]',
     default  => sub { {} },
     init_arg => undef,
 );
@@ -83,10 +83,10 @@ around 'msg_accept' => sub {
 sub assign_message {
     my ($self, $msg, $client) = @_;
 
-    push @{$self->assignments->{$client}}, $msg->id;
+    $self->assignments->{$client}{$msg->id} = 1;
     $self->msg_assigned($msg);
     my $sent = time;
-    
+
     my $on_success = sub {
         my $reply = shift;
 
@@ -96,13 +96,14 @@ sub assign_message {
 
         $self->avg_processing_time->{$client} = sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES;
         $self->msg_complete($reply);
+        delete $self->assignments->{$client}{$msg->id};
     };
-    
+
     my $on_error = sub {
         my $reply = shift;
         $self->msg_complete($reply);
     };
-    
+
     $client->queue($msg, $on_success, $on_error);
 }
 
@@ -115,7 +116,7 @@ sub add_client {
     $client->connect(sub {
         LOG("Remote host %s:%d connected.", $client->host, $client->port);
         push @{$self->servers}, $client;
-        $self->assignments->{$client}         = [];
+        $self->assignments->{$client}         = {};
         $self->processing_times->{$client}    = [];
         $self->avg_processing_time->{$client} = 0.001;
         # Note: an arbitrary value is used for avg_processing_time to allow
@@ -131,7 +132,7 @@ sub add_client {
 sub del_client {
     my ($self, $client) = @_;
 
-    foreach my $id (@{$self->assignments->{$client}}) {
+    foreach my $id (keys %{$self->assignments->{$client}}) {
         my $msg   = $self->message->{$id};
         my $reply = $msg->reply(CMD_ERROR);
         $self->msg_complete($reply);
@@ -152,7 +153,7 @@ sub del_client {
 sub estimated_processing_time {
     my ($self, $client) = @_;
     return $self->avg_processing_time->{$client}
-         * (1 + scalar(@{$self->assignments->{$client}}));
+         * (1 + scalar(keys %{$self->assignments->{$client}}));
 }
 
 #-------------------------------------------------------------------------------
