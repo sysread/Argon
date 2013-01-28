@@ -1,8 +1,23 @@
 Changes
-lib/Argon.pm
 Makefile.PL
 MANIFEST			This list of files
 README
+
+lib/Argon.pm
+lib/Client.pm
+lib/Cluster.pm
+lib/Message.pm
+lib/MessageManager.pm
+lib/MessageProducer.pm
+lib/MessageQueue.pm
+lib/Node.pm
+lib/Pool.pm
+lib/Pool/Worker.pm
+lib/Respond.pm
+lib/Role/MessageServer.pm
+lib/Role/QueueManager.pm
+lib/Server.pm
+
 t/00-load.t
 t/manifest.t
 t/pod-coverage.t
