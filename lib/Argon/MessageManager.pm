@@ -6,6 +6,8 @@
 #
 # TODO Track message stats with a time slice rather than the last n messages
 # TODO Higher resolution in tracking to deal with very small/fast jobs
+# TODO Determine why tasks are not being distributed well across multiple
+#      clients
 #-------------------------------------------------------------------------------
 package Argon::MessageManager;
 

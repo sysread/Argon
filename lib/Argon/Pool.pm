@@ -151,35 +151,37 @@ sub assign_pending {
     return unless $self->queue_length > 0;
     return unless $self->idle         > 0;
 
-    my ($message, $callback) = @{$self->queue_get};
-    my $worker = $self->checkout;
+    while ($self->queue_length > 0 && $self->idle > 0) {
+        my ($message, $callback) = @{$self->queue_get};
+        my $worker = $self->checkout;
 
-    $worker->do($message, sub {
-        # ARGS: worker, Message reply
-        $worker  = shift;
-        $message = Argon::Message::decode(shift);
+        $worker->do($message, sub {
+            # ARGS: worker, Message reply
+            $worker  = shift;
+            $message = Argon::Message::decode(shift);
 
-        # Call task callback
-        eval { $callback->($message) };
-        $@ && carp $@;
+            # Call task callback
+            eval { $callback->($message) };
+            $@ && carp $@;
 
-        if ($self->is_running) {
-            # Check if worker ought to be restarted
-            if ($self->max_requests != 0
-             && $worker->inc >= $self->max_requests) {
-                $self->stop_worker($worker);
-                $worker = $self->start_worker; # implicitly checks in new workers
+            if ($self->is_running) {
+                # Check if worker ought to be restarted
+                if ($self->max_requests != 0
+                 && $worker->inc >= $self->max_requests) {
+                    $self->stop_worker($worker);
+                    $worker = $self->start_worker; # implicitly checks in new workers
+                } else {
+                    $self->checkin($worker);
+                }
+
+                # Trigger assign_pending again
+                $self->assign_pending;
             } else {
-                $self->checkin($worker);
+                # System is shut down - stop worker
+                $self->stop_worker($worker);
             }
-
-            # Trigger assign_pending again
-            $self->assign_pending;
-        } else {
-            # System is shut down - stop worker
-            $self->stop_worker($worker);
-        }
-    });
+        });
+    }
 }
 
 #-------------------------------------------------------------------------------

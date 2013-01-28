@@ -12,11 +12,12 @@ require Argon::Message;
 require SampleJob;
 
 my %opt;
-getopt('hpn', \%opt);
+getopt('hpns', \%opt);
 
 my $total = $opt{n} || 10;
 my $host  = $opt{h} || 'localhost';
 my $port  = $opt{p} || 8888;
+my $sleep = $opt{s} || 0.1;
 
 my $client = Argon::Client->new(
     host => $host,
@@ -53,7 +54,7 @@ $client->connect(sub {
     foreach my $i (1 .. $total) {
         $client->process(
             class      => 'SampleJob',
-            args       => [$i, 0.1],
+            args       => [$i, $sleep],
             on_success => on_complete($i),
             on_error   => on_error($i),
         );

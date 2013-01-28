@@ -2,6 +2,9 @@
 # Argon::Cluster is a MessageManager that intelligently distributes messages
 # among a list of clients. Clusters are also MessageServers that accept new
 # messages and track their status, acting as a proxy for its client list.
+#
+# TODO
+#   * Handle unexpected node disconnects
 #-------------------------------------------------------------------------------
 package Argon::Cluster;
 
