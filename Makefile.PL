@@ -7,7 +7,7 @@ WriteMakefile(
     NAME                => 'Argon',
     AUTHOR              => q{"Jeff Ober" <"jeffober@gmail.com">},
     VERSION_FROM        => 'lib/Argon.pm',
-    ABSTRACT_FROM       => 'lib/Argon.pm',
+    ABSTRACT            => 'A robust, distributed services platform.',
     ($ExtUtils::MakeMaker::VERSION >= 6.3002
       ? ('LICENSE'=> 'perl')
       : ()),
