@@ -46,6 +46,11 @@ sub add_node {
         chunk_size => $self->chunk_size,
     );
 
+    $client->add_disconnect_callbacks(sub {
+        delete $self->nodes->{"$host:$port"};
+        $self->del_client($client);
+    });
+
     $self->nodes->{"$host:$port"} = $client;
     $self->add_client($client);
 
@@ -57,7 +62,7 @@ sub del_node {
     my ($host, $port) = @{$msg->get_payload};
     if (exists $self->nodes->{"$host:$port"}) {
         my $client = $self->nodes->{"$host:$port"};
-        undef $self->nodes->{"$host:$port"};
+        delete $self->nodes->{"$host:$port"};
         $self->del_client($client);
     }
 

@@ -63,7 +63,7 @@ sub notify {
         });
 
         LOG("Connecting to manager %s", $manager);
-        $client->on_connect(sub { $client->send($msg, $respond) });
+        $client->add_connect_callbacks(sub { $client->send($msg, $respond) });
         $client->connect;
     }
 }

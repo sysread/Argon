@@ -38,16 +38,28 @@ has 'chunk_size' => (
     default   => CHUNK_SIZE,
 );
 
-has 'on_connect' => (
-    is        => 'rw',
-    isa       => 'CodeRef',
-    required  => 0,
+has 'connect_callbacks' => (
+    traits  => ['Array'],
+    is      => 'ro',
+    isa     => 'ArrayRef[CodeRef]',
+    default => sub { [] },
+    handles => {
+        all_connect_callbacks => 'elements',
+        add_connect_callbacks => 'push',
+        has_connect_callbacks => 'count',
+    },
 );
 
-has 'on_disconnect' => (
-    is        => 'rw',
-    isa       => 'CodeRef',
-    required  => 0,
+has 'disconnect_callbacks' => (
+    traits  => ['Array'],
+    is      => 'ro',
+    isa     => 'ArrayRef[CodeRef]',
+    default => sub { [] },
+    handles => {
+        all_disconnect_callbacks => 'elements',
+        add_disconnect_callbacks => 'push',
+        has_disconnect_callbacks => 'count',
+    },
 );
 
 has 'handle' => (
@@ -165,8 +177,9 @@ sub stop_reconnecting {
 sub disconnect_handler {
     my $self = shift;
 
-    $self->on_disconnect->($self)
-        if $self->on_disconnect;
+    if ($self->has_disconnect_callbacks) {
+        $_->($self) foreach $self->all_disconnect_callbacks;
+    }
 
     $self->reconnect;
 }
@@ -197,8 +210,8 @@ sub connect_handler {
             $cb->($self);
         }
 
-        if ($self->on_connect) {
-            $self->on_connect->($self);
+        if ($self->has_connect_callbacks) {
+            $_->($self) foreach $self->all_connect_callbacks;
         }
     }
 }
@@ -262,6 +275,7 @@ sub process {
 #-------------------------------------------------------------------------------
 sub queue {
     my ($self, $msg, $on_success, $on_error) = @_;
+
     Carp::confess 'Inappropriate message status (expected QUEUE)'
         unless $msg->command() == CMD_QUEUE;
 

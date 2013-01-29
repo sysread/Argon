@@ -6,8 +6,6 @@
 #
 # TODO Track message stats with a time slice rather than the last n messages
 # TODO Higher resolution in tracking to deal with very small/fast jobs
-# TODO Determine why tasks are not being distributed well across multiple
-#      clients
 #-------------------------------------------------------------------------------
 package Argon::MessageManager;
 
@@ -25,8 +23,8 @@ extends 'Argon::MessageProcessor';
 # List of Argon::Client instances
 has 'servers' => (
     is       => 'rw',
-    isa      => 'ArrayRef[Argon::Client]',
-    default  => sub { [] },
+    isa      => 'HashRef[Argon::Client]',
+    default  => sub { {} },
     init_arg => undef,
 );
 
@@ -104,6 +102,7 @@ sub assign_message {
     my $on_error = sub {
         my $reply = shift;
         $self->msg_complete($reply);
+        delete $self->assignments->{$client}{$msg->id};
     };
 
     $client->queue($msg, $on_success, $on_error);
@@ -115,17 +114,18 @@ sub assign_message {
 sub add_client {
     my ($self, $client) = @_;
 
-    $client->connect(sub {
+    $client->add_connect_callbacks(sub {
         LOG("Remote host %s:%d connected.", $client->host, $client->port);
-        push @{$self->servers}, $client;
-        $self->assignments->{$client}         = {};
-        $self->processing_times->{$client}    = [];
+        $self->servers->{$client}          = $client;
+        $self->assignments->{$client}      = {};
+        $self->processing_times->{$client} = [];
+        # Note: an arbitrary value is used for avg_processing_time to allow the
+        # ranking algorithm to properly evaluate newly attached clients.
         $self->avg_processing_time->{$client} = 0.001;
-        # Note: an arbitrary value is used for avg_processing_time to allow
-        # the ranking algorithm to properly evaluate brand new clients.
     });
 
-    # TODO: add on_error handler
+    $client->add_disconnect_callbacks(sub { $self->del_client(shift) });
+    $client->connect;
 }
 
 #-------------------------------------------------------------------------------
@@ -133,19 +133,22 @@ sub add_client {
 #-------------------------------------------------------------------------------
 sub del_client {
     my ($self, $client) = @_;
+    LOG("Remote host %s:%d disconnected.", $client->host, $client->port);
 
+    # Fail any tasks assigned to a client that has disconnected. There is no
+    # way to know if the task was actually run or not, because the client did
+    # not communicate this to us (e.g. from a clean shutdown).
     foreach my $id (keys %{$self->assignments->{$client}}) {
         my $msg   = $self->message->{$id};
-        my $reply = $msg->reply(CMD_ERROR);
-        $self->msg_complete($reply);
-        LOG("Remote host %s:%d disconnected.", $client->host, $client->port);
+        my $error = $msg->reply(CMD_ERROR);
+        $error->set_payload('Connection lost to the worker processing the task.');
+        $self->msg_complete($error);
     }
 
-    $self->servers([ map {$_ ne $client} @{$self->servers} ]);
-    undef $self->assignments->{client};
-    undef $self->processing_times->{$client};
-    undef $self->avg_processing_time->{$client};
-    $client->close;
+    delete $self->servers->{$client};
+    delete $self->assignments->{$client};
+    delete $self->processing_times->{$client};
+    delete $self->avg_processing_time->{$client};
 }
 
 #-------------------------------------------------------------------------------
@@ -167,9 +170,10 @@ sub next_client {
 
     my %time;
     $time{$_} = $self->estimated_processing_time($_)
-        foreach @{$self->servers};
+        foreach values %{$self->servers};
 
-    return reduce { $time{$a} < $time{$b} ? $a : $b } @{$self->servers};
+    return reduce { $time{$a} < $time{$b} ? $a : $b }
+        values %{$self->servers};
 }
 
 no Moose;
