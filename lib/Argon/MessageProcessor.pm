@@ -1,5 +1,6 @@
 #-------------------------------------------------------------------------------
-# MessageProcessors track message status.
+# MessageProcessors serve as a proxy or hub, tracking message status as messages
+# are accepted, routed for processing, and returned.
 #-------------------------------------------------------------------------------
 package Argon::MessageProcessor;
 

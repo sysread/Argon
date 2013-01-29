@@ -38,7 +38,13 @@ has 'chunk_size' => (
     default   => CHUNK_SIZE,
 );
 
-has 'on_connection' => (
+has 'on_connect' => (
+    is        => 'rw',
+    isa       => 'CodeRef',
+    required  => 0,
+);
+
+has 'on_disconnect' => (
     is        => 'rw',
     isa       => 'CodeRef',
     required  => 0,
@@ -122,7 +128,7 @@ sub BUILD {
 
 sub connect {
     my ($self, $cb) = @_;
-    tcp_connect $self->host, $self->port, sub { $self->on_connect($cb, @_) };
+    tcp_connect $self->host, $self->port, sub { $self->connect_handler($cb, @_) };
 }
 
 sub close {
@@ -156,7 +162,16 @@ sub stop_reconnecting {
     $self->clear_connection_timer;
 }
 
-sub on_connect {
+sub disconnect_handler {
+    my $self = shift;
+
+    $self->on_disconnect->($self)
+        if $self->on_disconnect;
+
+    $self->reconnect;
+}
+
+sub connect_handler {
     my ($self, $cb, $fh, $host, $port, $retry) = @_;
 
     if (!defined $fh) {
@@ -169,8 +184,8 @@ sub on_connect {
 
         my $handle = AnyEvent::Handle->new(
             fh       => $fh,
-            on_eof   => sub { $self->reconnect },
-            on_error => sub { $self->reconnect },
+            on_eof   => sub { $self->disconnect_handler },
+            on_error => sub { $self->disconnect_handler },
         );
 
         $self->handle($handle);
@@ -182,8 +197,8 @@ sub on_connect {
             $cb->($self);
         }
 
-        if ($self->on_connection) {
-            $self->on_connection->($self);
+        if ($self->on_connect) {
+            $self->on_connect->($self);
         }
     }
 }

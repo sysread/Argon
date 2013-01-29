@@ -1,9 +1,16 @@
 #-------------------------------------------------------------------------------
 # TODO
 #   * Debug levels (higher levels log less, remove stack traces from warnings, etc.)
-#   * Fault tolerance
 #   * Clearing out completed messages that were never picked up
 #   * Chaos monkey
+# 
+# BUGS
+#   * When a Node goes down, Cluster does not notify Clients of failed tasks
+#     that Cluster had assigned to down Node
+#     - solution: when node connection is broken, cluster fails any pending
+#       tasks for the node.
+#       - if node does not crash (e.g. network connection is broken, appearing
+#         the same to the cluster/node) what should the node do with its tasks?
 #-------------------------------------------------------------------------------
 package Argon;
 

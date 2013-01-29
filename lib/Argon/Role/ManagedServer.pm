@@ -62,12 +62,8 @@ sub notify {
             del $self->managers->{$manager};
         });
 
-        $client->on_connection(sub {
-            LOG("Notification sent to manager %s", $manager);
-            $client->send($msg, $respond);
-        });
-
         LOG("Connecting to manager %s", $manager);
+        $client->on_connect(sub { $client->send($msg, $respond) });
         $client->connect;
     }
 }
