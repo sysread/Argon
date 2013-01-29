@@ -1,6 +1,6 @@
-package Argon::Server;
+package Argon::Role::Server;
 
-use Moose;
+use Moose::Role;
 use Carp;
 use namespace::autoclean;
 use AnyEvent;
@@ -220,6 +220,5 @@ sub send_reply {
 }
 
 no Moose;
-__PACKAGE__->meta->make_immutable;
 
 1;

@@ -15,6 +15,7 @@ use Argon qw/LOG :commands/;
 require Argon::Client;
 
 extends 'Argon::MessageManager';
+with    'Argon::Role::Server';
 with    'Argon::Role::MessageServer';
 with    'Argon::Role::ManagedServer';
 
@@ -31,8 +32,8 @@ has 'nodes' => (
 
 sub BUILD {
     my $self = shift;
-    $self->server->respond_to(CMD_ADD_NODE, sub { $self->add_node(@_) });
-    $self->server->respond_to(CMD_DEL_NODE, sub { $self->del_node(@_) });
+    $self->respond_to(CMD_ADD_NODE, sub { $self->add_node(@_) });
+    $self->respond_to(CMD_DEL_NODE, sub { $self->del_node(@_) });
 }
 
 sub add_node {

@@ -8,6 +8,8 @@ use Argon::MessageProcessor;
 
 requires 'msg_accept';
 requires 'status';
+requires 'respond_to';
+requires 'send_reply';
 
 has 'endline' => (
     is      => 'ro',
@@ -21,21 +23,14 @@ has 'chunk_size' => (
     default => CHUNK_SIZE,
 );
 
-# Instance of Argon::Server used to accept messages
-has 'server' => (
-    is       => 'ro',
-    isa      => 'Argon::Server',
-    required => 1,
-);
-
 #-------------------------------------------------------------------------------
 # Configures the server, mapping commands to local methods.
 #-------------------------------------------------------------------------------
 sub BUILD {}
 after 'BUILD' => sub {
     my $self = shift;
-    $self->server->respond_to(CMD_QUEUE,  sub { $self->reply_queue(@_)  });
-    $self->server->respond_to(CMD_STATUS, sub { $self->reply_status(@_) });
+    $self->respond_to(CMD_QUEUE,  sub { $self->reply_queue(@_)  });
+    $self->respond_to(CMD_STATUS, sub { $self->reply_status(@_) });
 };
 
 #-------------------------------------------------------------------------------
@@ -77,7 +72,7 @@ sub reply_status {
 around 'msg_complete' => sub {
     my ($orig, $self, $msg) = @_;
     $self->$orig($msg);
-    $self->server->send_reply($msg);
+    $self->send_reply($msg);
 };
 
 no Moose;

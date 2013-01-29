@@ -9,7 +9,8 @@ use Carp;
 use namespace::autoclean;
 use Argon qw/LOG :commands/;
 
-requires 'server';
+requires 'port';
+requires 'host';
 
 has 'managers' => (
     is       => 'rw',
@@ -38,17 +39,17 @@ sub add_manager {
 #-------------------------------------------------------------------------------
 sub notify {
     my $self = shift;
-    my $port = $self->server->port;
-    my $host = $self->server->host || 'localhost';
+    my $port = $self->port;
+    my $host = $self->host || 'localhost';
     my $node = [$host, $port];
 
     foreach my $manager (keys %{$self->managers}) {
         my ($host, $port) = @{$self->managers->{$manager}};
-        my $client = Argon::Client->new(host => $host, port => $port);
-        my $msg    = Argon::Message->new(command => CMD_ADD_NODE);
-        $msg->set_payload($node);
-
+        my $client  = Argon::Client->new(host => $host, port => $port);
+        my $msg     = Argon::Message->new(command => CMD_ADD_NODE);
         my $respond = Argon::Respond->new();
+
+        $msg->set_payload($node);
 
         $respond->to(CMD_ACK, sub {
             LOG("Registration complete with manager %s:%d", $host, $port);
@@ -61,11 +62,13 @@ sub notify {
             del $self->managers->{$manager};
         });
 
-        LOG("Connecting to manager %s", $manager);
-        $client->connect(sub {
+        $client->on_connection(sub {
             LOG("Notification sent to manager %s", $manager);
             $client->send($msg, $respond);
         });
+
+        LOG("Connecting to manager %s", $manager);
+        $client->connect;
     }
 }
 

@@ -38,6 +38,12 @@ has 'chunk_size' => (
     default   => CHUNK_SIZE,
 );
 
+has 'on_connection' => (
+    is        => 'rw',
+    isa       => 'CodeRef',
+    required  => 0,
+);
+
 has 'handle' => (
     is        => 'rw',
     isa       => 'AnyEvent::Handle',
@@ -134,8 +140,6 @@ sub next_reconnect_attempt {
 sub reconnect {
     my $self = shift;
     unless ($self->is_reconnecting) {
-        LOG("Reconnect in %fs", $self->next_reconnect_attempt);
-
         $self->connection_timer(AnyEvent->timer(
             after    => $self->next_reconnect_attempt,
             cb       => sub {
@@ -176,6 +180,10 @@ sub on_connect {
 
         if (ref $cb eq 'CODE') {
             $cb->($self);
+        }
+
+        if ($self->on_connection) {
+            $self->on_connection->($self);
         }
     }
 }

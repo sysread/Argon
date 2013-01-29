@@ -2,9 +2,6 @@
 # Nodes manage a pool of Worker processes. Like a Cluster, they route tasks to
 # Workers (without worrying about each processes' speed, since they are local),
 # and store the results.
-#
-# TODO
-#   * Reconnect/register to manager if disconnected
 #-------------------------------------------------------------------------------
 package Argon::Node;
 
@@ -18,9 +15,10 @@ require Argon::Client;
 require Argon::Pool;
 
 extends 'Argon::MessageProcessor';
+with    'Argon::Role::Server';
 with    'Argon::Role::MessageServer';
-with    'Argon::Role::QueueManager';
 with    'Argon::Role::ManagedServer';
+with    'Argon::Role::QueueManager';
 
 # These are used to configure the Argon::Pool
 has 'concurrency'  => (is => 'ro', isa => 'Int', required => 1);
@@ -49,7 +47,7 @@ has 'term_handler' => ( is => 'rw', init_arg => undef );
 #-------------------------------------------------------------------------------
 # Initializes the node
 #-------------------------------------------------------------------------------
-sub initialize {
+after 'start' => sub {
     my $self = shift;
 
     # Force creation of pool
@@ -61,7 +59,7 @@ sub initialize {
     # Add signal handlers
     $self->int_handler(AnyEvent->signal(signal => 'INT',  cb => sub { $self->shutdown }));
     $self->term_handler(AnyEvent->signal(signal => 'INT', cb => sub { $self->shutdown }));
-}
+};
 
 #-------------------------------------------------------------------------------
 # Shuts down
