@@ -11,7 +11,6 @@ package Argon::MessageManager;
 
 use Moose;
 use Carp;
-use Data::Dumper;
 use namespace::autoclean;
 use List::Util  qw/sum reduce/;
 use Time::HiRes qw/time/;
@@ -37,14 +36,6 @@ has 'clients' => (
     },
 );
 
-# Hash of msg id => server; tracks what messages are assigned where
-has 'assigned_to' => (
-    is       => 'ro',
-    isa      => 'HashRef[Argon::Server]',
-    default  => sub { {} },
-    init_arg => undef,
-);
-
 # Hash of server => msg id => 1; tracks assignments to a server
 has 'assignments' => (
     is       => 'ro',
@@ -67,6 +58,12 @@ has 'avg_processing_time' => (
     isa      => 'HashRef[Num]',
     default  => sub { {} },
     init_arg => undef,
+    traits   => ['Hash'],
+    handles  => {
+        'set_avg_proc_time' => 'set',
+        'get_avg_proc_time' => 'get',
+        'del_avg_proc_time' => 'delete',
+    }
 );
 
 #-------------------------------------------------------------------------------
@@ -103,7 +100,7 @@ sub assign_message {
         shift @{$self->processing_times->{$client}}
             if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
 
-        $self->avg_processing_time->{$client} = sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES;
+        $self->set_avg_proc_time($client, sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES);
         $self->msg_complete($reply);
         delete $self->assignments->{$client}{$msg->id};
     };
@@ -127,11 +124,11 @@ sub add_client {
         my $client = shift;
         LOG("Remote host %s:%d connected.", $client->host, $client->port);
         $self->client_set($client, $client);
-        $self->assignments->{$client}      = {};
+        $self->assignments->{$client} = {};
         $self->processing_times->{$client} = [];
         # Note: an arbitrary value is used for avg_processing_time to allow the
         # ranking algorithm to properly evaluate newly attached clients.
-        $self->avg_processing_time->{$client} = 0.001;
+        $self->set_avg_proc_time($client, 0.001);
     });
 
     $client->add_disconnect_callbacks(sub { $self->del_client(shift) });
@@ -156,9 +153,9 @@ sub del_client {
     }
 
     $self->client_del($client);
+    $self->del_avg_proc_time($client);
     delete $self->assignments->{$client};
     delete $self->processing_times->{$client};
-    delete $self->avg_processing_time->{$client};
     $client->close;
 }
 
@@ -168,7 +165,7 @@ sub del_client {
 #-------------------------------------------------------------------------------
 sub estimated_processing_time {
     my ($self, $client) = @_;
-    return $self->avg_processing_time->{$client}
+    return $self->get_avg_proc_time($client)
          * (1 + scalar(keys %{$self->assignments->{$client}}));
 }
 

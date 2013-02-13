@@ -246,7 +246,7 @@ sub on_message {
             my $respond = $self->respond_get($message->id);
             if ($respond) {
                 $respond->dispatch($message);
-                $self->respond_delete($message);
+                $self->respond_delete($message->id);
             }
 
             $self->handle->push_read(@start_request)

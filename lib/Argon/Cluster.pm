@@ -32,17 +32,8 @@ has 'nodes' => (
 
 sub BUILD {
     my $self = shift;
-    $self->respond_to(CMD_ADD_NODE, sub { $self->add_node(@_) });
-    $self->respond_to(CMD_DEL_NODE, sub { $self->del_node(@_) });
-}
-
-sub clear_node {
-    my ($self, $host, $port) = @_;
-    if (exists $self->nodes->{"$host:$port"}) {
-        my $client = $self->nodes->{"$host:$port"};
-        $self->del_client($client);
-        delete $self->nodes->{"$host:$port"};
-    }
+    $self->respond_to(CMD_ADD_NODE, sub { $self->debug, $self->add_node(@_) });
+    $self->respond_to(CMD_DEL_NODE, sub { $self->debug, $self->del_node(@_) });
 }
 
 sub add_node {
@@ -67,7 +58,11 @@ sub add_node {
 sub del_node {
     my ($self, $msg)  = @_;
     my ($host, $port) = @{$msg->get_payload};
-    $self->clear_node($host, $port);
+    if (exists $self->nodes->{"$host:$port"}) {
+        my $client = $self->nodes->{"$host:$port"};
+        $self->del_client($client);
+        delete $self->nodes->{"$host:$port"};
+    }
     return $msg->reply(CMD_ACK);
 }
 

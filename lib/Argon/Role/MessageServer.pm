@@ -52,6 +52,7 @@ around 'msg_complete' => sub {
     my ($orig, $self, $msg) = @_;
     $self->$orig($msg);
     $self->send_reply($msg);
+    $self->msg_clear($msg);
 };
 
 no Moose;

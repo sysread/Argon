@@ -195,7 +195,7 @@ sub register_message {
 sub unregister_message {
     my ($self, $handle, $message) = @_;
     $self->origin_del($message->id);
-    undef $self->fd2msg->{$handle->fh}{$message->id};
+    delete $self->fd2msg->{$handle->fh}{$message->id};
 }
 
 #-------------------------------------------------------------------------------
@@ -204,7 +204,7 @@ sub unregister_message {
 sub purge_fh {
     my ($self, $fh) = @_;
     $self->origin_del($_) foreach keys %{$self->fd2msg->{$fh}};
-    undef $self->fd2msg->{$fh};
+    delete $self->fd2msg->{$fh};
 }
 
 #-------------------------------------------------------------------------------
