@@ -36,7 +36,6 @@ has 'pool' => (
             max_requests => $self->max_requests,
         );
 
-        $pool->start;
         return $pool;
     }
 );
@@ -49,8 +48,8 @@ has 'term_handler' => ( is => 'rw', init_arg => undef );
 #-------------------------------------------------------------------------------
 after 'start' => sub {
     my $self = shift;
+    LOG('Starting node with %d workers on port %d', $self->concurrency, $self->port);
 
-    # Force creation of pool
     $self->pool->start;
 
     # Notify upstream managers
