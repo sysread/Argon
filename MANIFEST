@@ -8,7 +8,7 @@ lib/Argon/Client.pm
 lib/Argon/Cluster.pm
 lib/Argon/Message.pm
 lib/Argon/MessageManager.pm
-lib/Argon/MessageProducer.pm
+lib/Argon/MessageProcessor.pm
 lib/Argon/MessageQueue.pm
 lib/Argon/Node.pm
 lib/Argon/Pool.pm
