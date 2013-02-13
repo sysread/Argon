@@ -30,7 +30,6 @@ sub BUILD {}
 after 'BUILD' => sub {
     my $self = shift;
     $self->respond_to(CMD_QUEUE,  sub { $self->reply_queue(@_)  });
-    $self->respond_to(CMD_STATUS, sub { $self->reply_status(@_) });
 };
 
 #-------------------------------------------------------------------------------
@@ -46,26 +45,6 @@ sub reply_queue {
         return $reply;
     } else {
         return;
-        my $reply = $msg->reply(CMD_ACK);
-        return $reply;
-    }
-}
-
-#-------------------------------------------------------------------------------
-# Replies with the current message status (pending, complete, etc.)
-#-------------------------------------------------------------------------------
-sub reply_status {
-    my ($self, $msg) = @_;
-    if (exists $self->status->{$msg->id}) {
-        if ($self->status->{$msg->id} eq STATUS_COMPLETE) {
-            return $self->msg_clear($msg);
-        } else {
-            return $msg->reply(CMD_PENDING);
-        }
-    } else {
-        my $reply = $msg->reply(CMD_ERROR);
-        $reply->set_payload('Unknown message ID');
-        return $reply;
     }
 }
 
