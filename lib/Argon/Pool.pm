@@ -100,9 +100,11 @@ sub stop_worker {
 #-------------------------------------------------------------------------------
 sub start {
     my $self = shift;
-    $self->start_worker foreach (1 .. $self->concurrency);
-    $self->is_running(1);
-    $self->assign_pending;
+    unless ($self->is_running) {
+        $self->start_worker foreach (1 .. $self->concurrency);
+        $self->is_running(1);
+        $self->assign_pending;
+    }
 }
 
 #-------------------------------------------------------------------------------
