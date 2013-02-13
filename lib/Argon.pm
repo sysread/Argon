@@ -69,7 +69,7 @@ use constant CHUNK_SIZE         => 1024 * 4;
 use constant EOL                => "\015\012";
 use constant MESSAGE_SEPARATOR  => ' ';
 use constant TRACK_MESSAGES     => 10;   # number of message times to track for computing avg processing time at a host
-use constant POLL_INTERVAL      => 0.20; # seconds between polls for task results
+use constant POLL_INTERVAL      => 0.20; # seconds between polls for backlog (client)
 
 #-------------------------------------------------------------------------------
 # Priorities
