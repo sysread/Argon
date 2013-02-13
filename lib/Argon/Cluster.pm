@@ -12,6 +12,7 @@ use Moose;
 use Carp;
 use namespace::autoclean;
 use Argon qw/LOG :commands/;
+
 require Argon::Client;
 
 extends 'Argon::MessageManager';
@@ -32,8 +33,8 @@ has 'nodes' => (
 
 sub BUILD {
     my $self = shift;
-    $self->respond_to(CMD_ADD_NODE, sub { $self->debug, $self->add_node(@_) });
-    $self->respond_to(CMD_DEL_NODE, sub { $self->debug, $self->del_node(@_) });
+    $self->respond_to(CMD_ADD_NODE, sub { $self->add_node(@_) });
+    $self->respond_to(CMD_DEL_NODE, sub { $self->del_node(@_) });
 }
 
 sub add_node {
