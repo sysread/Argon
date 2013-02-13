@@ -23,6 +23,8 @@ with    'Argon::Role::QueueManager';
 # These are used to configure the Argon::Pool
 has 'concurrency'  => (is => 'ro', isa => 'Int', required => 1);
 has 'max_requests' => (is => 'ro', isa => 'Int', default  => 0);
+has 'int_handler'  => (is => 'rw', init_arg => undef);
+has 'term_handler' => (is => 'rw', init_arg => undef);
 
 has 'pool' => (
     is       => 'ro',
@@ -40,8 +42,6 @@ has 'pool' => (
     }
 );
 
-has 'int_handler'  => ( is => 'rw', init_arg => undef );
-has 'term_handler' => ( is => 'rw', init_arg => undef );
 
 #-------------------------------------------------------------------------------
 # Initializes the node

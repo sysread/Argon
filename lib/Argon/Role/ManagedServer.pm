@@ -45,12 +45,12 @@ sub notify {
 
     foreach my $manager (keys %{$self->managers}) {
         my ($host, $port) = @{$self->managers->{$manager}};
-        my $client  = Argon::Client->new(host => $host, port => $port);
-        my $msg     = Argon::Message->new(command => CMD_ADD_NODE);
-        my $respond = Argon::Respond->new();
-
+        my $client = Argon::Client->new(host => $host, port => $port);
+        
+        my $msg = Argon::Message->new(command => CMD_ADD_NODE);
         $msg->set_payload($node);
 
+        my $respond = Argon::Respond->new();
         $respond->to(CMD_ACK, sub {
             LOG("Registration complete with manager %s:%d", $host, $port);
             $self->manager->{$manager} = $client;

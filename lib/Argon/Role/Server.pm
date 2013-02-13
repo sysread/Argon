@@ -108,17 +108,17 @@ sub stop {
 #-------------------------------------------------------------------------------
 sub accept {
     my ($self, $fh, $host, $port) = @_;
-    LOG("client connected from %s:%d", $host, $port);
+    LOG("Client connected from %s:%d", $host, $port);
 
     my $handle = AnyEvent::Handle->new(
         fh       => $fh,
         on_eof   => sub {
-            LOG("client disconnected");
+            LOG("Client disconnected");
             $self->purge_fh($fh);
         },
         on_error => sub {
             my $msg = $_[2];
-            LOG("error: $msg") unless $msg eq 'Broken pipe';
+            LOG("ERROR: $msg") unless $msg eq 'Broken pipe';
             $self->purge_fh($fh);
         },
     );
@@ -172,7 +172,7 @@ sub dispatch_message {
         if ($self->on_error) {
             $response = $self->on_error->($error, $message);
         } else {
-            LOG("an error occurred: %s", $error);
+            LOG("An error occurred: %s", $error);
         }
     }
 

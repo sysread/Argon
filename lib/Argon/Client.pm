@@ -11,6 +11,7 @@ use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
 use Argon qw/:defaults :commands LOG/;
+
 require Argon::Message;
 require Argon::Respond;
 
@@ -103,6 +104,7 @@ has 'backlog' => (
 has 'backlog_timer' => (
     is        => 'rw',
     init_arg  => undef,
+    clearer   => 'clear_backlog_timer',
 );
 
 has 'connection_attempts' => (
@@ -122,10 +124,17 @@ has 'connection_timer' => (
     is        => 'rw',
     init_arg  => undef,
     clearer   => 'clear_connection_timer',
-    predicate => 'is_reconnecting',
 );
 
-sub BUILD {
+has 'is_reconnecting' => (
+    is        => 'rw',
+    isa       => 'Int',
+    init_arg  => undef,
+    default   => 0,
+);
+
+
+sub start_backlog_timer {
     my $self = shift;
     $self->backlog_timer(AnyEvent->timer(
         interval => POLL_INTERVAL,
@@ -141,10 +150,13 @@ sub BUILD {
 sub connect {
     my ($self, $cb) = @_;
     tcp_connect $self->host, $self->port, sub { $self->connect_handler($cb, @_) };
+    $self->start_backlog_timer;
 }
 
 sub close {
     my $self = shift;
+    $self->stop_reconnecting;
+    $self->clear_backlog_timer;
     $self->handle->destroy if $self->handle;
     $self->disconnect;
 }
@@ -163,7 +175,8 @@ sub reconnect {
             cb       => sub {
                 $self->clear_connection_timer;
                 $self->inc_connection_attempts;
-                $self->connect;
+                $self->is_reconnecting(1);
+                $self->connect
             },
         ));
     }
@@ -172,6 +185,7 @@ sub reconnect {
 sub stop_reconnecting {
     my $self = shift;
     $self->clear_connection_timer;
+    $self->is_reconnecting(0);
 }
 
 sub disconnect_handler {
@@ -188,10 +202,11 @@ sub connect_handler {
     my ($self, $cb, $fh, $host, $port, $retry) = @_;
 
     if (!defined $fh) {
-        LOG('Failure connecting to remote host %s:%d.', $self->host, $self->port);
+        LOG("Failure connecting to remote host %s:%d.", $self->host, $self->port);
+        $self->is_reconnecting(0);
         $self->reconnect;
     } else {
-        LOG('Connected to remote host %s:%d.', $self->host, $self->port);
+        LOG("Connected to remote host %s:%d.", $self->host, $self->port);
         $self->stop_reconnecting;
         $self->reset_connection_attempts;
 

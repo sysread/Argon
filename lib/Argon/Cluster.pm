@@ -36,37 +36,38 @@ sub BUILD {
     $self->respond_to(CMD_DEL_NODE, sub { $self->del_node(@_) });
 }
 
+sub clear_node {
+    my ($self, $host, $port) = @_;
+    if (exists $self->nodes->{"$host:$port"}) {
+        my $client = $self->nodes->{"$host:$port"};
+        $self->del_client($client);
+        delete $self->nodes->{"$host:$port"};
+    }
+}
+
 sub add_node {
     my ($self, $msg)  = @_;
     my ($host, $port) = @{$msg->get_payload};
-    my $client = Argon::Client->new(
-        host       => $host,
-        port       => $port,
-        endline    => $self->endline,
-        chunk_size => $self->chunk_size,
-    );
-
-    $client->add_disconnect_callbacks(sub {
-        if (exists $self->nodes->{"$host:$port"}) {
-            delete $self->nodes->{"$host:$port"};
-        }
-    });
-
-    $self->nodes->{"$host:$port"} = $client;
-    $self->add_client($client);
-
+    
+    unless (exists $self->nodes->{"$host:$port"}) {
+        my $client = Argon::Client->new(
+            host       => $host,
+            port       => $port,
+            endline    => $self->endline,
+            chunk_size => $self->chunk_size,
+        );
+    
+        $self->nodes->{"$host:$port"} = $client;
+        $self->add_client($client);
+    }
+    
     return $msg->reply(CMD_ACK);
 }
 
 sub del_node {
     my ($self, $msg)  = @_;
     my ($host, $port) = @{$msg->get_payload};
-    if (exists $self->nodes->{"$host:$port"}) {
-        my $client = $self->nodes->{"$host:$port"};
-        delete $self->nodes->{"$host:$port"};
-        $self->del_client($client);
-    }
-
+    $self->clear_node($host, $port);
     return $msg->reply(CMD_ACK);
 }
 

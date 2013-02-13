@@ -11,6 +11,7 @@ package Argon::MessageManager;
 
 use Moose;
 use Carp;
+use Data::Dumper;
 use namespace::autoclean;
 use List::Util  qw/sum reduce/;
 use Time::HiRes qw/time/;
@@ -21,11 +22,19 @@ require Argon::Client;
 extends 'Argon::MessageProcessor';
 
 # List of Argon::Client instances
-has 'servers' => (
+has 'clients' => (
     is       => 'rw',
     isa      => 'HashRef[Argon::Client]',
     default  => sub { {} },
     init_arg => undef,
+    traits   => ['Hash'],
+    handles  => {
+        client_set  => 'set',
+        client_get  => 'get',
+        client_del  => 'delete',
+        all_clients => 'values',
+        num_clients => 'count',
+    },
 );
 
 # Hash of msg id => server; tracks what messages are assigned where
@@ -115,8 +124,9 @@ sub add_client {
     my ($self, $client) = @_;
 
     $client->add_connect_callbacks(sub {
+        my $client = shift;
         LOG("Remote host %s:%d connected.", $client->host, $client->port);
-        $self->servers->{$client}          = $client;
+        $self->client_set($client, $client);
         $self->assignments->{$client}      = {};
         $self->processing_times->{$client} = [];
         # Note: an arbitrary value is used for avg_processing_time to allow the
@@ -145,7 +155,7 @@ sub del_client {
         $self->msg_complete($error);
     }
 
-    delete $self->servers->{$client};
+    $self->client_del($client);
     delete $self->assignments->{$client};
     delete $self->processing_times->{$client};
     delete $self->avg_processing_time->{$client};
@@ -171,10 +181,9 @@ sub next_client {
 
     my %time;
     $time{$_} = $self->estimated_processing_time($_)
-        foreach values %{$self->servers};
+        foreach $self->all_clients;
 
-    return reduce { $time{$a} < $time{$b} ? $a : $b }
-        values %{$self->servers};
+    return reduce { $time{$a} < $time{$b} ? $a : $b } $self->all_clients;
 }
 
 no Moose;
