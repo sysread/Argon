@@ -149,6 +149,7 @@ sub del_client {
     delete $self->assignments->{$client};
     delete $self->processing_times->{$client};
     delete $self->avg_processing_time->{$client};
+    $client->close;
 }
 
 #-------------------------------------------------------------------------------

@@ -145,7 +145,7 @@ sub connect {
 
 sub close {
     my $self = shift;
-    $self->handle->destroy;
+    $self->handle->destroy if $self->handle;
     $self->disconnect;
 }
 

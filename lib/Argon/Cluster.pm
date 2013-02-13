@@ -47,8 +47,9 @@ sub add_node {
     );
 
     $client->add_disconnect_callbacks(sub {
-        delete $self->nodes->{"$host:$port"};
-        $self->del_client($client);
+        if (exists $self->nodes->{"$host:$port"}) {
+            delete $self->nodes->{"$host:$port"};
+        }
     });
 
     $self->nodes->{"$host:$port"} = $client;
