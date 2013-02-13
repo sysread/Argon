@@ -9,7 +9,6 @@ use Carp;
 use namespace::autoclean;
 use Argon qw/LOG :commands :statuses/;
 
-require Argon::MessageQueue;
 require Argon::Message;
 
 # Hash of msg id => msg
@@ -18,6 +17,12 @@ has 'message' => (
     isa      => 'HashRef[Argon::Message]',
     init_arg => undef,
     default  => sub { {} },
+    traits   => ['Hash'],
+    handles  => {
+        message_set => 'set',
+        message_get => 'get',
+        message_del => 'delete',
+    },
 );
 
 # Hash of msg id => STATUS_*
@@ -26,6 +31,12 @@ has 'status' => (
     isa      => 'HashRef[Int]',
     init_arg => undef,
     default  => sub { {} },
+    traits   => ['Hash'],
+    handles  => {
+        status_set => 'set',
+        status_get => 'get',
+        status_del => 'delete',
+    },
 );
 
 #-------------------------------------------------------------------------------
@@ -33,8 +44,8 @@ has 'status' => (
 #-------------------------------------------------------------------------------
 sub msg_accept {
     my ($self, $msg) = @_;
-    $self->message->{$msg->id} = $msg;
-    $self->status->{$msg->id}  = STATUS_QUEUED;
+    $self->message_set($msg->id, $msg);
+    $self->status_set($msg->id, STATUS_QUEUED);
     return 1;
 }
 
@@ -43,8 +54,8 @@ sub msg_accept {
 #-------------------------------------------------------------------------------
 sub msg_assigned {
     my ($self, $msg) = @_;
-    $self->message->{$msg->id} = $msg;
-    $self->status->{$msg->id}  = STATUS_ASSIGNED;
+    $self->message_set($msg->id, $msg);
+    $self->status_set($msg->id, STATUS_ASSIGNED);
     return 1;
 }
 
@@ -53,8 +64,8 @@ sub msg_assigned {
 #-------------------------------------------------------------------------------
 sub msg_complete {
     my ($self, $msg) = @_;
-    $self->message->{$msg->id} = $msg;
-    $self->status->{$msg->id}  = STATUS_COMPLETE;
+    $self->message_set($msg->id, $msg);
+    $self->status_set($msg->id, STATUS_COMPLETE);
     return 1;
 }
 
@@ -64,9 +75,9 @@ sub msg_complete {
 #-------------------------------------------------------------------------------
 sub msg_clear {
     my ($self, $msg) = @_;
-    my $result = $self->message->{$msg->id};
-    undef $self->message->{$msg->id};
-    undef $self->status->{$msg->id};
+    my $result = $self->message_get($msg->id);
+    $self->message_del($msg->id);
+    $self->status_del($msg->id);
     return $result;
 }
 

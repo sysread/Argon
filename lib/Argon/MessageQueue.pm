@@ -106,11 +106,8 @@ sub get {
             last;
         }
     }
-    
-    if ($self->{size} == 0) {
-        $self->{data} = [];
-    }
 
+    $self->{data} = [] if $self->{size} == 0;
     return $msg;
 }
 

@@ -13,6 +13,8 @@ use namespace::autoclean;
 use AnyEvent qw//;
 use Argon    qw/LOG :defaults :statuses/;
 
+require Argon::MessageQueue;
+
 requires 'assign_message';
 requires 'msg_accept';
 requires 'msg_complete';
@@ -39,6 +41,7 @@ has 'queue' => (
 #-------------------------------------------------------------------------------
 around 'msg_accept' => sub {
     my ($orig, $self, $msg) = @_;
+
     if ($self->queue->is_full) {
         croak 'Queue is full';
     } else {
