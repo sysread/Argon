@@ -44,6 +44,20 @@ has 'assignments' => (
     init_arg => undef,
 );
 
+# Hash of msg id => start time
+has 'start_time' => (
+    is       => 'ro',
+    isa      => 'HashRef[Num]',
+    default  => sub { {} },
+    init_arg => undef,
+    traits   => ['Hash'],
+    handles  => {
+        'set_start_time' => 'set',
+        'get_start_time' => 'get',
+        'del_start_time' => 'delete',
+    }
+);
+
 # Hash of server => list of last N processing times
 has 'processing_times' => (
     is       => 'ro',
@@ -90,24 +104,27 @@ sub assign_message {
     my ($self, $msg, $client) = @_;
 
     $self->assignments->{$client}{$msg->id} = 1;
+    $self->set_start_time($msg->id, time);
     $self->msg_assigned($msg);
-    my $sent = time;
 
     my $on_success = sub {
         my $reply = shift;
+        my $start_time = $self->get_start_time($reply->id);
 
-        push @{$self->processing_times->{$client}}, time - $sent;
+        push @{$self->processing_times->{$client}}, time - $start_time;
         shift @{$self->processing_times->{$client}}
             if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
 
         $self->set_avg_proc_time($client, sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES);
         $self->msg_complete($reply);
-        delete $self->assignments->{$client}{$msg->id};
+        $self->del_start_time($reply->id);
+        delete $self->assignments->{$client}{$reply->id};
     };
 
     my $on_error = sub {
         my $reply = shift;
         $self->msg_complete($reply);
+        $self->del_start_time($reply->id);
         delete $self->assignments->{$client}{$msg->id};
     };
 
