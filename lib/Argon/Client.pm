@@ -245,7 +245,7 @@ sub on_message {
 
             my $respond = $self->respond_get($message->id);
             if ($respond) {
-                $respond->dispatch($message);
+                $respond->dispatch($message, $self);
                 $self->respond_delete($message->id);
             }
 
@@ -282,7 +282,11 @@ sub process {
 
     my $msg = Argon::Message->new(command => CMD_QUEUE);
     $msg->set_payload([$job_class, $job_args]);
-    $self->queue($msg, sub { $on_success->(shift->payload) }, sub { $on_error->(shift->payload) });
+    $self->queue(
+        $msg,
+        sub { $on_success->(shift->payload) },
+        sub { $on_error->(shift->payload) }
+    );
 }
 
 #-------------------------------------------------------------------------------
@@ -301,8 +305,8 @@ sub queue {
 
     if ($self->has_backlog) {
         $respond->to(CMD_REJECTED, sub { push @{$self->backlog}, [$msg, $on_success, $on_error] });
-    } else {
-        $respond->to(CMD_REJECTED, sub { $on_success->(shift) }) if $on_success;
+    } elsif ($on_success) {
+        $respond->to(CMD_REJECTED, sub { $on_success->(shift, $self) });
     }
 
     $self->send($msg, $respond);

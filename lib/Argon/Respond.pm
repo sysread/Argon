@@ -28,8 +28,8 @@ sub to {
 # no call is made and no error is signaled.
 #-------------------------------------------------------------------------------
 sub dispatch {
-    my ($self, $msg) = @_;
-    $self->callback->{$msg->command}->($msg)
+    my ($self, $msg, @args) = @_;
+    $self->callback->{$msg->command}->($msg, @args)
         if exists $self->callback->{$msg->command};
 }
 

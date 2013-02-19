@@ -72,15 +72,16 @@ has 'fd2msg' => (
     default  => sub {{}},
 );
 
-has 'clients' => (
+has 'handles' => (
     is       => 'ro',
-    isa      => 'HashRef',
+    isa      => 'HashRef[AnyEvent::Handle]',
     init_arg => undef,
     default  => sub {{}},
     traits   => ['Hash'],
     handles  => {
-        add_client => 'set',
-        del_client => 'delete',
+        get_handle => 'get',
+        add_handle => 'set',
+        del_handle => 'delete',
     }
 );
 
@@ -126,19 +127,32 @@ sub accept {
         fh       => $fh,
         on_eof   => sub {
             LOG("Client disconnected");
+
+            if ($self->can('on_disconnect')) {
+                my $handle = $self->get_handle($fh);
+                $self->on_disconnect($handle)
+            }
+
             $self->purge_fh($fh);
-            $self->del_client($fh);
+            $self->del_handle($fh);
+
         },
         on_error => sub {
             my $msg = $_[2];
             LOG("ERROR: $msg") unless $msg eq 'Broken pipe';
+
+            if ($self->can('on_disconnect')) {
+                my $handle = $self->get_handle($fh);
+                $self->on_disconnect($handle)
+            }
+
             $self->purge_fh($fh);
-            $self->del_client($fh);
+            $self->del_handle($fh);
         },
     );
 
     $handle->on_read(sub { $self->read_ready(@_) });
-    $self->add_client($handle->fh, $handle);
+    $self->add_handle($handle->fh, $handle);
 }
 
 sub read_ready {

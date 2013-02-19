@@ -28,11 +28,12 @@ has 'clients' => (
     init_arg => undef,
     traits   => ['Hash'],
     handles  => {
-        client_set  => 'set',
-        client_get  => 'get',
-        client_del  => 'delete',
-        all_clients => 'values',
-        num_clients => 'count',
+        client_set    => 'set',
+        client_get    => 'get',
+        client_del    => 'delete',
+        all_clients   => 'values',
+        num_clients   => 'count',
+        client_exists => 'exists',
     },
 );
 
@@ -96,6 +97,13 @@ around 'msg_accept' => sub {
     }
 };
 
+sub on_disconnect {
+    my ($self, $client) = @_;
+    if ($self->client_exists($client)) {
+        $self->del_client($client);
+    }
+}
+
 #-------------------------------------------------------------------------------
 # Assigns a message to a client. By default, this method is called directly
 # from msg_accept.
@@ -107,28 +115,31 @@ sub assign_message {
     $self->set_start_time($msg->id, time);
     $self->msg_assigned($msg);
 
-    my $on_success = sub {
-        my $reply = shift;
-        my $start_time = $self->get_start_time($reply->id);
-
-        push @{$self->processing_times->{$client}}, time - $start_time;
-        shift @{$self->processing_times->{$client}}
-            if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
-
-        $self->set_avg_proc_time($client, sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES);
-        $self->msg_complete($reply);
-        $self->del_start_time($reply->id);
-        delete $self->assignments->{$client}{$reply->id};
-    };
-
-    my $on_error = sub {
-        my $reply = shift;
-        $self->msg_complete($reply);
-        $self->del_start_time($reply->id);
-        delete $self->assignments->{$client}{$msg->id};
-    };
-
+    my $on_success = sub { $self->on_msg_success(@_) };
+    my $on_error   = sub { $self->on_msg_error(@_)   };
     $client->queue($msg, $on_success, $on_error);
+}
+
+sub on_msg_success {
+    my ($self, $reply, $client) = @_;
+
+    my $start_time = $self->get_start_time($reply->id);
+
+    push @{$self->processing_times->{$client}}, time - $start_time;
+    shift @{$self->processing_times->{$client}}
+        if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
+
+    $self->set_avg_proc_time($client, sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES);
+    $self->msg_complete($reply);
+    $self->del_start_time($reply->id);
+    delete $self->assignments->{$client}{$reply->id};
+}
+
+sub on_msg_error {
+    my ($self, $reply, $client) = @_;
+    $self->msg_complete($reply);
+    $self->del_start_time($reply->id);
+    delete $self->assignments->{$client}{$reply->id};
 }
 
 #-------------------------------------------------------------------------------
