@@ -72,6 +72,18 @@ has 'fd2msg' => (
     default  => sub {{}},
 );
 
+has 'clients' => (
+    is       => 'ro',
+    isa      => 'HashRef',
+    init_arg => undef,
+    default  => sub {{}},
+    traits   => ['Hash'],
+    handles  => {
+        add_client => 'set',
+        del_client => 'delete',
+    }
+);
+
 #-------------------------------------------------------------------------------
 # Initializes and starts the server.
 #-------------------------------------------------------------------------------
@@ -115,35 +127,39 @@ sub accept {
         on_eof   => sub {
             LOG("Client disconnected");
             $self->purge_fh($fh);
+            $self->del_client($fh);
         },
         on_error => sub {
             my $msg = $_[2];
             LOG("ERROR: $msg") unless $msg eq 'Broken pipe';
             $self->purge_fh($fh);
+            $self->del_client($fh);
         },
     );
 
-    $handle->on_read(sub {
-        my @start_request;
+    $handle->on_read(sub { $self->read_ready(@_) });
+    $self->add_client($handle->fh, $handle);
+}
 
-        @start_request = (
-            line => sub {
-                my ($handle, $line, $eol) = @_;
-                my $message = Argon::Message::decode($line);
-
-                $self->register_message($handle, $message);
-                my $response = $self->dispatch_message($message);
-
-                if ($response && ref $response eq 'Argon::Message') {
-                    $self->send_reply($response);
-                }
-
-                $handle->push_read(@start_request);
-            }
-        );
-
-        $handle->push_read(@start_request);
+sub read_ready {
+    my ($self, $handle) = @_;
+    $handle->push_read(line => sub {
+        $self->line_received(@_);
     });
+}
+
+sub line_received {
+    my ($self, $handle, $line, $eol) = @_;
+    my $message = Argon::Message::decode($line);
+
+    $self->register_message($handle, $message);
+    my $response = $self->dispatch_message($message);
+
+    if ($response && ref $response eq 'Argon::Message') {
+        $self->send_reply($response);
+    }
+
+    $self->read_ready($handle);
 }
 
 #-------------------------------------------------------------------------------
