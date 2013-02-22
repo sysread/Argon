@@ -17,7 +17,7 @@ ok($queue->is_empty, 'instantiation, queue is_empty');
 
 my @items = shuffle(0 .. ($LIMIT - 1));
 foreach my $i (@items) {
-    my $msg = Argon::Message->new(command => 0, id => $i, priority => $i);
+    my $msg = Argon::Message->new(command => 0, priority => $i);
     ok($queue->put($msg), "queue put ($i)");
 }
 

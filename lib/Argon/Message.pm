@@ -5,7 +5,7 @@ use Carp;
 #use namespace::autoclean;
 use Argon       qw/:priorities LOG MESSAGE_SEPARATOR/;
 use Time::HiRes qw/time/;
-use overload 
+use overload
     '<=>'  => 'compare',
     '>'    => sub { compare($_[0], $_[1])  > 0 },
     '<'    => sub { compare($_[0], $_[1])  < 0 },
@@ -117,18 +117,25 @@ sub reply {
 }
 
 #-------------------------------------------------------------------------------
+# Calculates the effective priority of the message. This value is based on both
+# the base priority of the message as well as its age in the queue.
+#-------------------------------------------------------------------------------
+sub effective_priority {
+    my $self = shift;
+    my $age  = time - $self->timestamp;
+    return $self->priority if $age < 1;
+    return $self->priority / log($age + 1);
+}
+
+#-------------------------------------------------------------------------------
 # Compares two Messages and returns and the equivalent of the <=> operator.
-# Comparison is done based first on priority (lower priority is "higher" for
-# sorting) and second based on its timestamp.
+# Comparison is done based first on effective priority (lower priority is
+# higher for sorting).
 #-------------------------------------------------------------------------------
 sub compare {
     my ($self, $other, $swap) = @_;
     my ($x, $y) = $swap ? ($other, $self) : ($self, $other);
-    if ($x->priority != $y->priority) {
-        return $y->priority <=> $x->priority;
-    } else {
-        return $y->timestamp <=> $x->timestamp;
-    }
+    return $y->effective_priority <=> $x->effective_priority;
 }
 
 no Moose;
