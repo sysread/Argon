@@ -3,6 +3,8 @@ use warnings;
 use Carp;
 use Getopt::Std;
 use EV;
+use AnyEvent;
+use Argon qw/LOG/;
 
 require Argon::Cluster;
 

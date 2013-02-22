@@ -5,6 +5,7 @@ use Data::Dumper;
 use EV;
 use AnyEvent;
 use Getopt::Std;
+use Test::LeakTrace;
 use Argon qw/LOG :commands/;
 
 require Argon::Client;
@@ -30,7 +31,7 @@ sub inc {
     if (++$count == $total) {
         LOG('All results are in. Bye!');
         exit 0;
-    }   
+    }
 }
 
 sub on_complete {

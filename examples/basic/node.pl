@@ -4,6 +4,9 @@ use Carp;
 use EV;
 use Getopt::Std;
 
+# For strict parameter checking on all calls to AnyEvent
+$ENV{PERL_ANYEVENT_STRICT} = 1;
+
 require Argon::Node;
 
 my %opt;

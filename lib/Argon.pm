@@ -39,9 +39,7 @@ our %EXPORT_TAGS = (
         CMD_ACK
         CMD_ID
         CMD_QUEUE
-        CMD_STATUS
         CMD_REJECTED
-        CMD_PENDING
         CMD_COMPLETE
         CMD_ERROR
         CMD_ADD_NODE
@@ -92,13 +90,11 @@ use constant STATUS_COMPLETE => 2;
 #-------------------------------------------------------------------------------
 use constant CMD_ACK      => 0;  # Acknowledgement (respond OK)
 use constant CMD_QUEUE    => 1;  # Queue a message
-use constant CMD_STATUS   => 2;  # Poll a message status
-use constant CMD_PENDING  => 3;  # Response - message is in-progress
-use constant CMD_COMPLETE => 4;  # Response - message is complete
-use constant CMD_REJECTED => 5;  # Response - message was rejected
-use constant CMD_ERROR    => 6;  # Response - error processing message or invalid message format
-use constant CMD_ADD_NODE => 7;  # Add a node to a cluster
-use constant CMD_DEL_NODE => 8;  # Remove a node from a cluster
-use constant CMD_SHUTDOWN => 9;  # Shutdown a worker process
+use constant CMD_COMPLETE => 2;  # Response - message is complete
+use constant CMD_REJECTED => 3;  # Response - message was rejected
+use constant CMD_ERROR    => 4;  # Response - error processing message or invalid message format
+use constant CMD_ADD_NODE => 5;  # Add a node to a cluster
+use constant CMD_DEL_NODE => 6;  # Remove a node from a cluster
+use constant CMD_SHUTDOWN => 7;  # Shutdown a worker process
 
 1;

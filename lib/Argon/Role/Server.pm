@@ -3,6 +3,7 @@ package Argon::Role::Server;
 use Moose::Role;
 use Carp;
 use namespace::autoclean;
+use Scalar::Util qw/weaken/;
 use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
@@ -38,7 +39,7 @@ has 'on_error' => (
 
 has 'callback' => (
     is       => 'rw',
-    isa      => 'HashRef[CodeRef]',
+    isa      => 'HashRef[Str]',
     init_arg => undef,
     default  => sub { {} },
 );
@@ -106,6 +107,7 @@ sub start {
             return LISTEN_QUEUE_SIZE;
         },
     );
+
     $self->server($server);
 }
 
@@ -114,6 +116,32 @@ sub start {
 #-------------------------------------------------------------------------------
 sub stop {
     my $self = shift;
+}
+
+sub on_fh_eof {
+    my ($self, $fh) = @_;
+    LOG("Client disconnected");
+
+    if ($self->can('on_disconnect')) {
+        my $handle = $self->get_handle($fh);
+        $self->on_disconnect($handle)
+    }
+
+    $self->purge_fh($fh);
+    $self->del_handle($fh);
+}
+
+sub on_fh_error {
+    my ($self, $handle, $fatal, $msg) = @_;
+    LOG("ERROR: $msg") unless $msg eq 'Broken pipe';
+
+    if ($self->can('on_disconnect')) {
+        $self->on_disconnect($handle)
+    }
+
+    my $fh = $handle->fh;
+    $self->purge_fh($fh);
+    $self->del_handle($fh);
 }
 
 #-------------------------------------------------------------------------------
@@ -125,34 +153,14 @@ sub accept {
 
     my $handle = AnyEvent::Handle->new(
         fh       => $fh,
-        on_eof   => sub {
-            LOG("Client disconnected");
-
-            if ($self->can('on_disconnect')) {
-                my $handle = $self->get_handle($fh);
-                $self->on_disconnect($handle)
-            }
-
-            $self->purge_fh($fh);
-            $self->del_handle($fh);
-
-        },
-        on_error => sub {
-            my $msg = $_[2];
-            LOG("ERROR: $msg") unless $msg eq 'Broken pipe';
-
-            if ($self->can('on_disconnect')) {
-                my $handle = $self->get_handle($fh);
-                $self->on_disconnect($handle)
-            }
-
-            $self->purge_fh($fh);
-            $self->del_handle($fh);
-        },
+        on_eof   => sub { $self->on_fh_eof(@_)   },
+        on_error => sub { $self->on_fh_error(@_) },
     );
 
     $handle->on_read(sub { $self->read_ready(@_) });
     $self->add_handle($handle->fh, $handle);
+
+    weaken $self;
 }
 
 sub read_ready {
@@ -191,8 +199,10 @@ sub dispatch_message {
     my ($self, $message) = @_;
     my ($response, $error);
 
-    if (exists $self->callback->{$message->command}) {
-        $response = eval { $self->callback->{$message->command}->($message) };
+    my $cb = $self->can($self->callback->{$message->command});
+
+    if (ref $cb) {
+        $response = eval { $cb->($self, $message) };
         $@ && ($error = sprintf('Application Error: %s', $@));
     } else {
         $error = sprintf('Protocol Error: command not recognized [%s]', $message->command);
@@ -217,6 +227,7 @@ sub register_message {
     $self->origin_set($message->id, $handle);
     $self->fd2msg->{$handle->fh} ||= {};
     $self->fd2msg->{$handle->fh}{$message->id} = 1;
+    weaken $handle;
 }
 
 #-------------------------------------------------------------------------------

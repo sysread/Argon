@@ -12,18 +12,19 @@ package Argon::MessageManager;
 use Moose;
 use Carp;
 use namespace::autoclean;
-use List::Util  qw/sum reduce/;
-use Time::HiRes qw/time/;
-use Argon       qw/:commands LOG TRACK_MESSAGES/;
+use List::Util   qw/sum reduce/;
+use Scalar::Util qw/weaken/;
+use Time::HiRes  qw/time/;
+use Argon        qw/:commands LOG TRACK_MESSAGES/;
 
-require Argon::Client;
+require Argon::Channel;
 
 extends 'Argon::MessageProcessor';
 
-# List of Argon::Client instances
+# List of Argon::Channel instances
 has 'clients' => (
     is       => 'rw',
-    isa      => 'HashRef[Argon::Client]',
+    isa      => 'HashRef[Argon::Channel]',
     default  => sub { {} },
     init_arg => undef,
     traits   => ['Hash'],
@@ -110,33 +111,25 @@ sub on_disconnect {
 #-------------------------------------------------------------------------------
 sub assign_message {
     my ($self, $msg, $client) = @_;
-
     $self->assignments->{$client}{$msg->id} = 1;
     $self->set_start_time($msg->id, time);
     $self->msg_assigned($msg);
-
-    my $on_success = sub { $self->on_msg_success(@_) };
-    my $on_error   = sub { $self->on_msg_error(@_)   };
-    $client->queue($msg, $on_success, $on_error);
+    $client->queue($msg);
 }
 
-sub on_msg_success {
+sub on_msg_complete {
     my ($self, $reply, $client) = @_;
 
-    my $start_time = $self->get_start_time($reply->id);
+    if ($reply->command ne CMD_ERROR) {
+        my $start_time = $self->get_start_time($reply->id);
 
-    push @{$self->processing_times->{$client}}, time - $start_time;
-    shift @{$self->processing_times->{$client}}
-        if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
+        push @{$self->processing_times->{$client}}, time - $start_time;
+        shift @{$self->processing_times->{$client}}
+            if @{$self->processing_times->{$client}} > TRACK_MESSAGES;
 
-    $self->set_avg_proc_time($client, sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES);
-    $self->msg_complete($reply);
-    $self->del_start_time($reply->id);
-    delete $self->assignments->{$client}{$reply->id};
-}
+        $self->set_avg_proc_time($client, sum(@{$self->processing_times->{$client}}) / TRACK_MESSAGES);
+    }
 
-sub on_msg_error {
-    my ($self, $reply, $client) = @_;
     $self->msg_complete($reply);
     $self->del_start_time($reply->id);
     delete $self->assignments->{$client}{$reply->id};
@@ -147,20 +140,24 @@ sub on_msg_error {
 #-------------------------------------------------------------------------------
 sub add_client {
     my ($self, $client) = @_;
-
-    $client->add_connect_callbacks(sub {
-        my $client = shift;
-        LOG("Remote host %s:%d connected.", $client->host, $client->port);
-        $self->client_set($client, $client);
-        $self->assignments->{$client} = {};
-        $self->processing_times->{$client} = [];
-        # Note: an arbitrary value is used for avg_processing_time to allow the
-        # ranking algorithm to properly evaluate newly attached clients.
-        $self->set_avg_proc_time($client, 0.001);
-    });
-
-    $client->add_disconnect_callbacks(sub { $self->del_client(shift) });
+    $client->add_connect_callbacks(sub { $self->_add_client(@_) });
+    $client->add_disconnect_callbacks(sub { $self->del_client(@_) });
+    $client->on_complete(sub { $self->on_msg_complete(@_) });
     $client->connect;
+    weaken $self;
+}
+
+sub _add_client {
+    my ($self, $client) = @_;
+    LOG("Remote host %s:%d connected.", $client->host, $client->port);
+    $self->client_set($client, $client);
+    $self->assignments->{$client} = {};
+    $self->processing_times->{$client} = [];
+    # Note: an arbitrary value is used for avg_processing_time to allow the
+    # ranking algorithm to properly evaluate newly attached clients.
+    $self->set_avg_proc_time($client, 0.0005);
+    weaken $self;
+    weaken $client;
 }
 
 #-------------------------------------------------------------------------------

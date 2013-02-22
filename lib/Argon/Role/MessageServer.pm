@@ -3,6 +3,7 @@ package Argon::Role::MessageServer;
 use Moose::Role;
 use Carp;
 use namespace::autoclean;
+use Scalar::Util qw/weaken/;
 use Argon qw/:commands :statuses LOG EOL CHUNK_SIZE/;
 use Argon::MessageProcessor;
 
@@ -29,7 +30,7 @@ has 'chunk_size' => (
 sub BUILD {}
 after 'BUILD' => sub {
     my $self = shift;
-    $self->respond_to(CMD_QUEUE,  sub { $self->reply_queue(@_)  });
+    $self->respond_to(CMD_QUEUE, 'reply_queue');
 };
 
 #-------------------------------------------------------------------------------
