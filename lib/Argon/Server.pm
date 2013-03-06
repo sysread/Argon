@@ -82,7 +82,7 @@ sub start {
     );
 
     unless ($sock) {
-        LOG($!);
+        LOG('Error creating server socket: %s', $!);
         exit 1;
     }
 

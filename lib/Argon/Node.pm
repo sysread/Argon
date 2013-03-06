@@ -196,7 +196,6 @@ sub stop_worker {
 #-------------------------------------------------------------------------------
 sub request_queue {
     my ($self, $msg, $stream) = @_;
-
     my $worker = $self->checkout;
 
     # Replace worker if necessary
