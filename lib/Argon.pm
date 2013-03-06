@@ -12,7 +12,8 @@ use strict;
 use warnings;
 use Carp;
 use namespace::autoclean;
-use POSIX qw/strftime/;
+use POSIX        qw/strftime/;
+use Scalar::Util qw/weaken/;
 
 require Exporter;
 use base qw/Exporter/;
@@ -23,10 +24,10 @@ our %EXPORT_TAGS = (
         LISTEN_QUEUE_SIZE
         SOCKET_TIMEOUT
         CHUNK_SIZE
-        EOL
         MESSAGE_SEPARATOR
         TRACK_MESSAGES
         POLL_INTERVAL
+        EOL
     /],
 
     # Priorities
@@ -37,25 +38,76 @@ our %EXPORT_TAGS = (
     # Command verbs and responses
     'commands'   => [qw/
         CMD_ACK
-        CMD_ID
         CMD_QUEUE
         CMD_REJECTED
         CMD_COMPLETE
         CMD_ERROR
         CMD_ADD_NODE
-        CMD_DEL_NODE
-        CMD_SHUTDOWN
+        CMD_PING
     /],
 );
 
 our @EXPORT_OK = map { @$_ } values %EXPORT_TAGS;
-our @EXPORT    = qw/LOG/;
+our @EXPORT    = qw/LOG K/;
+
+#-------------------------------------------------------------------------------
+# DEBUG level
+#-------------------------------------------------------------------------------
+our $DEBUG = 0;
+
+#-------------------------------------------------------------------------------
+# Strips an error message of line number and file information.
+#-------------------------------------------------------------------------------
+sub error {
+    my $msg = shift;
+    $msg =~ s/ at (.+?) line \d+.//gsm;
+    $msg =~ s/\s+$//gsm;
+    $msg =~ s/^\s+//gsm;
+    return $msg;
+}
 
 sub LOG {
     my ($format, @args) = @_;
     chomp $format;
-    my $ts = strftime("%Y-%m-%d %H:%M:%S", localtime);
-    warn sprintf("[%d] [%s] $format\n", $$, $ts, @args);
+    my $msg = error(sprintf($format, @args));
+    my $ts  = strftime("%Y-%m-%d %H:%M:%S", localtime);
+    warn sprintf("[%s] [%d] %s\n", $ts, $$, $msg);
+}
+
+#-------------------------------------------------------------------------------
+# Returns a new function suitable for use as a callback. This is useful to pass
+# instance methods as callbacks without leaking references.
+#
+# Inputs:
+#     $fn      : CODE reference or function name
+#     $context : class name or object instance
+#
+# Output:
+#     CODE reference
+#
+# Examples:
+#     # Using a function reference
+#     my $cb = K(\&on_connection);
+#
+#     # Using an instance method
+#     my $cb = K('on_connection', $client);
+#
+#     # Using a class method
+#     my $cb = K('on_connection', 'ClientClass');
+#-------------------------------------------------------------------------------
+sub K {
+    my ($fn, $context) = @_;
+
+    croak "unknown method $fn"
+        if !ref $context
+        || !$context->can($fn);
+
+    my $callback = sub {
+        $context->can($fn)->($context, @_);
+    };
+
+    weaken $context;
+    return $callback;
 }
 
 #-------------------------------------------------------------------------------
@@ -64,10 +116,10 @@ sub LOG {
 use constant LISTEN_QUEUE_SIZE  => 128;
 use constant SOCKET_TIMEOUT     => 30;
 use constant CHUNK_SIZE         => 1024 * 4;
-use constant EOL                => "\015\012";
+use constant EOL                => "\0";
 use constant MESSAGE_SEPARATOR  => ' ';
 use constant TRACK_MESSAGES     => 10;   # number of message times to track for computing avg processing time at a host
-use constant POLL_INTERVAL      => 0.20; # seconds between polls for backlog (client)
+use constant POLL_INTERVAL      => 2;    # number of seconds between polls for connectivity between cluster/node
 
 #-------------------------------------------------------------------------------
 # Priorities
@@ -94,7 +146,6 @@ use constant CMD_COMPLETE => 2;  # Response - message is complete
 use constant CMD_REJECTED => 3;  # Response - message was rejected
 use constant CMD_ERROR    => 4;  # Response - error processing message or invalid message format
 use constant CMD_ADD_NODE => 5;  # Add a node to a cluster
-use constant CMD_DEL_NODE => 6;  # Remove a node from a cluster
-use constant CMD_SHUTDOWN => 7;  # Shutdown a worker process
+use constant CMD_PING     => 6;  # Add a node to a cluster
 
 1;

@@ -3,8 +3,11 @@
 #-------------------------------------------------------------------------------
 package Argon::Role::Task;
 
-use Moose::Role;
+use strict;
+use warnings;
 use Carp;
+
+use Moose::Role;
 use namespace::autoclean;
 
 requires 'run';

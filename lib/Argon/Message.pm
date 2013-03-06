@@ -1,20 +1,25 @@
 package Argon::Message;
 
-use Moose;
+use strict;
+use warnings;
 use Carp;
-#use namespace::autoclean;
-use Argon       qw/:priorities LOG MESSAGE_SEPARATOR/;
-use Time::HiRes qw/time/;
+
+use Moose;
+use MooseX::StrictConstructor;
+#use namespace::autoclean; # incompatible with overload pragma
+
+use Argon        qw/:priorities LOG MESSAGE_SEPARATOR/;
+use Time::HiRes  qw/time/;
+use Data::UUID   qw//;
+use MIME::Base64 qw//;
+use Storable     qw//;;
+
 use overload
     '<=>'  => 'compare',
     '>'    => sub { compare($_[0], $_[1])  > 0 },
     '<'    => sub { compare($_[0], $_[1])  < 0 },
     '='    => sub { compare($_[0], $_[1]) == 0 },
     'bool' => sub { $_[0] };
-
-require Data::UUID;
-require MIME::Base64;
-require Storable;
 
 # Time stamp, used to sort incoming messages
 has 'timestamp' => (

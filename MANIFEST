@@ -7,17 +7,11 @@ lib/Argon.pm
 lib/Argon/Client.pm
 lib/Argon/Cluster.pm
 lib/Argon/Message.pm
-lib/Argon/MessageManager.pm
-lib/Argon/MessageProcessor.pm
-lib/Argon/MessageQueue.pm
 lib/Argon/Node.pm
-lib/Argon/Pool.pm
-lib/Argon/Pool/Worker.pm
-lib/Argon/Respond.pm
-lib/Argon/Role/ManagedServer.pm
-lib/Argon/Role/MessageServer.pm
-lib/Argon/Role/QueueManager.pm
-lib/Argon/Role/Server.pm
+lib/Argon/NodeTracker.pm
+lib/Argon/Queue.pm
+lib/Argon/Stream.pm
+lib/Argon/Worker.pm
 lib/Argon/Role/Task.pm
 
 t/00-load.t
@@ -25,5 +19,4 @@ t/boilerplate.t
 t/manifest.t
 t/pod-coverage.t
 t/pod.t
-t/MessageQueue.t
-t/Respond.t
+t/Queue.t

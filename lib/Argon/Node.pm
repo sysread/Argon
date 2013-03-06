@@ -1,83 +1,219 @@
-#-------------------------------------------------------------------------------
-# Nodes manage a pool of Worker processes. Like a Cluster, they route tasks to
-# Workers (without worrying about each processes' speed, since they are local),
-# and store the results.
-#-------------------------------------------------------------------------------
 package Argon::Node;
 
-use Moose;
+use strict;
+use warnings;
 use Carp;
+
+use Moose;
+use MooseX::StrictConstructor;
 use namespace::autoclean;
-use Sys::Hostname;
-use Argon qw/LOG :commands/;
 
-require Argon::Client;
-require Argon::Pool;
+use Coro;
+use Coro::AnyEvent;
+use AnyEvent;
 
-extends 'Argon::MessageProcessor';
-with    'Argon::Role::Server';
-with    'Argon::Role::MessageServer';
-with    'Argon::Role::ManagedServer';
-with    'Argon::Role::QueueManager';
+use Argon::Worker;
+use Argon::Queue;
+use Argon qw/LOG K :commands :defaults/;
 
-# These are used to configure the Argon::Pool
-has 'concurrency'  => (is => 'ro', isa => 'Int', required => 1);
-has 'max_requests' => (is => 'ro', isa => 'Int', default  => 0);
-has 'int_handler'  => (is => 'rw', init_arg => undef);
-has 'term_handler' => (is => 'rw', init_arg => undef);
+extends 'Argon::Server';
+
+has 'concurrency' => (
+    is        => 'ro',
+    isa       => 'Int',
+    required  => 1,
+);
+
+has 'max_requests' => (
+    is        => 'ro',
+    isa       => 'Int',
+    predicate => 'counts_requests',
+);
+
+has 'manager' => (
+    is        => 'ro',
+    isa       => 'Str',
+    required  => 0,
+    predicate => 'is_managed',
+);
 
 has 'pool' => (
-    is       => 'ro',
-    isa      => 'Argon::Pool',
-    init_arg => undef,
-    lazy     => 1,
-    default  => sub {
-        my $self = shift;
-        my $pool = Argon::Pool->new(
-            concurrency  => $self->concurrency,
-            max_requests => $self->max_requests,
-        );
-
-        return $pool;
+    is        => 'rw',
+    isa       => 'Coro::Channel',
+    init_arg  => undef,
+    handles   => {
+        'checkin'  => 'put',
+        'checkout' => 'get',
+        'workers'  => 'size',
     }
 );
 
+has 'sigint' => (
+    is        => 'rw',
+    init_arg  => undef,
+);
 
 #-------------------------------------------------------------------------------
-# Initializes the node
+# Configure responders
 #-------------------------------------------------------------------------------
-after 'start' => sub {
+sub BUILD {
     my $self = shift;
-    LOG('Starting node with %d workers on port %d', $self->concurrency, $self->port);
+    $self->respond_to(CMD_QUEUE, K('request_queue', $self));
 
-    $self->pool->start;
+    # Add watcher for sigint
+    $self->sigint(AnyEvent->signal(
+        signal => 'INT',
+        cb     => sub {
+            LOG('Shutting down workers');
 
-    # Notify upstream managers
-    $self->notify;
+            while ($self->workers > 0) {
+                my $worker = $self->checkout;
+                $worker->kill_child(1);
+            }
 
-    # Add signal handlers
-    $self->int_handler(AnyEvent->signal(signal => 'INT',  cb => sub { $self->shutdown }));
-    $self->term_handler(AnyEvent->signal(signal => 'INT', cb => sub { $self->shutdown }));
-};
-
-#-------------------------------------------------------------------------------
-# Shuts down
-#-------------------------------------------------------------------------------
-sub shutdown {
-    my $self = shift;
-    LOG('Shutting down.');
-    $self->pool->shutdown;
-    exit 0;
+            exit 0;
+        }
+    ));
 }
 
 #-------------------------------------------------------------------------------
-# Attempts to assign the message to the next free worker process. If no
-# processes are free, returns false.
+# Initializes the Node and starts worker processes.
 #-------------------------------------------------------------------------------
-sub assign_message {
-    my ($self, $message) = @_;
-    $self->pool->assign($message, sub { $self->msg_complete(shift) });
-    return 1;
+before 'start' => sub {
+    my $self = shift;
+    LOG('Starting node with %d workers', $self->concurrency);
+
+    $self->pool(Coro::Channel->new($self->concurrency + 1));
+    $self->checkin($self->start_worker)
+        for 1 .. $self->concurrency;
+
+    if ($self->is_managed) {
+        LOG('Notifying manager of availability');
+        $self->notify;
+    }
+};
+
+#-------------------------------------------------------------------------------
+# Sends notifications to configured manager.
+#-------------------------------------------------------------------------------
+sub notify {
+    my $self = shift;
+    my ($host, $port) = split ':', $self->manager;
+
+    async {
+        LOG('Connecting to manager: %s', $self->manager);
+        my $is_connected = 0;
+        my $attempts     = 0;
+        my $address      = sprintf '%s:%d', $self->host, $self->port;
+        my $last_error   = ''; # prevent the same connection error from being reported multiple times
+
+        until ($is_connected) {
+            ++$attempts;
+
+            # Connect to manager
+            my $stream = eval { Argon::Stream->connect(host => $host, port => $port) };
+            my $error;
+
+            if ($@) {
+                $error = sprintf 'Unable to reach manager (%s): %s', $address, $@;
+            } else {
+                # Send registration packet
+                my $reply;
+                eval {
+                    my $msg = Argon::Message->new(command => CMD_ADD_NODE);
+                    $msg->set_payload($address);
+                    $reply = $stream->send($msg);
+                };
+
+                # Connection errors show up during transmission on non-blocking
+                # sockets.
+                if ($@) {
+                    $error = sprintf 'Error connecting to manager: %s', $@;
+                }
+                # Check validity of response
+                elsif ($reply->command == CMD_ACK) {
+                    LOG('Connected to manager: %s', $self->manager);
+                    $is_connected = 1;
+                    $self->service($stream);
+
+                    $stream->monitor(sub {
+                        my ($stream, $reason) = @_;
+                        LOG('Lost connection to manager');
+                        $self->notify;
+                    });
+                }
+                # Error response
+                elsif ($reply->command == CMD_ERROR) {
+                    my $error = $reply->get_payload;
+                    LOG('Manager reported registration error: %s', $error);
+                    $is_connected = 1
+                        if $error =~ /node is already registered/;
+                }
+                # Unknown response
+                else {
+                    my $msg = $reply->get_payload || '<empty>';
+                    LOG('Unexpected response from manager: (%d) %s', $reply->command, $msg);
+                }
+            }
+
+            if (defined $error && $error ne $last_error) {
+                LOG($error);
+                $last_error = $error;
+            }
+
+            # Schedule another retry
+            unless ($is_connected) {
+                my $delay = log($attempts);
+                Coro::AnyEvent::sleep($delay);
+            }
+        }
+    };
+}
+
+#-------------------------------------------------------------------------------
+# Returns a new AnyEvent::Worker process configured to handle Argon::Message
+# tasks.
+#-------------------------------------------------------------------------------
+sub start_worker {
+    my $self   = shift;
+    my $worker = Argon::Worker->new();
+    $worker->start();
+    return $worker;
+}
+
+#-------------------------------------------------------------------------------
+# Kills an individual worker process and removes it from internal tracking.
+# Assumes that the worker process has been checked out of the pool. If the
+# worker process is still in the pool, the results could be unexpected!
+#-------------------------------------------------------------------------------
+sub stop_worker {
+    my ($self, $worker) = @_;
+    $worker->kill_child;
+}
+
+#-------------------------------------------------------------------------------
+# Accepts a message and processes it in the pool.
+#-------------------------------------------------------------------------------
+sub request_queue {
+    my ($self, $msg, $stream) = @_;
+
+    my $worker = $self->checkout;
+
+    # Replace worker if necessary
+    if (   $self->counts_requests
+        && $worker->request_count >= $self->max_requests)
+    {
+        $worker->kill_child;
+        $worker = $self->start_worker;
+    }
+
+    # Process the task in a worker
+    my $reply = $worker->process($msg);
+
+    # Return worker to the pool
+    $self->checkin($worker);
+
+    return $reply;
 }
 
 no Moose;

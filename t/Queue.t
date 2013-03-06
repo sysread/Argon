@@ -2,14 +2,14 @@ use strict;
 use warnings;
 
 use Argon::Message;
-use Argon::MessageQueue;
+use Argon::Queue;
 use List::Util   qw/shuffle/;
 use Test::More   tests => 1507;
 
 my $LIMIT = 500;
 
-my $queue = Argon::MessageQueue->new(limit => $LIMIT);
-ok($queue->isa('Argon::MessageQueue'), 'instantiation');
+my $queue = Argon::Queue->new(limit => $LIMIT);
+ok($queue->isa('Argon::Queue'), 'instantiation');
 ok($queue->{limit} == $LIMIT, 'instantiation');
 ok($queue->{size} == 0, 'instantiation');
 ok($queue->is_empty, 'instantiation, queue is_empty');
