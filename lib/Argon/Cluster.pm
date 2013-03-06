@@ -48,17 +48,26 @@ has 'tracking' => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Configures responders
+#-------------------------------------------------------------------------------
 sub BUILD {
     my $self = shift;
     $self->respond_to(CMD_ADD_NODE, K('request_add_node', $self));
     $self->respond_to(CMD_QUEUE,    K('request_queue',    $self));
 }
 
+#-------------------------------------------------------------------------------
+# Adds a little logging to start up.
+#-------------------------------------------------------------------------------
 before 'start' => sub {
     my $self = shift;
     LOG('Starting cluster manager');
 };
 
+#-------------------------------------------------------------------------------
+# Returns the next "most available" node.
+#-------------------------------------------------------------------------------
 sub next_node {
     my $self  = shift;
     my @nodes = sort {
@@ -98,6 +107,9 @@ sub register_node {
     $stream->monitor(K('unregister_node', $self));
 }
 
+#-------------------------------------------------------------------------------
+# Unregisters a stream as a node.
+#-------------------------------------------------------------------------------
 sub unregister_node {
     my ($self, $stream) = @_;
     my $address = first { $self->get_node($_) eq $stream } $self->node_addrs;
@@ -109,10 +121,12 @@ sub unregister_node {
     }
 }
 
+#-------------------------------------------------------------------------------
+# Request handler for CMD_ADD_NODE.
+#-------------------------------------------------------------------------------
 sub request_add_node {
     my ($self, $msg, $stream) = @_;
     my $address = $msg->get_payload;
-
     eval { $self->register_node($stream, $address) };
     if ($@) {
         my $reply = $msg->reply(CMD_ERROR);
@@ -124,44 +138,41 @@ sub request_add_node {
     }
 }
 
+#-------------------------------------------------------------------------------
+# Request handler for CMD_QUEUE. Forwards messages to the most available node.
+#-------------------------------------------------------------------------------
 sub request_queue {
     my ($self, $msg, $stream) = @_;
     if (defined(my $node = $self->next_node)) {
         $self->get_tracking($node)->start_request($msg->id);
         my $address = $node->address;
+        my $reply   = eval { $node->send($msg) };
 
-        async {
-            eval {
-                my $reply = $node->send($msg);
-                $self->get_tracking($node)->end_request($msg->id);
-                $self->send_response($reply);
-            };
+        # An error signifies a lost connection to the node. Unregister
+        # the node, then send an error response to the client (since there
+        # is no way to know whether or not the request was successfully
+        # processed before the connection dropped.)
+        if ($@) {
+            my $error = $@;
+            LOG('Error (%s): %s', $address, $@)
+                unless Argon::Stream::is_connection_error($@);
 
-            # An error signifies a lost connection to the node. Unregister
-            # the node, then send an error response to the client (since there
-            # is no way to know whether or not the request was successfully
-            # processed before the connection dropped.)
-            if ($@) {
-                my $error = $@;
-                LOG('Error (%s): %s', $address, $@)
-                    unless Argon::Stream::is_connection_error($@);
-
-                $self->unregister_node($node);
-
-                my $reply = $msg->reply(CMD_ERROR);
-                $reply->set_payload(sprintf(
+            $self->unregister_node($node);
+            $reply = $msg->reply(CMD_ERROR);
+            $reply->set_payload(sprintf(
 <<END
 Lost connection to worker node while processing request. Verify task state and
 retry if necessary. Error: %s
 END
-                    , $error
-                ));
+                , $error
+            ));
 
-                $self->send_response($reply);
-            }
-        };
+            return $reply;
+        } else {
+            $self->get_tracking($node)->end_request($msg->id);
+        }
 
-        return;
+        return $reply;
     } else {
         my $reply = $msg->reply(CMD_ERROR);
         $reply->set_payload('No workers available to handle request.');

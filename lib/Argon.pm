@@ -66,6 +66,10 @@ sub error {
     return $msg;
 }
 
+#-------------------------------------------------------------------------------
+# Emits a message to STDERR in a consistent fashion. Accepts arguments
+# identically to sprintf.
+#-------------------------------------------------------------------------------
 sub LOG {
     my ($format, @args) = @_;
     chomp $format;

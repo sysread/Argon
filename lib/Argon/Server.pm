@@ -48,24 +48,6 @@ has 'handler' => (
 );
 
 #-------------------------------------------------------------------------------
-# Marks a msg id as having a request pending with a stream.
-#-------------------------------------------------------------------------------
-has 'pending' => (
-    is       => 'ro',
-    isa      => 'HashRef[Argon::Stream]',
-    init_arg => undef,
-    default  => sub {{}},
-    traits   => ['Hash'],
-    handles  => {
-        set_pending => 'set',
-        get_pending => 'get',
-        del_pending => 'delete',
-        has_pending => 'exists',
-        all_pending => 'keys',
-    }
-);
-
-#-------------------------------------------------------------------------------
 # Flags the stream->address as currently being serviced. If the flag is deleted,
 # the service loop for the stream will self-terminate. If unset from within a
 # response-handler, any message returned by the handler will be sent before the
@@ -126,15 +108,12 @@ sub service {
 
     async {
         while ($stream->is_connected && $self->has_service($stream->address)) {
-            my $msg = $stream->next_message or last;
-            $self->set_pending($msg->id, $stream);
-            
+            my $msg   = $stream->next_message or last;
             my $reply = $self->dispatch($msg, $stream);
             if (defined $reply) {
                 if ($reply->isa('Argon::Message')) {
-                    $self->send_response($reply);
-                } else {
-                    $self->del_pending($msg->id);
+                    eval { $stream->send_message($reply) };
+                    last if $@ && Argon::Stream::is_connection_error($@);
                 }
             }
         }
@@ -155,39 +134,6 @@ sub dispatch {
         my $reply = $msg->reply(CMD_ERROR);
         $reply->set_payload('Command not handled');
         return $reply;
-    }
-}
-
-#-------------------------------------------------------------------------------
-# For previously dispatched messages which did not generate an immediate
-# response, send_response allows a reply to be sent when it becomes available.
-# It is the handler's responsibility to manage this by calling send_response.
-#-------------------------------------------------------------------------------
-sub send_response {
-    my ($self, $msg) = @_;
-    if ($self->has_pending($msg->id)) {
-        my $stream = $self->get_pending($msg->id);
-        $self->del_pending($msg->id);
-
-        eval { $stream->send_message($msg) };
-
-        # If sending the reply failed due to a connection error, clear any other
-        # messages pending for this stream.
-        if ($@ && $@ =~ /closed/) {
-            $self->cleanup_stream($stream);
-        }
-    }
-}
-
-#-------------------------------------------------------------------------------
-# 
-#-------------------------------------------------------------------------------
-sub cleanup_stream {
-    my ($self, $stream) = @_;
-    foreach my $msg_id ($self->all_pending) {
-        if ($self->get_pending($msg_id) eq $stream) {
-            $self->del_pending($msg_id);
-        }
     }
 }
 
