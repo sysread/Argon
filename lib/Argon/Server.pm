@@ -56,7 +56,8 @@ has 'handler' => (
 has 'service_loop' => (
     is       => 'ro',
     isa      => 'HashRef[Int]',
-    init_arg => sub {{}},
+    init_arg => undef,
+    default  => sub {{}},
     traits   => ['Hash'],
     handles  => {
         set_service  => 'set',
@@ -102,20 +103,25 @@ sub start {
 #-------------------------------------------------------------------------------
 sub service {
     my ($self, $stream) = @_;
-    LOG('Client connected: %s', $stream->address);
+    my $addr = $stream->address;
+    LOG('Client connected: %s', $addr);
 
-    $self->set_service($stream->address, 1);
+    $self->set_service($addr, 1);
 
     async {
         while ($stream->is_connected && $self->has_service($stream->address)) {
-            my $msg   = $stream->next_message or last;
-            my $reply = $self->dispatch($msg, $stream);
-            if (defined $reply) {
-                if ($reply->isa('Argon::Message')) {
-                    eval { $stream->send_message($reply) };
-                    last if $@ && Argon::Stream::is_connection_error($@);
+            my $msg = $stream->next_message or last;
+            async {
+                my $reply = $self->dispatch($msg, $stream);
+                if (defined $reply) {
+                    if ($reply->isa('Argon::Message')) {
+                        eval { $stream->send_message($reply) };
+                        if ($@ && Argon::Stream::is_connection_error($@)) {
+                            # pass
+                        }
+                    }
                 }
-            }
+            };
         }
 
         $self->stop_service($stream->address);

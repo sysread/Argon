@@ -17,6 +17,9 @@ use Argon qw/LOG K :commands/;
 
 extends 'Argon::Server';
 
+#-------------------------------------------------------------------------------
+# Stores nodes as a hash of address => stream.
+#-------------------------------------------------------------------------------
 has 'node' => (
     is       => 'ro',
     isa      => 'HashRef[Argon::Stream]',
@@ -34,6 +37,9 @@ has 'node' => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Stores NodeTrackers for each node address.
+#-------------------------------------------------------------------------------
 has 'tracking' => (
     is       => 'ro',
     isa      => 'HashRef[Argon::NodeTracker]',
@@ -46,6 +52,16 @@ has 'tracking' => (
         del_tracking => 'delete',
         has_tracking => 'exists',
     }
+);
+
+#-------------------------------------------------------------------------------
+# Stores the number of workers each node has (node address -> worker count).
+#-------------------------------------------------------------------------------
+has 'workers' => (
+    is       => 'ro',
+    isa      => 'HashRef[Int]',
+    init_arg => undef,
+    default  => sub {{}},
 );
 
 #-------------------------------------------------------------------------------
@@ -66,7 +82,8 @@ before 'start' => sub {
 };
 
 #-------------------------------------------------------------------------------
-# Returns the next "most available" node.
+# Returns the next "most available" node, based on current load and average
+# processing time for each node.
 #-------------------------------------------------------------------------------
 sub next_node {
     my $self  = shift;
@@ -74,7 +91,7 @@ sub next_node {
             $self->get_tracking($a)->avg_proc_time
         <=> $self->get_tracking($b)->avg_proc_time
     } $self->nodes;
-    return shift @nodes;
+    return first { $self->get_tracking($_)->capacity > 0 } @nodes;
 }
 
 #-------------------------------------------------------------------------------
@@ -85,24 +102,23 @@ sub next_node {
 # the node.
 #-------------------------------------------------------------------------------
 sub register_node {
-    my ($self, $stream, $address) = @_;
+    my ($self, $stream, $address, $workers) = @_;
 
     # If the node is already registered, it signifies that the node was
     # disconnected and the cluster has not yet detected it. In that case, the
     # node's existing records may be transferred.
     if (exists $self->node->{$address}) {
-        my $old_stream   = $self->get_node($address);
-        my $old_tracking = $self->get_tracking($old_stream);
-        $self->unregister_node($old_stream);
-        $self->set_node($address, $stream);
-        $self->set_tracking($stream, $old_tracking);
-        LOG('Updated registration for worker node %s', $address);
+        $self->unregister_node($stream);
     }
-    else {
-        $self->set_node($address, $stream);
-        $self->set_tracking($stream, Argon::NodeTracker->new(tracking => 10));
-        LOG('Registered worker node %s', $address);
-    }
+
+    $self->workers->{$address} = $workers;
+    $self->set_node($address, $stream);
+    $self->set_tracking($stream, Argon::NodeTracker->new(
+        workers  => $workers,
+        tracking => 10,
+    ));
+
+    LOG('Registered worker node %s', $address);
 
     $stream->monitor(K('unregister_node', $self));
 }
@@ -117,6 +133,10 @@ sub unregister_node {
         $self->del_tracking($stream);
         $self->del_node($address);
         $stream->close;
+
+        my $workers = $self->workers->{$address};
+        delete $self->workers->{$address};
+
         LOG('Unregistered worker node %s', $address);
     }
 }
@@ -126,8 +146,12 @@ sub unregister_node {
 #-------------------------------------------------------------------------------
 sub request_add_node {
     my ($self, $msg, $stream) = @_;
-    my $address = $msg->get_payload;
-    eval { $self->register_node($stream, $address) };
+    my $payload = $msg->get_payload;
+    my $address = $payload->{address};
+    my $workers = $payload->{workers};
+
+    eval { $self->register_node($stream, $address, $workers) };
+
     if ($@) {
         my $reply = $msg->reply(CMD_ERROR);
         $reply->set_payload($@);
@@ -143,6 +167,7 @@ sub request_add_node {
 #-------------------------------------------------------------------------------
 sub request_queue {
     my ($self, $msg, $stream) = @_;
+
     if (defined(my $node = $self->next_node)) {
         $self->get_tracking($node)->start_request($msg->id);
         my $address = $node->address;
@@ -166,15 +191,13 @@ retry if necessary. Error: %s
 END
                 , $error
             ));
-
-            return $reply;
         } else {
             $self->get_tracking($node)->end_request($msg->id);
         }
 
         return $reply;
     } else {
-        my $reply = $msg->reply(CMD_ERROR);
+        my $reply = $msg->reply(CMD_REJECTED);
         $reply->set_payload('No workers available to handle request.');
         return $reply;
     }

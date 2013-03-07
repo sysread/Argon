@@ -13,7 +13,6 @@ use Coro::AnyEvent;
 use AnyEvent;
 
 use Argon::Worker;
-use Argon::Queue;
 use Argon qw/LOG K :commands :defaults/;
 
 extends 'Argon::Server';
@@ -121,7 +120,12 @@ sub notify {
                 my $reply;
                 eval {
                     my $msg = Argon::Message->new(command => CMD_ADD_NODE);
-                    $msg->set_payload($address);
+
+                    $msg->set_payload({
+                        address => $address,
+                        workers => $self->concurrency,
+                    });
+
                     $reply = $stream->send($msg);
                 };
 

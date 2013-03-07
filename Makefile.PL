@@ -19,7 +19,6 @@ WriteMakefile(
         'Data::UUID'           => 0,
         'AnyEvent'             => 0,
         'Coro'                 => 0,
-        'Coro::PrioChannel'    => 0,
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean               => { FILES => 'Argon-*' },

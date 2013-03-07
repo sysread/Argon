@@ -140,7 +140,7 @@ sub effective_priority {
 sub compare {
     my ($self, $other, $swap) = @_;
     my ($x, $y) = $swap ? ($other, $self) : ($self, $other);
-    return $y->effective_priority <=> $x->effective_priority;
+    return $y->priority <=> $x->priority;
 }
 
 no Moose;

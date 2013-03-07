@@ -27,11 +27,12 @@ our %EXPORT_TAGS = (
         MESSAGE_SEPARATOR
         TRACK_MESSAGES
         POLL_INTERVAL
+        PRI_BOOST_TIME
         EOL
     /],
 
     # Priorities
-    'priorities' => [qw/PRI_REAL PRI_HIGH PRI_NORMAL PRI_LOW PRI_IGNORE/],
+    'priorities' => [qw/PRI_MAX PRI_HIGH PRI_NORMAL PRI_LOW PRI_MIN/],
 
     'statuses' => [qw/STATUS_QUEUED STATUS_ASSIGNED STATUS_COMPLETE/],
 
@@ -124,15 +125,16 @@ use constant EOL                => "\0";
 use constant MESSAGE_SEPARATOR  => ' ';
 use constant TRACK_MESSAGES     => 10;   # number of message times to track for computing avg processing time at a host
 use constant POLL_INTERVAL      => 2;    # number of seconds between polls for connectivity between cluster/node
+use constant PRI_BOOST_TIME     => 1;    # number of seconds spent in the queue before priority of a message is boosted
 
 #-------------------------------------------------------------------------------
 # Priorities
 #-------------------------------------------------------------------------------
-use constant PRI_REAL    => 0;
-use constant PRI_HIGH    => 1;
-use constant PRI_NORMAL  => 2;
-use constant PRI_LOW     => 3;
-use constant PRI_IGNORE  => 4;
+use constant PRI_MAX    => 0;
+use constant PRI_HIGH   => 1;
+use constant PRI_NORMAL => 2;
+use constant PRI_LOW    => 3;
+use constant PRI_MIN    => 4;
 
 #-------------------------------------------------------------------------------
 # Message states

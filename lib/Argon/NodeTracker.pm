@@ -10,12 +10,27 @@ use namespace::autoclean;
 
 use Time::HiRes qw/time/;
 
+#-------------------------------------------------------------------------------
+# The length of tracking history to keep.
+#-------------------------------------------------------------------------------
 has 'tracking' => (
     is       => 'ro',
     isa      => 'Int',
     required => 1,
 );
 
+#-------------------------------------------------------------------------------
+# The number of workers a node has.
+#-------------------------------------------------------------------------------
+has 'workers' => (
+    is       => 'ro',
+    isa      => 'Int',
+    required => 1,
+);
+
+#-------------------------------------------------------------------------------
+# The total number of requests this node has served.
+#-------------------------------------------------------------------------------
 has 'requests' => (
     is       => 'ro',
     isa      => 'Int',
@@ -27,6 +42,9 @@ has 'requests' => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Stores the last <tracking> request timings.
+#-------------------------------------------------------------------------------
 has 'history' => (
     is       => 'ro',
     isa      => 'ArrayRef[Num]',
@@ -41,6 +59,9 @@ has 'history' => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Hash of pending requests (msgid => tracking start time).
+#-------------------------------------------------------------------------------
 has 'pending' => (
     is       => 'ro',
     isa      => 'HashRef[Num]',
@@ -55,6 +76,9 @@ has 'pending' => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Avg processing time, calculated after each request completes.
+#-------------------------------------------------------------------------------
 has 'avg_proc_time' => (
     is       => 'rw',
     isa      => 'Num',
@@ -62,11 +86,18 @@ has 'avg_proc_time' => (
     default  => 0,
 );
 
+#-------------------------------------------------------------------------------
+# Begins tracking a request.
+#-------------------------------------------------------------------------------
 sub start_request {
     my ($self, $msg_id) = @_;
     $self->set_pending($msg_id, time);
+    $self->inc_requests;
 }
 
+#-------------------------------------------------------------------------------
+# Completes tracking for a request and updates tracking stats.
+#-------------------------------------------------------------------------------
 sub end_request {
     my ($self, $msg_id) = @_;
     my $taken = time - $self->get_pending($msg_id);
@@ -83,6 +114,18 @@ sub end_request {
     $self->avg_proc_time($sum / $self->len_history);
 }
 
+#-------------------------------------------------------------------------------
+# Returns the current capacity (workers - pending requests).
+#-------------------------------------------------------------------------------
+sub capacity {
+    my $self = shift;
+    return $self->workers - $self->num_pending;
+}
+
+#-------------------------------------------------------------------------------
+# Returns the estimated time it would take to process a task, based on the
+# number of pending tasks for this node and the average processing time.
+#-------------------------------------------------------------------------------
 sub est_proc_time {
     my $self = shift;
     return $self->avg_proc_time * ($self->num_pending + 1);
