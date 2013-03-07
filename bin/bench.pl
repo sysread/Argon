@@ -29,7 +29,7 @@ GetOptions(
 LOG('Benchmark plan:');
 LOG('Host: %s:%d', $host, $port);
 LOG('Will send %d tasks over %d concurrent connections', $total, $conc);
-LOG('Simulated task will take %f seconds to complete.', $delay);
+LOG('Simulated task will take %0.4f seconds to complete.', $delay);
 LOG('--------------------------------------------------------------------------------');
 
 # Create connections
@@ -43,7 +43,7 @@ foreach (1 .. $conc) {
 # Configure reporting
 my $report_every = $total / 10;
 my $int_padding  = length "$total";
-my $format       = "%0${int_padding}d/%0${int_padding}d complete in %fs (avg %fs/task)";
+my $format       = "%0${int_padding}d/%0${int_padding}d complete in %.4fs (avg %.4fs/task)";
 
 # Start
 my @threads;
@@ -58,7 +58,7 @@ foreach my $task (1 .. $total) {
             class  => 'SampleTask',
             params => [num => $task, delay => $delay],
         );
-        
+
         my $finish = time;
 
         $clients->put($client);
@@ -78,6 +78,6 @@ my $taken = time - $start_time;
 my $avg   = $taken / $complete;
 LOG('--------------------------------------------------------------------------------');
 LOG($format, $complete, $total, $taken, $avg);
-LOG('Savings / Overhead: %fs/task', ($avg - $delay));
+LOG('Savings / Overhead: %0.4fs/task', ($avg - $delay));
 
 exit 0;

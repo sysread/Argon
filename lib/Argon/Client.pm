@@ -59,7 +59,8 @@ sub process {
         # If the task was rejected, sleep a short (but lengthening) amount of
         # time before attempting again.
         if ($reply->command == CMD_REJECTED) {
-            Coro::AnyEvent::sleep(log($attempts) / 10);
+            my $sleep_time = log($attempts + 1) / log(10);
+            Coro::AnyEvent::sleep($sleep_time);
         }
         else {
             return $reply;
