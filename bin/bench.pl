@@ -4,12 +4,11 @@ use strict;
 use warnings;
 use Carp;
 
-use EV;
 use Coro;
 use Getopt::Long;
 use Time::HiRes qw/time/;
+use Argon       qw/LOG :commands/;
 use Argon::Client;
-use Argon qw/LOG :commands/;
 
 # Default values
 my $host  = 'localhost';
@@ -64,6 +63,10 @@ foreach my $task (1 .. $total) {
         $clients->put($client);
         ++$complete;
 
+        if ($result->command == CMD_ERROR) {
+            LOG('Error: %s', $result->get_payload);
+        }
+
         if ($complete % $report_every == 0) {
             my $taken = $finish - $start_time;
             my $avg   = $taken / $complete;
@@ -72,8 +75,10 @@ foreach my $task (1 .. $total) {
     }
 }
 
+# Wait for all threads to complete
 $_->join foreach @threads;
 
+# Output summary
 my $taken = time - $start_time;
 my $avg   = $taken / $complete;
 LOG('--------------------------------------------------------------------------------');

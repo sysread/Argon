@@ -104,7 +104,6 @@ sub start {
 sub service {
     my ($self, $stream) = @_;
     my $addr = $stream->address;
-    LOG('Client connected: %s', $addr);
 
     $self->set_service($addr, 1);
 

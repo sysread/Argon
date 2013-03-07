@@ -34,6 +34,7 @@ has 'node' => (
         nodes      => 'values',
         node_pairs => 'kv',
         node_addrs => 'keys',
+        num_nodes  => 'count',
     }
 );
 
@@ -52,16 +53,6 @@ has 'tracking' => (
         del_tracking => 'delete',
         has_tracking => 'exists',
     }
-);
-
-#-------------------------------------------------------------------------------
-# Stores the number of workers each node has (node address -> worker count).
-#-------------------------------------------------------------------------------
-has 'workers' => (
-    is       => 'ro',
-    isa      => 'HashRef[Int]',
-    init_arg => undef,
-    default  => sub {{}},
 );
 
 #-------------------------------------------------------------------------------
@@ -111,7 +102,6 @@ sub register_node {
         $self->unregister_node($stream);
     }
 
-    $self->workers->{$address} = $workers;
     $self->set_node($address, $stream);
     $self->set_tracking($stream, Argon::NodeTracker->new(
         workers  => $workers,
@@ -133,10 +123,6 @@ sub unregister_node {
         $self->del_tracking($stream);
         $self->del_node($address);
         $stream->close;
-
-        my $workers = $self->workers->{$address};
-        delete $self->workers->{$address};
-
         LOG('Unregistered worker node %s', $address);
     }
 }
@@ -168,6 +154,12 @@ sub request_add_node {
 sub request_queue {
     my ($self, $msg, $stream) = @_;
 
+    if ($self->num_nodes == 0) {
+        my $reply = $msg->reply(CMD_ERROR);
+        $reply->set_payload('Unable to service requests: no worker nodes are registered.');
+        return $reply;
+    }
+
     if (defined(my $node = $self->next_node)) {
         $self->get_tracking($node)->start_request($msg->id);
         my $address = $node->address;
@@ -198,7 +190,7 @@ END
         return $reply;
     } else {
         my $reply = $msg->reply(CMD_REJECTED);
-        $reply->set_payload('No workers available to handle request.');
+        $reply->set_payload('No workers available to handle request. Please try again after a short delay.');
         return $reply;
     }
 }
