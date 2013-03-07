@@ -6,20 +6,13 @@ use Carp;
 
 use Moose;
 use MooseX::StrictConstructor;
-#use namespace::autoclean; # incompatible with overload pragma
+use namespace::autoclean;
 
-use Argon        qw/:priorities LOG MESSAGE_SEPARATOR/;
+use Argon        qw/LOG MESSAGE_SEPARATOR/;
 use Time::HiRes  qw/time/;
 use Data::UUID   qw//;
 use MIME::Base64 qw//;
 use Storable     qw//;;
-
-use overload
-    '<=>'  => 'compare',
-    '>'    => sub { compare($_[0], $_[1])  > 0 },
-    '<'    => sub { compare($_[0], $_[1])  < 0 },
-    '='    => sub { compare($_[0], $_[1]) == 0 },
-    'bool' => sub { $_[0] };
 
 # Time stamp, used to sort incoming messages
 has 'timestamp' => (
@@ -41,13 +34,6 @@ has 'command' => (
     is       => 'ro',
     isa      => 'Int',
     required => 1,
-);
-
-# Message priority (lower value is higher priority)
-has 'priority' => (
-    is      => 'rw',
-    isa     => 'Int',
-    default => PRI_NORMAL,
 );
 
 # Private - storage for encoded and decoded payloads
@@ -99,12 +85,12 @@ sub get_payload {
 sub encode {
     my $self = shift;
     my $payload = $self->encoded || '-';
-    return join(MESSAGE_SEPARATOR, $self->command, $self->priority, $self->id, $self->timestamp, $payload);
+    return join(MESSAGE_SEPARATOR, $self->command, $self->id, $self->timestamp, $payload);
 }
 
 sub decode {
-    my ($cmd, $pri, $id, $timestamp, $payload) = split MESSAGE_SEPARATOR, $_[0];
-    my $msg = Argon::Message->new(command => $cmd, priority => $pri, id => $id, timestamp => $timestamp);
+    my ($cmd, $id, $timestamp, $payload) = split MESSAGE_SEPARATOR, $_[0];
+    my $msg = Argon::Message->new(command => $cmd, id => $id, timestamp => $timestamp);
     $msg->encoded($payload) if $payload ne '-';
     return $msg;
 }
@@ -116,31 +102,9 @@ sub decode {
 #-------------------------------------------------------------------------------
 sub reply {
     my ($self, $cmd, $include_payload) = @_;
-    my $msg = Argon::Message->new(command => $cmd, id => $self->id, priority => $self->priority);
+    my $msg = Argon::Message->new(command => $cmd, id => $self->id);
     $msg->encoded($self->encoded) if $include_payload;
     return $msg;
-}
-
-#-------------------------------------------------------------------------------
-# Calculates the effective priority of the message. This value is based on both
-# the base priority of the message as well as its age in the queue.
-#-------------------------------------------------------------------------------
-sub effective_priority {
-    my $self = shift;
-    my $age  = time - $self->timestamp;
-    return $self->priority if $age < 1;
-    return $self->priority / log($age + 1);
-}
-
-#-------------------------------------------------------------------------------
-# Compares two Messages and returns and the equivalent of the <=> operator.
-# Comparison is done based first on effective priority (lower priority is
-# higher for sorting).
-#-------------------------------------------------------------------------------
-sub compare {
-    my ($self, $other, $swap) = @_;
-    my ($x, $y) = $swap ? ($other, $self) : ($self, $other);
-    return $y->priority <=> $x->priority;
 }
 
 no Moose;

@@ -10,7 +10,7 @@ use namespace::autoclean;
 
 use Argon::Stream;
 use Argon::Message;
-use Argon qw/LOG :commands :defaults :priorities/;
+use Argon qw/LOG :commands :defaults/;
 
 has 'port' => (
     is       => 'ro',
@@ -42,13 +42,12 @@ sub connect {
 
 sub process {
     my ($self, %param) = @_;
-    my $class    = $param{class}    || croak 'expected class';
-    my $params   = $param{params}   || [];
-    my $priority = $param{priority} || PRI_NORMAL;
+    my $class    = $param{class}  || croak 'expected class';
+    my $params   = $param{params} || [];
 
     croak 'not connected' unless $self->stream;
 
-    my $msg = Argon::Message->new(command  => CMD_QUEUE, priority => $priority);
+    my $msg = Argon::Message->new(command  => CMD_QUEUE);
     $msg->set_payload([$class, $params]);
 
     my $attempts = 0;
