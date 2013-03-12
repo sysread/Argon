@@ -1,5 +1,9 @@
 #-------------------------------------------------------------------------------
-# 
+# A bounded queue with rudimentary safeguards against starvation. Queues
+# manage a separate array for each priority. Pulling the next item from the
+# queue checks each priority's array in turn, returning the next item from the
+# highest priority queue. Starvation is avoided by increasing the priority of
+# items which have remained in their queue for too long.
 #-------------------------------------------------------------------------------
 package Argon::Queue;
 
@@ -10,26 +14,61 @@ use namespace::autoclean;
 
 use Coro;
 use Time::HiRes qw/time/;
-use Argon       qw/:priorities LOG/;
+use Argon       qw/:priorities/;
 
+use fields (
+    'check',      # seconds (float) between reprioritization checks
+    'limit',      # max items permitted in queue
+    'queues',     # store queue for each priority
+    'count',      # # of items currently in queue
+    'last_check', # time stamp of last reprioritization
+    'item',       # hash of item to [item ref, priority, time added]
+    'sem',        # used to block get() until an element is ready
+);
+
+#-------------------------------------------------------------------------------
+# Creates a new queue. Queues may be bounded to set a maximum length to the
+# queue. Optional parameter 'check' flips on starvation checks. When active,
+# a starvation check will occur no more often than once every 'check' seconds.
+# At that point, if any element has been present in the queue for 'check'
+# seconds, its priority will be bumped to the next highest to prevent it from
+# being starved by higher priority queues indefinitely. Reprioritization is
+# performed on get()s and put()s.
+#
+# Inputs:
+#   limit (int,   optional) = upper limit on queue length
+#   check (float, optional) = seconds between reprioritization checks
+#-------------------------------------------------------------------------------
 sub new {
     my ($class, %param) = @_;
     my $limit = $param{limit};
     my $check = $param{check};
-    my $self  = bless {
-        queues     => [map {[]} (PRI_MAX .. PRI_MIN)], # store queue for each priority
-        check      => $check,   # seconds (float) between reprioritization checks
-        limit      => $limit,   # max items permitted in queue
-        count      => 0,        # # of items currently in queue
-        last_check => 0,        # time stamp of last reprioritization
-        item       => {},       # hash of item to [item ref, priority, time added]
-        sem        => Coro::Semaphore->new(0),
-    }, $class;
+    my $self  = fields::new($class);
+
+    $self->{limit}  = $limit;
+    $self->{check}  = $check;
+    $self->{queues} = [map {[]} (PRI_MAX .. PRI_MIN)];
+    $self->{item}   = {};
+    $self->{sem}    = Coro::Semaphore->new(0);
+    $self->{last_check} = 0;
+
+    return $self;
 }
 
+#-------------------------------------------------------------------------------
+# Returns true if there are no elements in the queue.
+#-------------------------------------------------------------------------------
 sub is_empty { $_[0]->{count} == 0 }
-sub is_full  { defined $_[0]->{limit} && $_[0]->{count} == $_[0]->{limit} }
 
+#-------------------------------------------------------------------------------
+# Returns true if there is no limit set or if the queue is at the specified
+# limit.
+#-------------------------------------------------------------------------------
+sub is_full { defined $_[0]->{limit} && $_[0]->{count} == $_[0]->{limit} }
+
+#-------------------------------------------------------------------------------
+# Helper method that actually does the work of placing the item in the queue.
+#-------------------------------------------------------------------------------
 sub _put {
     my ($self, $item, $priority) = @_;
     push @{$self->{queues}[$priority]}, $item;
@@ -42,6 +81,15 @@ sub _put {
     $self->{sem}->up;
 }
 
+#-------------------------------------------------------------------------------
+# Places an item in the queue. Throws an error if the queue is full.
+#
+# Inputs:
+#    item (any): item to place in the queue
+#    priority (Argon::PRI_*, optional): priority of the item (defaults to PRI_NORMAL)
+# Output:
+#    new queue length
+#-------------------------------------------------------------------------------
 sub put {
     my ($self, $item, $priority) = @_;
     $self->is_full && croak 'queue is full';
@@ -51,6 +99,9 @@ sub put {
     return $self->{count};
 }
 
+#-------------------------------------------------------------------------------
+# Blocks until an item is available in the queue, then returns that item.
+#-------------------------------------------------------------------------------
 sub get {
     my $self = shift;
     $self->reprioritize;
@@ -68,6 +119,12 @@ sub get {
     return;
 }
 
+#-------------------------------------------------------------------------------
+# Reprioritizes items in the queue. Any item which has remained in its own
+# queue for more than $self->{check} seconds gets placed in the next highest
+# priority queue. This method will not perform its work more often than once
+# every $self->{check} seconds.
+#-------------------------------------------------------------------------------
 sub reprioritize {
     my $self = shift;
     my $now  = time;
