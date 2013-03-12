@@ -1,11 +1,12 @@
 #-------------------------------------------------------------------------------
 # TODO
-#   * Change name
-#   * Chaos monkey
+#   * CPAN-friendly name
 #   * Better configuration:
 #     * File-based config - for pre-packaged bin scripts
 #   * Trap sigint for clean shutdown
 #   * Worker API for other languages/platforms
+#   * Track ping times and report lag between cluster/node
+#     * Adjust cluster's node selection to account for lag time
 #-------------------------------------------------------------------------------
 package Argon;
 
@@ -15,6 +16,8 @@ use strict;
 use warnings;
 use Carp;
 use namespace::autoclean;
+
+use Coro;
 use POSIX        qw/strftime/;
 use Scalar::Util qw/weaken/;
 
@@ -96,6 +99,8 @@ our $EOL                = "\0";     # end of line/message character(s)
 our $MESSAGE_SEPARATOR  = ' ';      # separator between parts of a message (command, priority, payload, etc)
 our $TRACK_MESSAGES     = 10;       # number of message times to track for computing avg processing time at a host
 our $POLL_INTERVAL      = 2;        # number of seconds between polls for connectivity between cluster/node
+our $CHAOS_MONKEY       = 0;        # percent chance of causing service to die every 30 seconds (set to zero to disable)
+                                    # See: http://www.codinghorror.com/blog/2011/04/working-with-the-chaos-monkey.html
 
 #-------------------------------------------------------------------------------
 # Debug levels
@@ -158,5 +163,24 @@ sub LOG ($@) {
 sub INFO  ($@) { goto \&LOG if $DEBUG & DEBUG_INFO  }
 sub WARN  ($@) { goto \&LOG if $DEBUG & DEBUG_WARN  }
 sub ERROR ($@) { goto \&LOG if $DEBUG & DEBUG_ERROR }
+
+#-------------------------------------------------------------------------------
+# Chaos monkey
+#-------------------------------------------------------------------------------
+sub CHAOS {
+    if ($CHAOS_MONKEY) {
+        srand time;
+        while (1) {
+            Coro::AnyEvent::sleep(30);
+            my $chance = rand 100;
+            if ($chance <= $CHAOS_MONKEY) {
+                ERROR 'The chaos moneky strikes! (rolled %d)', $chance;
+                exit 1;
+            } else {
+                INFO 'Chaos monkey rolled %d', $chance;
+            }
+        }
+    }
+}
 
 1;

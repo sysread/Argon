@@ -149,9 +149,12 @@ sub notify {
                 # Error response
                 elsif ($reply->command == CMD_ERROR) {
                     my $error = $reply->get_payload;
-                    ERROR 'Manager reported registration error: %s', $error;
-                    $is_connected = 1
-                        if $error =~ /node is already registered/;
+                    if ($error =~ /node is already registered/) {
+                        INFO 'Re-registered with manager';
+                        $is_connected = 1;
+                    } else {
+                        ERROR 'Manager reported registration error: %s', $error;
+                    }
                 }
                 # Unknown response
                 else {
@@ -172,6 +175,8 @@ sub notify {
             }
         }
     };
+
+    cede;
 }
 
 #-------------------------------------------------------------------------------

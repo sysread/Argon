@@ -81,7 +81,7 @@ my @threads;
 my $complete     = 0;
 my $start_time   = time;
 
-foreach my $task (@tasks) {
+while (my $task = shift @tasks) {
     my $client = $clients->get;
 
     push @threads, async {
@@ -91,19 +91,19 @@ foreach my $task (@tasks) {
         );
 
         my $finish = time;
-
         $clients->put($client);
-        ++$complete;
 
         if ($result->command == CMD_ERROR) {
             ERROR 'Error: %s', $result->get_payload;
-            
-        }
+            push @tasks, $task;
+        } else {
+            ++$complete;
 
-        if ($complete % $report_every == 0) {
-            my $taken = $finish - $start_time;
-            my $avg   = $taken / $complete;
-            INFO $format, $complete, $total, $taken, $avg;
+            if ($complete % $report_every == 0) {
+                my $taken = $finish - $start_time;
+                my $avg   = $taken / $complete;
+                INFO $format, $complete, $total, $taken, $avg;
+            }
         }
     }
 }

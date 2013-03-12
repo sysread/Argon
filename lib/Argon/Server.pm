@@ -88,7 +88,7 @@ has 'queue_check' => (
 );
 
 #-------------------------------------------------------------------------------
-# Task queue storing tuples of [Argon::Stream, Argon::Message].
+# Message queue storing tuples of [Argon::Stream, Argon::Message].
 #-------------------------------------------------------------------------------
 has 'queue' => (
     is       => 'rw',
@@ -143,6 +143,7 @@ sub start {
         $self->queue_limit,
         $self->queue_check;
 
+    async { Argon::CHAOS };
     async { $self->process_messages };
 
     while (1) {

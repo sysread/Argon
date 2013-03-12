@@ -162,6 +162,7 @@ sub request_queue {
 
     if (defined(my $node = $self->next_node)) {
         $self->get_tracking($node)->start_request($msg->id);
+
         my $address = $node->address;
         my $reply   = eval { $node->send($msg) };
 
@@ -171,8 +172,8 @@ sub request_queue {
         # processed before the connection dropped.)
         if ($@) {
             my $error = $@;
-            WARN 'Error (%s): %s', $address, $@
-                unless Argon::Stream::is_connection_error($@);
+            WARN('Error (%s): %s', $address, $@);
+                #unless Argon::Stream::is_connection_error($@);
 
             $self->unregister_node($node);
             $reply = $msg->reply(CMD_ERROR);

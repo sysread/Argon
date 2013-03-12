@@ -78,6 +78,7 @@ has 'pending' => (
         get_pending => 'get',
         del_pending => 'delete',
         has_pending => 'exists',
+        all_pending => 'keys',
     }
 );
 
@@ -119,7 +120,7 @@ sub poll_fh {
             my $msg = eval { $self->read_message };
 
             if ($@) {
-                WARN '(%d) Client error: %s', $fd, $@
+                WARN('(%d) Connection: %s', $fd, $@)
                     unless is_connection_error($@);
                 last;
             }
@@ -236,6 +237,7 @@ sub get_response {
     my $reply = $self->get_pending($msg_id)->get;
     $self->del_pending($msg_id);
 
+    croak $self->error if $reply == 0;
     return $reply;
 }
 
@@ -325,9 +327,15 @@ sub read_message {
 sub close {
     my $self = shift;
     $self->is_connected(0);
+
     if (defined $self->fh) {
         $self->fh->close;
         $self->unset_fh;
+    }
+
+    foreach my $msgid ($self->all_pending) {
+        $self->get_pending($msgid)->put(0);
+        $self->del_pending($msgid);
     }
 }
 
