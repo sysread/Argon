@@ -13,7 +13,7 @@ use Coro::AnyEvent;
 use AnyEvent;
 
 use Argon::Worker;
-use Argon qw/LOG K :commands/;
+use Argon qw/K :commands :logging/;
 
 extends 'Argon::Server';
 
@@ -63,7 +63,7 @@ sub BUILD {
     $self->sigint(AnyEvent->signal(
         signal => 'INT',
         cb     => sub {
-            LOG('Shutting down workers');
+            INFO 'Shutting down workers';
 
             while ($self->workers > 0) {
                 my $worker = $self->checkout;
@@ -80,14 +80,14 @@ sub BUILD {
 #-------------------------------------------------------------------------------
 before 'start' => sub {
     my $self = shift;
-    LOG('Starting node with %d workers', $self->concurrency);
+    INFO 'Starting node with %d workers', $self->concurrency;
 
     $self->pool(Coro::Channel->new($self->concurrency + 1));
     $self->checkin($self->start_worker)
         for 1 .. $self->concurrency;
 
     if ($self->is_managed) {
-        LOG('Notifying manager of availability');
+        INFO 'Notifying manager of availability';
         $self->notify;
     }
 };
@@ -100,7 +100,7 @@ sub notify {
     my ($host, $port) = split ':', $self->manager;
 
     async {
-        LOG('Connecting to manager: %s', $self->manager);
+        INFO 'Connecting to manager: %s', $self->manager;
         my $is_connected = 0;
         my $attempts     = 0;
         my $address      = sprintf '%s:%d', $self->host, $self->port;
@@ -136,32 +136,32 @@ sub notify {
                 }
                 # Check validity of response
                 elsif ($reply->command == CMD_ACK) {
-                    LOG('Connected to manager: %s', $self->manager);
+                    INFO 'Connected to manager: %s', $self->manager;
                     $is_connected = 1;
                     $self->service($stream);
 
                     $stream->monitor(sub {
                         my ($stream, $reason) = @_;
-                        LOG('Lost connection to manager');
+                        WARN 'Lost connection to manager';
                         $self->notify;
                     });
                 }
                 # Error response
                 elsif ($reply->command == CMD_ERROR) {
                     my $error = $reply->get_payload;
-                    LOG('Manager reported registration error: %s', $error);
+                    ERROR 'Manager reported registration error: %s', $error;
                     $is_connected = 1
                         if $error =~ /node is already registered/;
                 }
                 # Unknown response
                 else {
                     my $msg = $reply->get_payload || '<empty>';
-                    LOG('Unexpected response from manager: (%d) %s', $reply->command, $msg);
+                    ERROR 'Unexpected response from manager: (%d) %s', $reply->command, $msg;
                 }
             }
 
             if (defined $error && $error ne $last_error) {
-                LOG($error);
+                ERROR $error;
                 $last_error = $error;
             }
 

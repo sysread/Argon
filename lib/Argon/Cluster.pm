@@ -13,7 +13,7 @@ use List::Util qw/first/;
 use Argon::Stream;
 use Argon::Server;
 use Argon::NodeTracker;
-use Argon qw/LOG K :commands/;
+use Argon qw/K :commands :logging/;
 
 extends 'Argon::Server';
 
@@ -69,7 +69,7 @@ sub BUILD {
 #-------------------------------------------------------------------------------
 before 'start' => sub {
     my $self = shift;
-    LOG('Starting cluster manager');
+    INFO 'Starting cluster manager';
 };
 
 #-------------------------------------------------------------------------------
@@ -108,7 +108,7 @@ sub register_node {
         tracking => $Argon::TRACK_MESSAGES,
     ));
 
-    LOG('Registered worker node %s', $address);
+    INFO 'Registered worker node %s', $address;
 
     $stream->monitor(K('unregister_node', $self));
 }
@@ -123,7 +123,7 @@ sub unregister_node {
         $self->del_tracking($stream);
         $self->del_node($address);
         $stream->close;
-        LOG('Unregistered worker node %s', $address);
+        INFO 'Unregistered worker node %s', $address;
     }
 }
 
@@ -171,7 +171,7 @@ sub request_queue {
         # processed before the connection dropped.)
         if ($@) {
             my $error = $@;
-            LOG('Error (%s): %s', $address, $@)
+            WARN 'Error (%s): %s', $address, $@
                 unless Argon::Stream::is_connection_error($@);
 
             $self->unregister_node($node);

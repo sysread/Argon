@@ -13,7 +13,7 @@ use POSIX          qw/:sys_wait_h/;
 use AnyEvent       qw//;
 use AnyEvent::Util qw//;
 use Time::HiRes    qw/sleep/;
-use Argon          qw/LOG :commands/;
+use Argon          qw/:logging :commands/;
 
 # Nabbed from AnyEvent::Worker
 our $FD_MAX = eval { POSIX::sysconf(&POSIX::_SC_OPEN_MAX) - 1 } || 1023;
@@ -91,7 +91,8 @@ sub start {
 
 		while (my $line = do { local $/ = $Argon::EOL; <$parent> }) {
 			unless (defined $line) {
-				LOG('Parent terminated connection');
+				WARN 'Parent terminated connection';
+
 				$exit_code = 1;
 				last;
 			}
@@ -103,12 +104,12 @@ sub start {
 			$parent->flush();
 		}
 
-		LOG('Worker exiting');
+		INFO 'Worker exiting';
 		kill 9, $$ if AnyEvent::WIN32;
 		POSIX::_exit $exit_code;
     }
     else {
-		LOG('Error starting worker process: %s', $!);
+		ERROR 'Error starting worker process: %s', $!;
         croak $!;
     }
 }
@@ -124,7 +125,6 @@ sub process_task {
         require "$class.pm";
 
         unless ($class->does('Argon::Role::Task')) {
-            LOG('Tasks must implement Argon::Role::Task');
             croak 'Tasks must implement Argon::Role::Task';
         }
 
@@ -135,7 +135,7 @@ sub process_task {
     my $reply;
     if ($@) {
         my $error = $@;
-        LOG('Task error: %s', $@);
+        WARN 'Task error: %s', $@;
         $reply = $msg->reply(CMD_ERROR);
         $reply->set_payload($error);
     } else {
@@ -158,7 +158,7 @@ sub kill_child {
 		kill(0, $pid)
 			&& kill(9, $pid)
 			|| $!{ESRCH}
-			|| LOG("kill %d: %s", $pid, $!);
+			|| ERROR("Error killing pid %d: %s", $pid, $!);
 
         if ($wait) {
             while ($pid > 0) {

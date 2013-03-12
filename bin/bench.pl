@@ -7,7 +7,7 @@ use Carp;
 use Coro;
 use Getopt::Long;
 use Time::HiRes qw/time/;
-use Argon       qw/LOG :commands/;
+use Argon       qw/:commands :logging/;
 use Argon::Client;
 
 # Default values
@@ -30,24 +30,24 @@ GetOptions(
 # If the delay is 0, use the variance to calculate an average such that the
 # delay ought not fall below zero.
 if ($delay == 0 && $variance != 0) {
-    LOG('Warning: recalculated delay and variance to prevent negative delays.');
+    INFO 'Warning: recalculated delay and variance to prevent negative delays.';
     $delay    = $variance / 2;
     $variance = $variance / 2;
 }
 # If the variance could cause the delay to be less than zero, use the variance
 # to calculate the effective avg delay.
 elsif ($delay < $variance) {
-    LOG('Warning: recalculated delay and variance to prevent negative delays.');
+    INFO 'Warning: recalculated delay and variance to prevent negative delays.';
     my $difference = $variance - $delay;
     $delay    += $difference;
     $variance -= $difference;
 }
 
-LOG('Benchmark plan:');
-LOG('Host: %s:%d', $host, $port);
-LOG('Will send %d tasks over %d concurrent connections', $total, $conc);
-LOG('Simulated task will average %0.4fs (+/-%0.4fs) to complete.', $delay, $variance);
-LOG('--------------------------------------------------------------------------------');
+INFO 'Benchmark plan:';
+INFO 'Host: %s:%d', $host, $port;
+INFO 'Will send %d tasks over %d concurrent connections', $total, $conc;
+INFO 'Simulated task will average %0.4fs (+/-%0.4fs) to complete.', $delay, $variance;
+INFO '--------------------------------------------------------------------------------';
 
 # Create connections
 my $clients = Coro::Channel->new();
@@ -96,13 +96,14 @@ foreach my $task (@tasks) {
         ++$complete;
 
         if ($result->command == CMD_ERROR) {
-            LOG('Error: %s', $result->get_payload);
+            ERROR 'Error: %s', $result->get_payload;
+            
         }
 
         if ($complete % $report_every == 0) {
             my $taken = $finish - $start_time;
             my $avg   = $taken / $complete;
-            LOG($format, $complete, $total, $taken, $avg);
+            INFO $format, $complete, $total, $taken, $avg;
         }
     }
 }
@@ -113,8 +114,8 @@ $_->join foreach @threads;
 # Output summary
 my $taken = time - $start_time;
 my $avg   = $taken / $complete;
-LOG('--------------------------------------------------------------------------------');
-LOG($format, $complete, $total, $taken, $avg);
-LOG('Savings / Overhead: %0.4fs/task', ($avg - $delay));
+INFO '--------------------------------------------------------------------------------';
+INFO $format, $complete, $total, $taken, $avg;
+INFO 'Savings / Overhead: %0.4fs/task', ($avg - $delay);
 
 exit 0;

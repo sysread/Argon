@@ -2,11 +2,10 @@
 # TODO
 #   * Change name
 #   * Chaos monkey
-#   * Better logging
 #   * Better configuration:
-#     * Change some parameters from constants to variables
 #     * File-based config - for pre-packaged bin scripts
 #   * Trap sigint for clean shutdown
+#   * Worker API for other languages/platforms
 #-------------------------------------------------------------------------------
 package Argon;
 
@@ -41,38 +40,16 @@ our %EXPORT_TAGS = (
         CMD_ADD_NODE
         CMD_PING
     /],
+
+    'logging' => [qw/
+        INFO
+        WARN
+        ERROR
+    /],
 );
 
 our @EXPORT_OK = map { @$_ } values %EXPORT_TAGS;
-our @EXPORT    = qw/LOG K/;
-
-#-------------------------------------------------------------------------------
-# DEBUG flag
-#-------------------------------------------------------------------------------
-our $DEBUG = 0;
-
-#-------------------------------------------------------------------------------
-# Strips an error message of line number and file information.
-#-------------------------------------------------------------------------------
-sub error {
-    my $msg = shift;
-    $msg =~ s/ at (.+?) line \d+.//gsm;
-    $msg =~ s/\s+$//gsm;
-    $msg =~ s/^\s+//gsm;
-    return $msg;
-}
-
-#-------------------------------------------------------------------------------
-# Emits a message to STDERR in a consistent fashion. Accepts arguments
-# identically to sprintf.
-#-------------------------------------------------------------------------------
-sub LOG {
-    my ($format, @args) = @_;
-    chomp $format;
-    my $msg = error(sprintf($format, @args));
-    my $ts  = strftime("%Y-%m-%d %H:%M:%S", localtime);
-    warn sprintf("[%s] [%d] %s\n", $ts, $$, $msg);
-}
+our @EXPORT    = qw/K/;
 
 #-------------------------------------------------------------------------------
 # Returns a new function suitable for use as a callback. This is useful to pass
@@ -113,12 +90,19 @@ sub K {
 #-------------------------------------------------------------------------------
 # Defaults
 #-------------------------------------------------------------------------------
-our $LISTEN_QUEUE_SIZE  = 128;
-our $CHUNK_SIZE         = 1024 * 4;
-our $EOL                = "\0";
-our $MESSAGE_SEPARATOR  = ' ';
-our $TRACK_MESSAGES     = 10;   # number of message times to track for computing avg processing time at a host
-our $POLL_INTERVAL      = 2;    # number of seconds between polls for connectivity between cluster/node
+our $LISTEN_QUEUE_SIZE  = 128;      # queue size for listening sockets
+our $CHUNK_SIZE         = 1024 * 4; # number of bytes to read at a time
+our $EOL                = "\0";     # end of line/message character(s)
+our $MESSAGE_SEPARATOR  = ' ';      # separator between parts of a message (command, priority, payload, etc)
+our $TRACK_MESSAGES     = 10;       # number of message times to track for computing avg processing time at a host
+our $POLL_INTERVAL      = 2;        # number of seconds between polls for connectivity between cluster/node
+
+#-------------------------------------------------------------------------------
+# Debug levels
+#-------------------------------------------------------------------------------
+use constant DEBUG_INFO  => 1 << 0;
+use constant DEBUG_WARN  => 1 << 1;
+use constant DEBUG_ERROR => 1 << 2;
 
 #-------------------------------------------------------------------------------
 # Commands
@@ -139,5 +123,40 @@ use constant PRI_HIGH   => 1;
 use constant PRI_NORMAL => 2;
 use constant PRI_LOW    => 3;
 use constant PRI_MIN    => 4;
+
+#-------------------------------------------------------------------------------
+# DEBUG bitmask
+#-------------------------------------------------------------------------------
+our $DEBUG = DEBUG_INFO | DEBUG_WARN | DEBUG_ERROR;
+
+#-------------------------------------------------------------------------------
+# Strips an error message of line number and file information.
+#-------------------------------------------------------------------------------
+sub error {
+    my $msg = shift;
+    $msg =~ s/ at (.+?) line \d+.//gsm;
+    $msg =~ s/\s+$//gsm;
+    $msg =~ s/^\s+//gsm;
+    return $msg;
+}
+
+#-------------------------------------------------------------------------------
+# Emits a message to STDERR in a consistent fashion. Accepts arguments
+# identically to sprintf.
+#-------------------------------------------------------------------------------
+sub LOG ($@) {
+    my ($format, @args) = @_;
+    chomp $format;
+    my $msg = error(sprintf($format, @args));
+    my $ts  = strftime("%F %T", localtime);
+    warn sprintf("[%s] [%d] %s\n", $ts, $$, $msg);
+}
+
+#-------------------------------------------------------------------------------
+# Logging functions
+#-------------------------------------------------------------------------------
+sub INFO  ($@) { goto \&LOG if $DEBUG & DEBUG_INFO  }
+sub WARN  ($@) { goto \&LOG if $DEBUG & DEBUG_WARN  }
+sub ERROR ($@) { goto \&LOG if $DEBUG & DEBUG_ERROR }
 
 1;

@@ -16,7 +16,7 @@ use AnyEvent::Util qw//;
 use AnyEvent::Util qw//;
 use Socket         qw/getnameinfo NI_NUMERICSERV/;
 use Errno          qw/EWOULDBLOCK/;
-use Argon          qw/LOG :commands/;
+use Argon          qw/:logging :commands/;
 use Argon::Message;
 
 has 'fh' => (
@@ -119,7 +119,7 @@ sub poll_fh {
             my $msg = eval { $self->read_message };
 
             if ($@) {
-                LOG('(%d) Client error: %s', $fd, $@)
+                WARN '(%d) Client error: %s', $fd, $@
                     unless is_connection_error($@);
                 last;
             }

@@ -9,11 +9,11 @@ use MooseX::StrictConstructor;
 use Moose::Util::TypeConstraints;
 use namespace::autoclean;
 
-use Argon        qw/:priorities LOG/;
 use Time::HiRes  qw/time/;
 use Data::UUID   qw//;
 use MIME::Base64 qw//;
 use Storable     qw//;;
+use Argon        qw/:priorities/;
 
 enum 'Argon::Message::Priority', [PRI_MAX .. PRI_MIN];
 
@@ -99,7 +99,7 @@ sub encode {
 }
 
 sub decode {
-    my ($cmd, $pri, $id, $timestamp, $payload) = split MESSAGE_SEPARATOR, $_[0];
+    my ($cmd, $pri, $id, $timestamp, $payload) = split $Argon::MESSAGE_SEPARATOR, $_[0];
     my $msg = Argon::Message->new(command => $cmd, priority => $pri, id => $id, timestamp => $timestamp);
     $msg->encoded($payload) if $payload ne '-';
     return $msg;

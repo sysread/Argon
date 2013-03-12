@@ -17,7 +17,7 @@ use Socket qw/getnameinfo/;
 use Argon::Stream;
 use Argon::Message;
 use Argon::Queue;
-use Argon qw/:commands LOG K/;
+use Argon qw/:commands :logging K/;
 
 has 'port' => (
     is       => 'ro',
@@ -132,17 +132,16 @@ sub start {
     );
 
     unless ($sock) {
-        LOG('Error creating server socket: %s', $!);
+        ERROR 'Error creating server socket: %s', $!;
         exit 1;
     }
 
     $sock->listen or croak $!;
-    LOG('Starting service on %s:%d (queue limit: %d, starvation check: %0.2fs)',
+    INFO 'Starting service on %s:%d (queue limit: %d, starvation check: %0.2fs)',
         $self->host,
         $self->port,
         $self->queue_limit,
-        $self->queue_check,
-    );
+        $self->queue_check;
 
     async { $self->process_messages };
 
@@ -180,7 +179,7 @@ sub reply {
             # pass - stream is disconnected and producer thread
             # (Argon::Server->service) will self-terminate.
         } elsif ($@) {
-            LOG('Error sending reply: %s', $@);
+            WARN 'Error sending reply: %s', $@;
         }
     }
 }
@@ -228,7 +227,7 @@ sub dispatch {
     if ($self->has_handler($msg->command)) {
         return $self->get_handler($msg->command)->($msg, $stream);
     } else {
-        LOG('Warning: command not handled - %d', $msg->command);
+        WARN 'Warning: command not handled - %d', $msg->command;
         my $reply = $msg->reply(CMD_ERROR);
         $reply->set_payload('Command not handled');
         return $reply;

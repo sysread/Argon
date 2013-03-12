@@ -10,7 +10,7 @@ use namespace::autoclean;
 
 use Argon::Stream;
 use Argon::Message;
-use Argon qw/LOG :commands/;
+use Argon qw/:logging :commands/;
 
 has 'port' => (
     is       => 'ro',
