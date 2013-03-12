@@ -13,7 +13,7 @@ use Coro::AnyEvent;
 use AnyEvent;
 
 use Argon::Worker;
-use Argon qw/LOG K :commands :defaults/;
+use Argon qw/LOG K :commands/;
 
 extends 'Argon::Server';
 

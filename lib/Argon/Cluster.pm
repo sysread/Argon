@@ -105,7 +105,7 @@ sub register_node {
     $self->set_node($address, $stream);
     $self->set_tracking($stream, Argon::NodeTracker->new(
         workers  => $workers,
-        tracking => 10,
+        tracking => $Argon::TRACK_MESSAGES,
     ));
 
     LOG('Registered worker node %s', $address);

@@ -13,7 +13,7 @@ use POSIX          qw/:sys_wait_h/;
 use AnyEvent       qw//;
 use AnyEvent::Util qw//;
 use Time::HiRes    qw/sleep/;
-use Argon          qw/LOG :commands :defaults/;
+use Argon          qw/LOG :commands/;
 
 # Nabbed from AnyEvent::Worker
 our $FD_MAX = eval { POSIX::sysconf(&POSIX::_SC_OPEN_MAX) - 1 } || 1023;
@@ -89,7 +89,7 @@ sub start {
 
 		my $exit_code = 0;
 
-		while (my $line = do { local $/ = EOL; <$parent> }) {
+		while (my $line = do { local $/ = $Argon::EOL; <$parent> }) {
 			unless (defined $line) {
 				LOG('Parent terminated connection');
 				$exit_code = 1;
@@ -99,7 +99,7 @@ sub start {
 			my $msg   = Argon::Message::decode($line);
 			my $reply = $self->process_task($msg);
 
-			$parent->print($reply->encode . EOL);
+			$parent->print($reply->encode . $Argon::EOL);
 			$parent->flush();
 		}
 

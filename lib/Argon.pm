@@ -1,7 +1,12 @@
 #-------------------------------------------------------------------------------
 # TODO
-#   * Debug levels (higher levels log less, remove stack traces from warnings, etc.)
+#   * Change name
 #   * Chaos monkey
+#   * Better logging
+#   * Better configuration:
+#     * Change some parameters from constants to variables
+#     * File-based config - for pre-packaged bin scripts
+#   * Trap sigint for clean shutdown
 #-------------------------------------------------------------------------------
 package Argon;
 
@@ -18,22 +23,16 @@ require Exporter;
 use base qw/Exporter/;
 
 our %EXPORT_TAGS = (
-    # Defaults and parameters
-    'defaults' => [qw/
-        LISTEN_QUEUE_SIZE
-        SOCKET_TIMEOUT
-        CHUNK_SIZE
-        MESSAGE_SEPARATOR
-        TRACK_MESSAGES
-        POLL_INTERVAL
-        EOL
+    'priorities' => [qw/
+        PRI_MAX
+        PRI_HIGH
+        PRI_NORMAL
+        PRI_LOW
+        PRI_MIN
     /],
 
-    'statuses'   => [qw/STATUS_QUEUED STATUS_ASSIGNED STATUS_COMPLETE/],
-    'priorities' => [qw/PRI_MAX PRI_HIGH PRI_NORMAL PRI_LOW PRI_MIN/],
-
     # Command verbs and responses
-    'commands'   => [qw/
+    'commands' => [qw/
         CMD_ACK
         CMD_QUEUE
         CMD_REJECTED
@@ -114,20 +113,12 @@ sub K {
 #-------------------------------------------------------------------------------
 # Defaults
 #-------------------------------------------------------------------------------
-use constant LISTEN_QUEUE_SIZE  => 128;
-use constant SOCKET_TIMEOUT     => 30;
-use constant CHUNK_SIZE         => 1024 * 4;
-use constant EOL                => "\0";
-use constant MESSAGE_SEPARATOR  => ' ';
-use constant TRACK_MESSAGES     => 10;   # number of message times to track for computing avg processing time at a host
-use constant POLL_INTERVAL      => 2;    # number of seconds between polls for connectivity between cluster/node
-
-#-------------------------------------------------------------------------------
-# Message states
-#-------------------------------------------------------------------------------
-use constant STATUS_QUEUED   => 0;
-use constant STATUS_ASSIGNED => 1;
-use constant STATUS_COMPLETE => 2;
+our $LISTEN_QUEUE_SIZE  = 128;
+our $CHUNK_SIZE         = 1024 * 4;
+our $EOL                = "\0";
+our $MESSAGE_SEPARATOR  = ' ';
+our $TRACK_MESSAGES     = 10;   # number of message times to track for computing avg processing time at a host
+our $POLL_INTERVAL      = 2;    # number of seconds between polls for connectivity between cluster/node
 
 #-------------------------------------------------------------------------------
 # Commands

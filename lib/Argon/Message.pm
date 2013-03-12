@@ -9,7 +9,7 @@ use MooseX::StrictConstructor;
 use Moose::Util::TypeConstraints;
 use namespace::autoclean;
 
-use Argon        qw/:priorities LOG MESSAGE_SEPARATOR/;
+use Argon        qw/:priorities LOG/;
 use Time::HiRes  qw/time/;
 use Data::UUID   qw//;
 use MIME::Base64 qw//;
@@ -95,7 +95,7 @@ sub get_payload {
 sub encode {
     my $self = shift;
     my $payload = $self->encoded || '-';
-    return join(MESSAGE_SEPARATOR, $self->command, $self->priority, $self->id, $self->timestamp, $payload);
+    return join($Argon::MESSAGE_SEPARATOR, $self->command, $self->priority, $self->id, $self->timestamp, $payload);
 }
 
 sub decode {

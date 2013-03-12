@@ -17,7 +17,7 @@ use Socket qw/getnameinfo/;
 use Argon::Stream;
 use Argon::Message;
 use Argon::Queue;
-use Argon qw/:commands :defaults LOG K/;
+use Argon qw/:commands LOG K/;
 
 has 'port' => (
     is       => 'ro',
@@ -126,7 +126,7 @@ sub start {
         LocalPort => $self->port,
         Proto     => 'tcp',
         Type      => SOCK_STREAM,
-        Listen    => LISTEN_QUEUE_SIZE,
+        Listen    => $Argon::LISTEN_QUEUE_SIZE,
         ReuseAddr => 1,
         Blocking  => 0,
     );

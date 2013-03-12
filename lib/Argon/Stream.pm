@@ -16,7 +16,7 @@ use AnyEvent::Util qw//;
 use AnyEvent::Util qw//;
 use Socket         qw/getnameinfo NI_NUMERICSERV/;
 use Errno          qw/EWOULDBLOCK/;
-use Argon          qw/LOG :defaults :commands/;
+use Argon          qw/LOG :commands/;
 use Argon::Message;
 
 has 'fh' => (
@@ -165,7 +165,7 @@ sub monitor {
                 $on_fail->($self, $@);
                 last;
             } else {
-                Coro::AnyEvent::sleep POLL_INTERVAL;
+                Coro::AnyEvent::sleep $Argon::POLL_INTERVAL;
             }
         }
     };
@@ -250,7 +250,7 @@ sub send_message {
     # Note: must check again for connection after sleeping until writable
     croak $self->error unless $self->is_connected;
 
-    my $bytes = syswrite($self->fh, $msg->encode . EOL);
+    my $bytes = syswrite($self->fh, $msg->encode . $Argon::EOL);
 
     if (!defined $bytes) {
         $self->close_with_error($!);
@@ -271,7 +271,7 @@ sub read_chunk {
     my $bytes = sysread(
         $self->fh,
         $self->{buffer},
-        CHUNK_SIZE,
+        $Argon::CHUNK_SIZE,
         $self->offset,
     );
 
@@ -292,7 +292,7 @@ sub read_chunk {
 #-------------------------------------------------------------------------------
 sub read_message {
     my ($self, %param) = @_;
-    my $eol = $param{eol} || EOL;
+    my $eol = $param{eol} || $Argon::EOL;
 
     my $eol_index = -1;
     while ($eol_index == -1) {
