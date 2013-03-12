@@ -30,7 +30,8 @@ our %EXPORT_TAGS = (
         EOL
     /],
 
-    'statuses' => [qw/STATUS_QUEUED STATUS_ASSIGNED STATUS_COMPLETE/],
+    'statuses'   => [qw/STATUS_QUEUED STATUS_ASSIGNED STATUS_COMPLETE/],
+    'priorities' => [qw/PRI_MAX PRI_HIGH PRI_NORMAL PRI_LOW PRI_MIN/],
 
     # Command verbs and responses
     'commands'   => [qw/
@@ -139,5 +140,14 @@ use constant CMD_REJECTED => 3;  # Response - message was rejected
 use constant CMD_ERROR    => 4;  # Response - error processing message or invalid message format
 use constant CMD_ADD_NODE => 5;  # Add a node to a cluster
 use constant CMD_PING     => 6;  # Add a node to a cluster
+
+#-------------------------------------------------------------------------------
+# Priorities
+#-------------------------------------------------------------------------------
+use constant PRI_MAX    => 0;
+use constant PRI_HIGH   => 1;
+use constant PRI_NORMAL => 2;
+use constant PRI_LOW    => 3;
+use constant PRI_MIN    => 4;
 
 1;

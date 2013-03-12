@@ -6,13 +6,16 @@ use Carp;
 
 use Moose;
 use MooseX::StrictConstructor;
+use Moose::Util::TypeConstraints;
 use namespace::autoclean;
 
-use Argon        qw/LOG MESSAGE_SEPARATOR/;
+use Argon        qw/:priorities LOG MESSAGE_SEPARATOR/;
 use Time::HiRes  qw/time/;
 use Data::UUID   qw//;
 use MIME::Base64 qw//;
 use Storable     qw//;;
+
+enum 'Argon::Message::Priority', [PRI_MAX .. PRI_MIN];
 
 # Time stamp, used to sort incoming messages
 has 'timestamp' => (
@@ -27,6 +30,13 @@ has 'id' => (
     isa     => 'Str',
     lazy    => 1,
     default => sub { Data::UUID->new->create_str },
+);
+
+# Message priority, used when queueing messages at entry point
+has 'priority' => (
+    is      => 'ro',
+    isa     => 'Argon::Message::Priority',
+    default => PRI_NORMAL,
 );
 
 # Processing instruction
@@ -85,12 +95,12 @@ sub get_payload {
 sub encode {
     my $self = shift;
     my $payload = $self->encoded || '-';
-    return join(MESSAGE_SEPARATOR, $self->command, $self->id, $self->timestamp, $payload);
+    return join(MESSAGE_SEPARATOR, $self->command, $self->priority, $self->id, $self->timestamp, $payload);
 }
 
 sub decode {
-    my ($cmd, $id, $timestamp, $payload) = split MESSAGE_SEPARATOR, $_[0];
-    my $msg = Argon::Message->new(command => $cmd, id => $id, timestamp => $timestamp);
+    my ($cmd, $pri, $id, $timestamp, $payload) = split MESSAGE_SEPARATOR, $_[0];
+    my $msg = Argon::Message->new(command => $cmd, priority => $pri, id => $id, timestamp => $timestamp);
     $msg->encoded($payload) if $payload ne '-';
     return $msg;
 }
@@ -102,12 +112,13 @@ sub decode {
 #-------------------------------------------------------------------------------
 sub reply {
     my ($self, $cmd, $include_payload) = @_;
-    my $msg = Argon::Message->new(command => $cmd, id => $self->id);
+    my $msg = Argon::Message->new(command => $cmd, id => $self->id, priority => $self->priority);
     $msg->encoded($self->encoded) if $include_payload;
     return $msg;
 }
 
 no Moose;
+no Moose::Util::TypeConstraints;
 __PACKAGE__->meta->make_immutable;
 
 1;

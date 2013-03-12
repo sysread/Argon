@@ -16,6 +16,7 @@ use Socket qw/getnameinfo/;
 
 use Argon::Stream;
 use Argon::Message;
+use Argon::Queue;
 use Argon qw/:commands :defaults LOG K/;
 
 has 'port' => (
@@ -68,6 +69,52 @@ has 'service_loop' => (
 );
 
 #-------------------------------------------------------------------------------
+# Queue size limit. When the queue is at maximum capacity, tasks are rejected.
+#-------------------------------------------------------------------------------
+has 'queue_limit' => (
+    is       => 'ro',
+    isa      => 'Int',
+    required => 1,
+);
+
+#-------------------------------------------------------------------------------
+# Queue check time (float seconds). Controls the length of time a message may
+# spend in the queue before it's priority is increased to prevent starvation.
+#-------------------------------------------------------------------------------
+has 'queue_check' => (
+    is       => 'ro',
+    isa      => 'Num',
+    required => 1,
+);
+
+#-------------------------------------------------------------------------------
+# Task queue storing tuples of [Argon::Stream, Argon::Message].
+#-------------------------------------------------------------------------------
+has 'queue' => (
+    is       => 'rw',
+    isa      => 'Argon::Queue',
+    init_arg => undef,
+    builder  => 'build_queue',
+    lazy     => 1,
+    handles  => {
+        'queue_put'     => 'put',
+        'queue_get'     => 'get',
+        'queue_is_full' => 'is_full',
+    }
+);
+
+#-------------------------------------------------------------------------------
+# Queue constructor.
+#-------------------------------------------------------------------------------
+sub build_queue {
+    my $self = shift;
+    return Argon::Queue->new(
+        limit => $self->queue_limit,
+        check => $self->queue_check,
+    );
+}
+
+#-------------------------------------------------------------------------------
 # Starts the server listening for new requests.
 #-------------------------------------------------------------------------------
 sub start {
@@ -90,11 +137,44 @@ sub start {
     $sock->listen or croak $!;
     LOG('Service started on %s:%d', $self->host, $self->port);
 
+    async { $self->process_messages };
+
     while (1) {
         Coro::AnyEvent::readable($sock);
         my $client = $sock->accept;
         my $stream = Argon::Stream->new(fh => $client);
         $self->service($stream);
+    }
+}
+
+#-------------------------------------------------------------------------------
+# Consumer thread. Loops on Argon::Queue->get, dispatching messages and sending
+# the results back to the originating stream.
+#-------------------------------------------------------------------------------
+sub process_messages {
+    my $self = shift;
+    while (1) {
+        my ($stream, $msg) = @{ $self->queue_get };
+        async {
+            my $reply = $self->dispatch($msg, $stream);
+            $self->reply($stream, $reply);
+        };
+    }
+}
+
+#-------------------------------------------------------------------------------
+# Helper method to send a message to a stream. Traps connection errors.
+#-------------------------------------------------------------------------------
+sub reply {
+    my ($self, $stream, $reply) = @_;
+    if ($reply->isa('Argon::Message')) {
+        eval { $stream->send_message($reply) };
+        if ($@ && Argon::Stream::is_connection_error($@)) {
+            # pass - stream is disconnected and producer thread
+            # (Argon::Server->service) will self-terminate.
+        } elsif ($@) {
+            LOG('Error sending reply: %s', $@);
+        }
     }
 }
 
@@ -109,18 +189,15 @@ sub service {
 
     async {
         while ($stream->is_connected && $self->has_service($stream->address)) {
+            # Pull next message. On failure, stop serving stream.
             my $msg = $stream->next_message or last;
-            async {
-                my $reply = $self->dispatch($msg, $stream);
-                if (defined $reply) {
-                    if ($reply->isa('Argon::Message')) {
-                        eval { $stream->send_message($reply) };
-                        if ($@ && Argon::Stream::is_connection_error($@)) {
-                            # pass
-                        }
-                    }
-                }
-            };
+
+            if ($self->queue_is_full) {
+                my $reply = $msg->reply(CMD_REJECTED);
+                $self->reply($stream, $reply);
+            } else {
+                $self->queue_put([$stream, $msg], $msg->priority);
+            }
         }
 
         $self->stop_service($stream->address);
