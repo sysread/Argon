@@ -137,9 +137,7 @@ sub reprioritize {
 
     my %prune;
     @prune{@msgids} = (1) x @msgids;
-    foreach my $pri (PRI_MIN .. PRI_MAX) {
-        $self->{queues}[$pri] = [ grep { !$prune{$_} } @{$self->{queues}[$pri]} ];
-    }
+    $self->filter(sub { !$prune{$_} });
 
     $self->{count} -= scalar @msgids;
 
@@ -153,6 +151,35 @@ sub reprioritize {
     }
 
     $self->{last_check} = $now;
+}
+
+#-------------------------------------------------------------------------------
+# Safely filters items from the queue.
+#-------------------------------------------------------------------------------
+sub filter {
+    my ($self, $filter) = @_;
+    croak 'expected CODE ref' unless ref $filter eq 'CODE';
+
+    my $change = 0;
+
+    foreach my $pri (PRI_MIN .. PRI_MAX) {
+        my @clean;
+
+        foreach my $item (@{$self->{queues}[$pri]}) {
+            my $keep = do { local $_ = $item; $filter->($item) };
+            if ($keep) {
+                push @clean, $item;
+            } else {
+                delete $self->{item}{$item};
+                ++$change;
+            }
+        }
+
+        $self->{queues}[$pri] = \@clean;
+    }
+
+    $self->{count} -= $change;
+    $self->{sem}->adjust(-$change);
 }
 
 1;

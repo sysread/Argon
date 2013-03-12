@@ -61,10 +61,10 @@ has 'service_loop' => (
     default  => sub {{}},
     traits   => ['Hash'],
     handles  => {
-        set_service  => 'set',
-        get_service  => 'get',
-        stop_service => 'delete',
-        has_service  => 'exists',
+        set_service => 'set',
+        get_service => 'get',
+        del_service => 'delete',
+        has_service => 'exists',
     }
 );
 
@@ -100,6 +100,7 @@ has 'queue' => (
         'queue_put'     => 'put',
         'queue_get'     => 'get',
         'queue_is_full' => 'is_full',
+        'queue_filter'  => 'filter',
     }
 );
 
@@ -119,6 +120,7 @@ sub build_queue {
 #-------------------------------------------------------------------------------
 sub start {
     my $self = shift;
+
     my $sock = IO::Socket::INET->new(
         LocalAddr => $self->host,
         LocalPort => $self->port,
@@ -135,7 +137,12 @@ sub start {
     }
 
     $sock->listen or croak $!;
-    LOG('Service started on %s:%d', $self->host, $self->port);
+    LOG('Starting service on %s:%d (queue limit: %d, starvation check: %0.2fs)',
+        $self->host,
+        $self->port,
+        $self->queue_limit,
+        $self->queue_check,
+    );
 
     async { $self->process_messages };
 
@@ -202,6 +209,15 @@ sub service {
 
         $self->stop_service($stream->address);
     };
+}
+
+#-------------------------------------------------------------------------------
+# Removes a stream from the service set.
+#-------------------------------------------------------------------------------
+sub stop_service {
+    my ($self, $stream) = @_;
+    $self->del_service($stream);
+    $self->queue_filter(sub { $_->[0] ne $stream });
 }
 
 #-------------------------------------------------------------------------------

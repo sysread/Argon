@@ -9,6 +9,8 @@ lib/Argon/Cluster.pm
 lib/Argon/Message.pm
 lib/Argon/Node.pm
 lib/Argon/NodeTracker.pm
+lib/Argon/Queue.pm
+lib/Argon/Server.pm
 lib/Argon/Stream.pm
 lib/Argon/Worker.pm
 lib/Argon/Role/Task.pm

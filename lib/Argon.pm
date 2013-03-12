@@ -1,7 +1,6 @@
 #-------------------------------------------------------------------------------
 # TODO
 #   * Debug levels (higher levels log less, remove stack traces from warnings, etc.)
-#   * Clearing out completed messages that were never picked up
 #   * Chaos monkey
 #-------------------------------------------------------------------------------
 package Argon;
@@ -49,7 +48,7 @@ our @EXPORT_OK = map { @$_ } values %EXPORT_TAGS;
 our @EXPORT    = qw/LOG K/;
 
 #-------------------------------------------------------------------------------
-# DEBUG level
+# DEBUG flag
 #-------------------------------------------------------------------------------
 our $DEBUG = 0;
 

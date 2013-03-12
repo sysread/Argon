@@ -16,7 +16,7 @@ has 'delay' => (is => 'ro', isa => 'Num', required => 0, default => 0);
 sub run {
     my $self = shift;
     sleep $self->delay if $self->delay != 0;
-    return $self->num * 2;
+    return $self->num;
 }
 
 no Moose;
