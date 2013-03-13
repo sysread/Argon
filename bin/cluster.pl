@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Carp;
 
+use EV;
 use Getopt::Long;
 use Pod::Usage;
 use Argon::Cluster;

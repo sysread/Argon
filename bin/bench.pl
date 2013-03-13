@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Carp;
 
+use EV;
 use Coro;
 use Getopt::Long;
 use Pod::Usage;

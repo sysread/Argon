@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Carp;
 
+use EV;
 use Argon qw/:commands/;
 use Argon::Node;
 use Getopt::Long;
