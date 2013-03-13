@@ -164,7 +164,7 @@ sub request_queue {
         $self->get_tracking($node)->start_request($msg->id);
 
         my $address = $node->address;
-        my $reply   = eval { $node->send($msg) };
+        my $reply   = eval { $node->send_retry($msg) };
 
         # An error signifies a lost connection to the node. Unregister
         # the node, then send an error response to the client (since there

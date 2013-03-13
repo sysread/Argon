@@ -12,7 +12,7 @@ use Pod::Usage;
 # Default values
 my $port;
 my $workers = 4;
-my $limit;
+my $limit   = 64;
 my $check   = 2;
 my $manager;
 my $max_reqs;
@@ -37,8 +37,8 @@ if (!$got_options || $help || !$port) {
 my %param = (
     concurrency => $workers,
     port        => $port,
-    limit => $limit,
-    check => $check,
+    queue_limit => $limit,
+    queue_check => $check,
 );
 
 $param{max_requests} = $max_reqs if $max_reqs;

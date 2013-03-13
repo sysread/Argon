@@ -50,22 +50,7 @@ sub process {
     my $msg = Argon::Message->new(command  => CMD_QUEUE);
     $msg->set_payload([$class, $params]);
 
-    my $attempts = 0;
-
-    while (1) {
-        ++$attempts;
-        my $reply = $self->stream->send($msg);
-
-        # If the task was rejected, sleep a short (but lengthening) amount of
-        # time before attempting again.
-        if ($reply->command == CMD_REJECTED) {
-            my $sleep_time = log($attempts + 1) / log(10);
-            Coro::AnyEvent::sleep($sleep_time);
-        }
-        else {
-            return $reply;
-        }
-    }
+    return $self->stream->send_retry($msg);
 }
 
 no Moose;

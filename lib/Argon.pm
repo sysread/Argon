@@ -1,7 +1,6 @@
 #-------------------------------------------------------------------------------
 # TODO
 #   * CPAN-friendly name
-#   * Handle when node rejects task from cluster
 #   * Trap sigint for clean shutdown
 #   * Worker API for other languages/platforms
 #   * Track ping times and report lag between cluster/node

@@ -215,6 +215,31 @@ sub connect {
 }
 
 #-------------------------------------------------------------------------------
+# Sends a message and waits for the response. If the message is rejected,
+# continues to resend the message after longer and longer delays until it is
+# accepted.
+#-------------------------------------------------------------------------------
+sub send_retry {
+    my ($self, $msg) = @_;
+    my $attempts = 0;
+
+    while (1) {
+        ++$attempts;
+        my $reply = $self->send($msg);
+
+        # If the task was rejected, sleep a short (but lengthening) amount of
+        # time before attempting again.
+        if ($reply->command == CMD_REJECTED) {
+            my $sleep_time = log($attempts + 1) / log(10);
+            Coro::AnyEvent::sleep($sleep_time);
+        }
+        else {
+            return $reply;
+        }
+    }
+}
+
+#-------------------------------------------------------------------------------
 # Sends a message and returns the reply.
 #-------------------------------------------------------------------------------
 sub send {
