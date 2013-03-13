@@ -79,12 +79,12 @@ interrupting service for existing clients.
 
 Usage
 =====
-See `/examples` for examples of usage. More to come as the design is solidified.
+See `/bin` for examples of usage. More to come as the design is solidified.
 
 LICENSE AND COPYRIGHT
 =====================
 
-Copyright (C) 2012 "Jeff Ober"
+Copyright (C) 2013 "Jeff Ober"
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published
