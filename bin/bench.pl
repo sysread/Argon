@@ -1,4 +1,4 @@
-#!/bin/env perl
+#!/usr/bin/env perl
 
 use strict;
 use warnings;
@@ -6,26 +6,35 @@ use Carp;
 
 use Coro;
 use Getopt::Long;
+use Pod::Usage;
 use Time::HiRes qw/time/;
 use Argon       qw/:commands :logging/;
 use Argon::Client;
 
 # Default values
 my $host     = 'localhost';
-my $port     = 8888;
+my $port;
 my $total    = 1000;
 my $conc     = 4;
 my $delay    = 0.05;
 my $variance = 0;
+my $help;
 
-GetOptions(
-    'host=s'       => \$host,
-    'port=i'       => \$port,
-    'number=i'     => \$total,
-    'concurrent=i' => \$conc,
-    'delay=f'      => \$delay,
-    'variance=f'   => \$variance,
+my $got_options = GetOptions(
+    'address=s'     => \$host,
+    'port=i'        => \$port,
+    'number=i'      => \$total,
+    'concurrency=i' => \$conc,
+    'delay=f'       => \$delay,
+    'variance=f'    => \$variance,
+    'help'          => \$help,
 );
+
+if (!$got_options || $help || !$port) {
+    pod2usage(2);
+    exit 1 if !$got_options || !$port;
+    exit 0;
+}
 
 # If the delay is 0, use the variance to calculate an average such that the
 # delay ought not fall below zero.
@@ -119,3 +128,64 @@ INFO $format, $complete, $total, $taken, $avg;
 INFO 'Savings / Overhead: %0.4fs/task', ($avg - $delay);
 
 exit 0;
+__END__
+
+=head1 NAME
+
+bench.pl - runs a benchmark against a node or cluster
+
+=head1 SYNOPSIS
+
+bench.pl -p 8888 [-i somehost] [-n 2000] [-c 8] [-d 0.5] [-v 0.25]
+
+ Options:
+   -[p]ort          port to which the client should connect
+   -[a]ddress       host to which the client should connect
+   -[n]umber        total number of messages to send
+   -[c]oncurrency   number of concurrent connections to use
+   -[d]elay         the amount of time to simulate each task taking
+   -[v]ariance      introduces variation in simulated task time (delay)
+   -[h]elp          prints this help message
+
+=head1 DESCRIPTION
+
+B<bench.pl> runs a stress test against an Argon node or cluster.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-[h]elp>
+
+Print a brief help message and exits.
+
+=item B<-[p]ort>
+
+The port to which the client connects.
+
+=item B<-[a]ddress>
+
+The hostname to which the client connects.
+
+=item B<-[n]umber>
+
+The total number of requests to send.
+
+=item B<-[c]oncurrency>
+
+The number of independent connections to the service to establish. Tasks will
+be split up among the connections for best throughput.
+
+=item B<-[d]elay>
+
+Sets the number of seconds the dummy task will sleep in order to simulate a
+task of fixed processing time.
+
+=item B<-[v]ariance>
+
+Setting this to a fractional value of seconds causes variation of up to that
+value in the delay used by the dummy task.
+
+=back
+
+=cut
