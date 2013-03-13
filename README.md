@@ -16,7 +16,7 @@ Simple design of distributed systems
 ------------------------------------
 Argon applications are built from simple components. The most basic piece is an
 Argon::Node, which manages a configurable pool of local Perl processes. Acting
-alone, a node can listen on TCP/IP socket and accept new tasks.
+alone, a node can listen on a TCP/IP socket and accept new tasks.
 
 Multiple nodes work in tandem through an Argon::Cluster. Clusters maintain a
 pool of nodes, routing tasks to the most available node based on it's recent
@@ -26,16 +26,16 @@ Tasks are assigned by passing a class name and arguments to an instance of an
 Argon::Client. Because all components of the system use the same protocol, it
 does not matter whether a client connects to a node or a cluster. Tasks are
 sent to the specified entry point to the Argon application and routed
-appropriately. The client is notified via a callback function when the
-asynchronous task completes.
+appropriately. The client's caller is suspended (using Coro) until the task is
+successfully completed.
 
 
 Task prioritization
 ---------------------
 Tasks are prioritized and the most important tasks are pushed to the front of
-the line. In cases of high load, the system may be configured to ignore and/or
-reject the most irrelevant tasks in order to allow more processing time for
-more important work.
+the line. In cases of high load, the system will reject tasks which it cannot
+handle. The client accounts for this transparently, rescheduling the task to be
+handled after the system again becomes available.
 
 Clusters actively track task delivery and route incoming tasks to the most
 available node.
@@ -91,4 +91,3 @@ under the terms of either: the GNU General Public License as published
 by the Free Software Foundation; or the Artistic License.
 
 See http://dev.perl.org/licenses/ for more information.
-
