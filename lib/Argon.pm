@@ -1,6 +1,5 @@
 #-------------------------------------------------------------------------------
 # TODO
-#   * CPAN-friendly name
 #   * Trap sigint for clean shutdown
 #   * Worker API for other languages/platforms
 #   * Track ping times and report lag between cluster/node
@@ -8,7 +7,7 @@
 #-------------------------------------------------------------------------------
 package Argon;
 
-our $VERSION = '0.001';
+our $VERSION = '0.01';
 
 use strict;
 use warnings;
@@ -138,6 +137,7 @@ our $DEBUG = DEBUG_INFO | DEBUG_WARN | DEBUG_ERROR;
 sub error {
     my $msg = shift;
     $msg =~ s/ at (.+?) line \d+.//gsm;
+    $msg =~ s/eval {...} called$//gsm;
     $msg =~ s/\s+$//gsm;
     $msg =~ s/^\s+//gsm;
     return $msg;

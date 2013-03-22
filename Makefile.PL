@@ -12,8 +12,10 @@ WriteMakefile(
       ? ('LICENSE'=> 'perl')
       : ()),
     PL_FILES            => {},
+    dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
+    clean               => { FILES => 'Argon-*' },
+
     PREREQ_PM => {
-        'Test::More'                => 0,
         'Moose'                     => 0,
         'MooseX::StrictConstructor' => 0,
         'namespace::autoclean'      => 0,
@@ -21,6 +23,9 @@ WriteMakefile(
         'AnyEvent'                  => 0,
         'Coro'                      => 0,
     },
-    dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-    clean               => { FILES => 'Argon-*' },
+
+    BUILD_REQUIRES => {
+        'Test::More'                => 0,
+        'IO::Capture::Stderr'       => 0,
+    },
 );
