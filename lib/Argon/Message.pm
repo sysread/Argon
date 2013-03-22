@@ -106,14 +106,12 @@ sub decode {
 }
 
 #-------------------------------------------------------------------------------
-# Creates a new Message object with the command verb as a reply. If the second
-# optional argument is true (false by default), includes the message payload in
-# the reply.
+# Creates a new Message object with the command verb as a reply. The payload is
+# not included in the reply.
 #-------------------------------------------------------------------------------
 sub reply {
-    my ($self, $cmd, $include_payload) = @_;
+    my ($self, $cmd) = @_;
     my $msg = Argon::Message->new(command => $cmd, id => $self->id, priority => $self->priority);
-    $msg->encoded($self->encoded) if $include_payload;
     return $msg;
 }
 

@@ -16,6 +16,8 @@ lib/Argon/Worker.pm
 lib/Argon/Role/Task.pm
 
 t/00-load.t
+t/01-Argon.t
+t/02-Message.t
 t/boilerplate.t
 t/manifest.t
 t/pod-coverage.t
