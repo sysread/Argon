@@ -22,6 +22,7 @@ WriteMakefile(
         'Data::UUID'                => 0,
         'AnyEvent'                  => 0,
         'Coro'                      => 0,
+        'String::Escape'            => 0,
     },
 
     BUILD_REQUIRES => {
