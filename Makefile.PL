@@ -20,9 +20,10 @@ WriteMakefile(
         'MooseX::StrictConstructor' => 0,
         'namespace::autoclean'      => 0,
         'Data::UUID'                => 0,
+        'String::Escape'            => 0,
         'AnyEvent'                  => 0,
         'Coro'                      => 0,
-        'String::Escape'            => 0,
+        'Coro::PrioChanel'          => '0.005',
     },
 
     BUILD_REQUIRES => {
