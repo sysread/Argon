@@ -8,15 +8,12 @@ use Moose;
 use MooseX::StrictConstructor;
 use namespace::autoclean;
 
-use Coro            qw//;
-use POSIX           qw/:sys_wait_h/;
-use AnyEvent        qw//;
-use AnyEvent::Util  qw//;
-use Time::HiRes     qw/sleep/;
-use Argon           qw/:logging :commands/;
-use Argon::IO::Pipe;
-use Argon::IO::InChannel;
-use Argon::IO::OutChannel;
+use Coro           qw//;
+use POSIX          qw/:sys_wait_h/;
+use AnyEvent       qw//;
+use AnyEvent::Util qw//;
+use Time::HiRes    qw/sleep/;
+use Argon          qw/:logging :commands/;
 
 # Nabbed from AnyEvent::Worker
 our $FD_MAX = eval { POSIX::sysconf(&POSIX::_SC_OPEN_MAX) - 1 } || 1023;
@@ -71,12 +68,7 @@ sub start {
     if ($pid) {
 		close $parent;
 		AnyEvent::Util::fh_nonblocking $child, 1;
-        $self->pipe(
-            Argon::IO::Pipe->new(
-                in  => Argon::IO::InChannel(handle => $child),
-                out => Argon::IO::OutChannel(handle => $child),
-            )
-        );
+        $self->stream(Argon::Stream->new(in_fh => $child, out_fh => $child));
 		$self->child_pid($pid);
     }
     # Child process
