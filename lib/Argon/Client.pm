@@ -8,7 +8,7 @@ use Moose;
 use MooseX::StrictConstructor;
 use namespace::autoclean;
 
-use Argon::Stream;
+use Argon::IO::Pipe;
 use Argon::Message;
 use Argon qw/:logging :commands/;
 
@@ -24,36 +24,35 @@ has 'host' => (
     required => 1,
 );
 
-has 'stream' => (
+has 'pipe' => (
     is       => 'rw',
-    isa      => 'Argon::Stream',
+    isa      => 'Argon::IO::Pipe',
     init_arg => undef,
 );
 
 sub connect {
-    my $self   = shift;
-    my $stream = Argon::Stream->connect(
+    my $self = shift;
+    my $pipe = Argon::IO::Pipe->connect(
         host => $self->host,
         port => $self->port,
     );
 
-    $self->stream($stream);
+    $self->pipe($pipe);
 }
 
 sub process {
     my ($self, %param) = @_;
-    my $class    = $param{class}  || croak 'expected class';
-    my $params   = $param{params} || [];
+    my $class  = $param{class}  || croak 'expected class';
+    my $params = $param{params} || [];
 
-    croak 'not connected' unless $self->stream;
+    croak 'not connected' unless $self->pipe;
 
     my $msg = Argon::Message->new(command  => CMD_QUEUE);
     $msg->set_payload([$class, $params]);
 
-    return $self->stream->send_retry($msg);
+    return $self->pipe->send_retry($msg);
 }
 
-no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;

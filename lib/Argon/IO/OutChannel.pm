@@ -256,7 +256,17 @@ sub reset {
     $self->outbox(Coro::Channel->new);
 }
 
-no Moose;
+#-------------------------------------------------------------------------------
+# Returns true if the channel is in a valid connection state.
+#-------------------------------------------------------------------------------
+sub is_connected {
+    my $self  = shift;
+    my $state = $self->state->curr_state->name;
+    return $state ne 'DISCONNECTED'
+        && $state ne 'ERROR'
+        && $state ne 'DONE';
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

@@ -97,6 +97,7 @@ has 'offset' => (
     traits    => ['Counter'],
     handles   => {
         inc_offset   => 'inc',
+        dec_offset   => 'dec',
         reset_offset => 'reset',
     }
 );
@@ -216,6 +217,7 @@ sub state_read {
             substr(${$self->buffer}, 0, $len) = '';
             $self->inbox->put($msg);
             $self->clear_current_read;
+            $self->dec_offset($len - 1);
             $state->message(Argon::IO::Channel::COMPLETE);
         }
     }
@@ -255,21 +257,21 @@ sub state_done {
 #-------------------------------------------------------------------------------
 sub reset {
     my $self = shift;
-    
+
     close $self->handle;
     $self->clear_handle;
-    
+
     $self->pending_reads->shutdown;
     $self->inbox->shutdown;
-    
+
     $self->clear_inbox;
     $self->clear_pending_reads;
     $self->clear_buffer;
-    
+
     $self->offset(0);
     $self->inbox(Coro::Channel->new(1));
     $self->pending_reads(Coro::Channel->new(1));
-    
+
     my $buf = '';
     $self->buffer(\$buf);
 }
@@ -279,12 +281,22 @@ sub reset {
 #-------------------------------------------------------------------------------
 sub receive {
     my ($self, %param) = @_;
-    my $to  = $param{TO} or croak 'Expected "TO"';
+    my $to = $param{TO} or croak 'Expected "TO"';
     $self->push_read($to);
     return $self->inbox->get;
 }
 
-no Moose;
+#-------------------------------------------------------------------------------
+# Returns true if the channel is in a valid connection state.
+#-------------------------------------------------------------------------------
+sub is_connected {
+    my $self  = shift;
+    my $state = $self->state->curr_state->name;
+    return $state ne 'DISCONNECTED'
+        && $state ne 'ERROR'
+        && $state ne 'DONE';
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
