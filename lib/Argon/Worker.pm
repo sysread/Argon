@@ -66,7 +66,7 @@ sub start {
     if ($pid) {
 		close $parent;
 		AnyEvent::Util::fh_nonblocking $child, 1;
-        $self->stream(Argon::Stream->new(fh => $child));
+        $self->stream(Argon::Stream->new(in_fh => $child, out_fh => $child));
 		$self->child_pid($pid);
     }
     # Child process

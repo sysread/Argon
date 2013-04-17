@@ -19,11 +19,17 @@ use Errno          qw/EWOULDBLOCK/;
 use Argon          qw/:logging :commands/;
 use Argon::Message;
 
-has 'fh' => (
+has 'in_fh' => (
     is       => 'ro',
     isa      => 'FileHandle',
-    clearer  => 'unset_fh',
+    clearer  => 'unset_in_fh',
     trigger  => \&watch_fh,
+);
+
+has 'out_fh' => (
+    is       => 'ro',
+    isa      => 'FileHandle',
+    clearer  => 'unset_out_fh',
 );
 
 has 'buffer' => (
@@ -82,6 +88,17 @@ has 'pending' => (
     }
 );
 
+sub fh {
+    my ($self, $fh) = @_;
+
+    if (defined $fh) {
+        $self->in_fh($fh);
+        $self->out_fh($fh);
+    }
+
+    return ($self->in_fh, $self->out_fh);
+}
+
 #-------------------------------------------------------------------------------
 # Returns true if an error message represents a connection error.
 #-------------------------------------------------------------------------------
@@ -93,8 +110,8 @@ sub is_connection_error {
 }
 
 #-------------------------------------------------------------------------------
-# Trigger (fh): starts a thread that watches for new messages while the stream
-# is connected.
+# Trigger (in_fh): starts a thread that watches for new messages while the
+# stream is connected.
 #-------------------------------------------------------------------------------
 sub watch_fh {
     my ($self, $fh, $old_fh) = @_;
@@ -104,7 +121,7 @@ sub watch_fh {
         $self->inbox(Coro::Channel->new());
         $self->is_connected(1);
 
-        my $fd = $self->fh->fileno;
+        my $fd = $self->in_fh->fileno;
         $self->poll_fh($fd);
     }
 }
@@ -124,7 +141,7 @@ sub poll_fh {
                     unless is_connection_error($@);
                 last;
             }
-
+            
             if ($msg->command == CMD_PING) {
                 $self->send_message($msg->reply(CMD_ACK));
             } elsif ($self->has_pending($msg->id)) {
@@ -178,14 +195,20 @@ sub monitor {
 #-------------------------------------------------------------------------------
 sub address {
     my $self = shift;
+    
+    my $fh
+        = defined $self->out_fh ? $self->out_fh
+        : defined $self->in_fh  ? $self->in_fh
+        : undef;
+    
     if ($self->is_connected
-     && $self->fh->isa('IO::Socket::INET')
-     && $self->fh->can('peername'))
+     && $fh->isa('IO::Socket::INET')
+     && $fh->can('peername'))
     {
-        my ($err, $host, $port) = getnameinfo($self->fh->peername, NI_NUMERICSERV);
+        my ($err, $host, $port) = getnameinfo($fh->peername, NI_NUMERICSERV);
         return sprintf('%s:%s', $host, $port);
-    } elsif (defined $self->fh) {
-        return sprintf('fh:%s', $self->fh->fileno);
+    } elsif (defined $fh) {
+        return sprintf('fh:%s', $fh->fileno);
     } else {
         return sprintf('%s', $self);
     }
@@ -211,7 +234,7 @@ sub connect {
     AnyEvent::Util::fh_nonblocking $sock, 1;
 
     Coro::AnyEvent::writable($sock);
-    return $class->new(fh => $sock);
+    return $class->new(in_fh => $sock, out_fh => $sock);
 }
 
 #-------------------------------------------------------------------------------
@@ -272,12 +295,12 @@ sub get_response {
 sub send_message {
     my ($self, $msg) = @_;
     croak $self->error unless $self->is_connected;
-    Coro::AnyEvent::writable($self->fh);
+    Coro::AnyEvent::writable($self->out_fh);
 
     # Note: must check again for connection after sleeping until writable
     croak $self->error unless $self->is_connected;
 
-    my $bytes = syswrite($self->fh, $msg->encode . $Argon::EOL);
+    my $bytes = syswrite($self->out_fh, $msg->encode . $Argon::EOL);
 
     if (!defined $bytes) {
         $self->close_with_error($!);
@@ -296,7 +319,7 @@ sub read_chunk {
     croak $self->error unless $self->is_connected;
 
     my $bytes = sysread(
-        $self->fh,
+        $self->in_fh,
         $self->{buffer},
         $Argon::CHUNK_SIZE,
         $self->offset,
@@ -326,7 +349,7 @@ sub read_message {
         $eol_index = index($self->{buffer}, $eol);
 
         if ($eol_index == -1) {
-            Coro::AnyEvent::readable($self->fh);
+            Coro::AnyEvent::readable($self->in_fh);
             $self->read_chunk;
         }
 
@@ -353,9 +376,14 @@ sub close {
     my $self = shift;
     $self->is_connected(0);
 
-    if (defined $self->fh) {
-        $self->fh->close;
-        $self->unset_fh;
+    if (defined $self->in_fh) {
+        $self->in_fh->close;
+        $self->unset_in_fh;
+    }
+    
+    if (defined $self->out_fh) {
+        $self->out_fh->close;
+        $self->unset_out_fh;
     }
 
     foreach my $msgid ($self->all_pending) {

@@ -172,8 +172,7 @@ sub request_queue {
         # processed before the connection dropped.)
         if ($@) {
             my $error = $@;
-            WARN('Error (%s): %s', $address, $@);
-                #unless Argon::Stream::is_connection_error($@);
+            WARN 'Error (%s): %s', $address, $@;
 
             $self->unregister_node($node);
             $reply = $msg->reply(CMD_ERROR);

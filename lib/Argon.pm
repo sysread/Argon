@@ -15,8 +15,10 @@ use Carp;
 use namespace::autoclean;
 
 use Coro;
-use POSIX        qw/strftime/;
-use Scalar::Util qw/weaken/;
+use Coro::Channel;
+use AnyEvent::Util qw/fh_nonblocking/;
+use POSIX          qw/strftime/;
+use Scalar::Util   qw/weaken/;
 
 require Exporter;
 use base qw/Exporter/;
@@ -145,8 +147,15 @@ sub error {
 
 #-------------------------------------------------------------------------------
 # Emits a message to STDERR in a consistent fashion. Accepts arguments
-# identically to sprintf.
+# identically to sprintf. Messages are queued until the output handle is
+# writable.
+#
+# TODO: more configurable
 #-------------------------------------------------------------------------------
+our $LOG_MESSAGES = Coro::Channel->new;
+our $LOG_OUT      = \*STDERR;
+fh_nonblocking $LOG_OUT, 1;
+
 sub LOG ($@) {
     my ($format, @args) = @_;
     chomp $format;
@@ -154,6 +163,14 @@ sub LOG ($@) {
     my $ts  = strftime("%F %T", localtime);
     warn sprintf("[%s] [%d] %s\n", $ts, $$, $msg);
 }
+
+async {
+    while (1) {
+        my $msg = $LOG_MESSAGES->get;
+        Coro::AnyEvent::writable $LOG_OUT;
+        print $LOG_OUT $msg;
+    }
+};
 
 #-------------------------------------------------------------------------------
 # Logging functions

@@ -6,8 +6,10 @@ use Carp;
 
 use Moose;
 use Coro;
+use AnyEvent::Util qw/fh_nonblocking/;
 use Cwd            qw/abs_path/;
 use POSIX          qw/:sys_wait_h/;
+use IPC::Open2     qw/open2/;
 use IPC::Open3     qw/open3/;
 use String::Escape qw/quote singlequote backslash/;
 use File::Spec     qw//;
@@ -40,22 +42,15 @@ has 'proc' => (
     predicate => 'is_running',
 );
 
-has 'to_proc' => (
+has 'stream' => (
     is        => 'rw',
+    isa       => 'Argon::Stream',
     init_arg  => undef,
-    clearer   => 'unset_to_proc',
-);
-
-has 'from_proc' => (
-    is        => 'rw',
-    init_arg  => undef,
-    clearer   => 'unset_from_proc',
-);
-
-has 'err_proc' => (
-    is        => 'rw',
-    init_arg  => undef,
-    clearer   => 'unset_err_proc',
+    clearer   => 'unset_stream',
+    handles   => {
+        send         => 'send',
+        send_message => 'send_message',
+    }
 );
 
 sub command {
@@ -74,70 +69,50 @@ sub code {
     my $self   = shift;
     my $class  = $self->class;
     my $params = join ',', map { quote($_) } @{$self->args};
-    return sprintf '$| = 1; require %s; %s->new(%s)->run();', $class, $class, $params;
+    return sprintf '$| = 1; require %s; my $o = %s->new(%s); $o->run();', $class, $class, $params;
 }
 
 sub spawn {
     my $self = shift;
     $self->is_running and croak 'process is already running';
 
-    pipe(my $in, my $out);
-    my $err = gensym;
+    pipe(my $child_in, my $child_out);
+    my $child_err = gensym;
 
     my $e    = sprintf '-e %s', singlequote($self->code);
     my $cmd  = join ' ', command, $self->includes, $e;
-    my $proc = open3($in, $out, $err, $cmd) or croak $?;
+    my $proc = open2($child_in, $child_out, $cmd) or croak $?;
 
     $self->proc($proc);
-    $self->to_proc($in);
-    $self->from_proc($out);
-    $self->err_proc($err);
+    $self->stream(Argon::Stream->new(in_fh => $child_in, out_fh => $child_out));
 
+=cut
+    # Start thread to route stderr msgs locally
+    async {
+        while (1) {
+            INFO 'Waiting on STDERR data';
+            Coro::AnyEvent::readable $child_err;
+            my $line = <$child_err>;
+            warn $line;
+        }
+    };
+=cut
     return 1;
 }
 
 sub kill_child {
     my ($self, $wait) = @_;
     $self->is_running or croak 'process is not running';
-    
+
     kill 9, $self->proc;
 
     $self->unset_proc;
-    $self->unset_to_proc;
-    $self->unset_from_proc;
-    $self->unset_err_proc;
+    $self->unset_stream;
 }
 
 sub wait_child {
     my $self = shift;
     waitpid $self->proc, 0;
-}
-
-sub send {
-    my ($self, $line) = @_;
-    $self->is_running or croak 'process is not running';
-    my $fh = $self->to_proc;
-    local $| = 1;
-    chomp $line;
-    printf $fh "%s\n", $line;
-}
-
-sub recv {
-    my $self = shift;
-    $self->is_running or croak 'process is not running';
-    my $fh   = $self->from_proc;
-    my $line = <$fh>;
-    chomp $line;
-    return $line;
-}
-
-sub recv_err {
-    my $self = shift;
-    $self->is_running or croak 'process is not running';
-    my $fh   = $self->err_proc;
-    my $line = <$fh>;
-    chomp $line;
-    return $line;   
 }
 
 sub DEMOLISH {

@@ -3,7 +3,10 @@ package TestProcessClass;
 use strict;
 use warnings;
 use Carp;
-use Argon;
+
+use IO::Handle;
+use Argon qw/:commands :logging/;
+use Argon::Stream;
 
 sub new {
     my ($class, @args) = @_;
@@ -14,17 +17,28 @@ sub run {
     my $self = shift;
     local $| = 1;
     
-    my $exit = 0;
-    until ($exit) {
-        my $line = <STDIN>;
-        defined $line or last;
-        chomp $line;
+    my $in  = IO::Handle->new;
+    my $out = IO::Handle->new;
+    
+    $in->fdopen(fileno(STDIN),   'r');
+    $out->fdopen(fileno(STDOUT), 'w');
 
-        if ($line eq 'EXIT') {
-            $exit = 1;
+    my $stream = Argon::Stream->new(in_fh  => $in, out_fh => $out);
+    
+    while (1) {
+        my $msg = $stream->next_message;
+        my $pay = $msg->get_payload;
+        INFO 'Input: %s', $pay;
+    
+        if ($pay eq 'EXIT') {
+            INFO 'Shutting down';
+            my $reply = $msg->reply(CMD_ACK);
+            $stream->send($reply);
+            last;
         } else {
-            warn  qq/Warning: you said "$line"\n/;
-            print qq/You said "$line"\n/;
+            my $reply = $msg->reply(CMD_ACK);
+            $reply->set_payload(sprintf('You said "%s"', $pay));
+            $stream->send($reply);
         }
     }
 
