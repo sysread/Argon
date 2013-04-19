@@ -149,7 +149,7 @@ sub start {
     while (1) {
         Coro::AnyEvent::readable($sock);
         my $client = $sock->accept;
-        my $stream = Argon::Stream->new(in_fh => $client, out_fh => $client);
+        my $stream = Argon::Stream->create($client);
         $self->service($stream);
     }
 }

@@ -16,18 +16,19 @@ WriteMakefile(
     clean               => { FILES => 'Argon-*' },
 
     PREREQ_PM => {
-        'Moose'                     => 0,
-        'MooseX::StrictConstructor' => 0,
-        'namespace::autoclean'      => 0,
-        'Data::UUID'                => 0,
-        'String::Escape'            => 0,
         'AnyEvent'                  => 0,
         'Coro'                      => 0,
         'Coro::PrioChanel'          => '0.005',
+        'Data::UUID'                => 0,
+        'FSA::Rules'                => 0,
+        'Moose'                     => 0,
+        'MooseX::StrictConstructor' => 0,
+        'namespace::autoclean'      => 0,
+        'String::Escape'            => 0,
     },
 
     BUILD_REQUIRES => {
-        'Test::More'                => 0,
         'IO::Capture::Stderr'       => 0,
+        'Test::More'                => 0,
     },
 );

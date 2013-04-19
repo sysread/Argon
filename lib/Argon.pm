@@ -94,6 +94,7 @@ sub K {
 # Defaults
 #-------------------------------------------------------------------------------
 our $LISTEN_QUEUE_SIZE  = 128;      # queue size for listening sockets
+our $TIMEOUT            = 3;        # number of seconds to wait for a read/write op on a socket
 our $CHUNK_SIZE         = 1024 * 4; # number of bytes to read at a time
 our $EOL                = "\0";     # end of line/message character(s)
 our $MESSAGE_SEPARATOR  = ' ';      # separator between parts of a message (command, priority, payload, etc)

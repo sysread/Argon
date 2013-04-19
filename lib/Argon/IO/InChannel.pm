@@ -16,7 +16,9 @@ use Coro::Channel   qw//;
 use Coro::AnyEvent  qw//;
 use AnyEvent::Util  qw/fh_nonblocking/;
 use Scalar::Util    qw/weaken/;
-use FSA::Rules;
+use FSA::Rules      qw//;
+use Errno           qw/EAGAIN/;
+use Argon           qw/:logging/;
 use Argon::IO::Channel;
 
 extends 'Argon::IO::Channel';
@@ -32,27 +34,21 @@ has 'state' => (
         FSA::Rules->new(
             READY => {
                 do    => \&state_ready,
-                rules => [ PENDING => 1 ],
-            },
-            PENDING => {
-                do    => \&state_pending,
-                rules => [
-                    WAIT  => sub {  shift->message },
-                    ERROR => sub { !shift->message },
-                ]
+                rules => [ WAIT => 1 ],
             },
             WAIT => {
                 do    => \&state_wait,
                 rules => [
-                    READ  => sub { !shift->message },
-                    ERROR => sub {  shift->message },
+                    ERROR => sub { !defined shift->message },
+                    READ  => sub {  shift->message         },
+                    WAIT  => sub { !shift->message         },
                 ],
             },
             READ => {
                 do    => \&state_read,
                 rules => [
-                    PENDING      => sub { shift->message eq Argon::IO::Channel::COMPLETE     },
-                    WAIT         => sub { shift->message eq Argon::IO::Channel::CONTINUE     },
+                    WAIT         => sub { shift->message eq Argon::IO::Channel::COMPLETE     },
+                    READ         => sub { shift->message eq Argon::IO::Channel::CONTINUE     },
                     ERROR        => sub { shift->message eq Argon::IO::Channel::ERROR        },
                     DISCONNECTED => sub { shift->message eq Argon::IO::Channel::DISCONNECTED },
                 ],
@@ -79,6 +75,9 @@ has 'inbox' => (
     init_arg  => undef,
     default   => sub { Coro::Channel->new },
     clearer   => 'clear_inbox',
+    handles   => {
+        receive => 'get',
+    }
 );
 
 has 'buffer' => (
@@ -100,25 +99,6 @@ has 'offset' => (
         dec_offset   => 'dec',
         reset_offset => 'reset',
     }
-);
-
-has 'pending_reads' => (
-    is        => 'rw',
-    isa       => 'Coro::Channel',
-    init_arg  => undef,
-    default   => sub { Coro::Channel->new(1) },
-    clearer   => 'clear_pending_reads',
-    handles   => {
-        push_read => 'put',
-        next_read => 'get',
-    }
-);
-
-has 'current_read' => (
-    is        => 'rw',
-    isa       => 'Str',
-    init_arg  => undef,
-    clearer   => 'clear_current_read',
 );
 
 #-------------------------------------------------------------------------------
@@ -150,34 +130,17 @@ sub state_ready {
 }
 
 #-------------------------------------------------------------------------------
-# Pending state
-#-------------------------------------------------------------------------------
-sub state_pending {
-    my $state = shift;
-    my $self  = instance($state);
-
-    async {
-        my $pending = $self->next_read;
-
-        if (defined $pending) {
-            $self->current_read($pending);
-            $state->message(1);
-        } else {
-            $state->message(0);
-        }
-
-        $self->state->switch;
-    };
-}
-
-#-------------------------------------------------------------------------------
 # Wait state
 #-------------------------------------------------------------------------------
 sub state_wait {
     my $state = shift;
     my $self  = instance($state);
-    $state->message(!defined Coro::AnyEvent::readable($self->handle));
-    $self->state->switch;
+    $self->read_messages;
+    async {
+        my $result = Coro::AnyEvent::readable($self->handle, $Argon::TIMEOUT);
+        $state->message($result);
+        $self->state->switch;
+    };
 }
 
 #-------------------------------------------------------------------------------
@@ -195,8 +158,12 @@ sub state_read {
 
     # I/O Error
     if (!defined $bytes) {
-        $self->last_error($!);
-        $state->message(Argon::IO::Channel::ERROR);
+        if ($! == EAGAIN) {
+            $state->message(Argon::IO::Channel::CONTINUE);
+        } else {
+            $self->last_error($!);
+            $state->message(Argon::IO::Channel::ERROR);
+        }
     }
     # Disconnect
     elsif ($bytes == 0) {
@@ -206,18 +173,9 @@ sub state_read {
     # Bytes read
     else {
         $self->inc_offset($bytes);
-        my $eol   = $self->current_read;
-        my $index = index ${$self->buffer}, $eol;
-
-        if ($index == -1) {
+        if ($self->read_messages == 0) {
             $state->message(Argon::IO::Channel::CONTINUE);
         } else {
-            my $len = $index + length($eol) + 1;
-            my $msg = substr ${$self->buffer}, 0, $len;
-            substr(${$self->buffer}, 0, $len) = '';
-            $self->inbox->put($msg);
-            $self->clear_current_read;
-            $self->dec_offset($len - 1);
             $state->message(Argon::IO::Channel::COMPLETE);
         }
     }
@@ -259,31 +217,36 @@ sub reset {
     my $self = shift;
 
     close $self->handle;
-    $self->clear_handle;
-
-    $self->pending_reads->shutdown;
     $self->inbox->shutdown;
 
+    $self->clear_handle;
     $self->clear_inbox;
-    $self->clear_pending_reads;
     $self->clear_buffer;
 
     $self->offset(0);
     $self->inbox(Coro::Channel->new(1));
-    $self->pending_reads(Coro::Channel->new(1));
 
     my $buf = '';
     $self->buffer(\$buf);
 }
 
 #-------------------------------------------------------------------------------
-# Reads message from the inbox
+# Reads messages out of the buffer and places them into the inbox.
 #-------------------------------------------------------------------------------
-sub receive {
-    my ($self, %param) = @_;
-    my $to = $param{TO} or croak 'Expected "TO"';
-    $self->push_read($to);
-    return $self->inbox->get;
+sub read_messages {
+    my $self = shift;
+    my $msgs = 0;
+
+    while ((my $index = index ${$self->buffer}, $Argon::EOL) != -1) {
+        my $msg = substr ${$self->buffer}, 0, $index;
+        my $len = $index + length($Argon::EOL);
+        substr(${$self->buffer}, 0, $len) = '';
+        $self->inbox->put($msg);
+        $self->dec_offset($len);
+        ++$msgs;
+    }
+    
+    return $msgs;
 }
 
 #-------------------------------------------------------------------------------

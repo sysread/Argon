@@ -10,58 +10,31 @@ use MooseX::StrictConstructor;
 use Coro;
 use Coro::AnyEvent;
 use Coro::Channel;
-use IO::Socket::INET;
 use AnyEvent;
 use AnyEvent::Util qw//;
-use AnyEvent::Util qw//;
-use Socket         qw/getnameinfo NI_NUMERICSERV/;
-use Errno          qw/EWOULDBLOCK/;
+use IO::Socket     qw/SOCK_STREAM/;
 use Argon          qw/:logging :commands/;
 use Argon::Message;
-
-has 'in_fh' => (
-    is       => 'ro',
-    isa      => 'FileHandle',
-    clearer  => 'unset_in_fh',
-    trigger  => \&watch_fh,
-);
-
-has 'out_fh' => (
-    is       => 'ro',
-    isa      => 'FileHandle',
-    clearer  => 'unset_out_fh',
-);
-
-has 'buffer' => (
-    is       => 'rw',
-    isa      => 'Str',
-    default  => '',
-    init_arg => undef,
-);
-
-has 'offset' => (
-    is       => 'rw',
-    isa      => 'Int',
-    default  => 0,
-    init_arg => undef,
-    traits   => ['Counter'],
-    handles  => {
-        'inc_offset' => 'inc',
-        'dec_offset' => 'dec',
-    });
+use Argon::IO::InChannel;
+use Argon::IO::OutChannel;
 
 has 'is_connected' => (
     is       => 'rw',
     isa      => 'Int',
-    default  => 1,
-    init_arg => undef,
+    default  => 0,
 );
 
-has 'error' => (
-    is       => 'rw',
-    isa      => 'Str',
-    default  => '',
-    init_arg => undef,
+has 'in_chan' => (
+    is       => 'ro',
+    isa      => 'Argon::IO::InChannel',
+    clearer  => 'unset_in_chan',
+    trigger  => \&watch_in_chan,
+);
+
+has 'out_chan' => (
+    is       => 'ro',
+    isa      => 'Argon::IO::OutChannel',
+    clearer  => 'unset_out_chan',
 );
 
 has 'inbox' => (
@@ -100,29 +73,25 @@ sub fh {
 }
 
 #-------------------------------------------------------------------------------
-# Returns true if an error message represents a connection error.
+# Class method: returns true if an error message represents a connection error.
 #-------------------------------------------------------------------------------
 sub is_connection_error {
     my $msg = shift;
-    return $msg =~ /connection was closed/
+    return $msg =~ /disconnected/
         || $msg =~ /Connection reset by peer/
         || $msg =~ /Broken pipe/;
 }
 
 #-------------------------------------------------------------------------------
-# Trigger (in_fh): starts a thread that watches for new messages while the
+# Trigger (in_chan): starts a thread that watches for new messages while the
 # stream is connected.
 #-------------------------------------------------------------------------------
-sub watch_fh {
-    my ($self, $fh, $old_fh) = @_;
-
-    if (defined $fh) {
-        AnyEvent::Util::fh_nonblocking $fh, 1;
+sub watch_in_chan {
+    my ($self, $in_chan, $old_in_chan) = @_;
+    if (defined $in_chan) {
         $self->inbox(Coro::Channel->new());
         $self->is_connected(1);
-
-        my $fd = $self->in_fh->fileno;
-        $self->poll_fh($fd);
+        $self->poll_fh;
     }
 }
 
@@ -131,17 +100,19 @@ sub watch_fh {
 # channel (inbox or pending). Handles the special case of PING requests.
 #-------------------------------------------------------------------------------
 sub poll_fh {
-    my ($self, $fd) = @_;
+    my ($self) = @_;
     async {
         while ($self->is_connected) {
-            my $msg = eval { $self->read_message };
+            my $line = $self->in_chan->receive;
 
-            if ($@) {
-                WARN('(%d) Connection: %s', $fd, $@)
-                    unless is_connection_error($@);
+            unless (defined $line && $self->in_chan->is_connected) {
+                WARN('Connection error: %s', $self->in_chan->last_error)
+                    unless is_connection_error($self->in_chan->last_error);
                 last;
             }
-            
+
+            my $msg = Argon::Message::decode($line);
+
             if ($msg->command == CMD_PING) {
                 $self->send_message($msg->reply(CMD_ACK));
             } elsif ($self->has_pending($msg->id)) {
@@ -173,12 +144,9 @@ sub ping {
 #-------------------------------------------------------------------------------
 sub monitor {
     my ($self, $on_fail) = @_;
-    my $addr = $self->address;
-
     async {
         while (1) {
             my $ping = eval { $self->ping };
-
             if ($@) {
                 $on_fail->($self, $@);
                 last;
@@ -190,28 +158,14 @@ sub monitor {
 }
 
 #-------------------------------------------------------------------------------
-# Returns the host:port of the connected socket as a string. Returns the string
-# <not connected> if there is no active connection.
+# Returns a string representing the first defined of <in-channel|out-channel>.
 #-------------------------------------------------------------------------------
 sub address {
     my $self = shift;
-    
-    my $fh
-        = defined $self->out_fh ? $self->out_fh
-        : defined $self->in_fh  ? $self->in_fh
-        : undef;
-    
-    if ($self->is_connected
-     && $fh->isa('IO::Socket::INET')
-     && $fh->can('peername'))
-    {
-        my ($err, $host, $port) = getnameinfo($fh->peername, NI_NUMERICSERV);
-        return sprintf('%s:%s', $host, $port);
-    } elsif (defined $fh) {
-        return sprintf('fh:%s', $fh->fileno);
-    } else {
-        return sprintf('%s', $self);
-    }
+    return
+        defined $self->in_chan ? $self->in_chan->address
+      : defined $self->out_chan ? $self->out_chan->address
+      : '<not connected>';
 }
 
 #-------------------------------------------------------------------------------
@@ -232,9 +186,23 @@ sub connect {
     ) or croak $!;
 
     AnyEvent::Util::fh_nonblocking $sock, 1;
-
     Coro::AnyEvent::writable($sock);
-    return $class->new(in_fh => $sock, out_fh => $sock);
+    
+    my $in_chan  = Argon::IO::InChannel->new(handle => $sock);
+    my $out_chan = Argon::IO::OutChannel->new(handle => $sock);
+
+    return $class->new(in_chan => $in_chan, out_chan => $out_chan);
+}
+
+#-------------------------------------------------------------------------------
+# Creates a new stream using a single handle as both input and output channels.
+#-------------------------------------------------------------------------------
+sub create {
+    my ($class, $handle) = @_;
+    return $class->new(
+        in_chan  => Argon::IO::InChannel->new(handle => $handle),
+        out_chan => Argon::IO::OutChannel->new(handle => $handle),
+    );
 }
 
 #-------------------------------------------------------------------------------
@@ -278,7 +246,7 @@ sub send {
 #-------------------------------------------------------------------------------
 sub get_response {
     my ($self, $msg_id) = @_;
-
+    croak $self->in_chan->error unless $self->in_chan->is_connected;
     croak sprintf('dead lock detected: msg %s not pending', $msg_id)
         unless $self->has_pending($msg_id);
 
@@ -294,79 +262,8 @@ sub get_response {
 #-------------------------------------------------------------------------------
 sub send_message {
     my ($self, $msg) = @_;
-    croak $self->error unless $self->is_connected;
-    Coro::AnyEvent::writable($self->out_fh);
-
-    # Note: must check again for connection after sleeping until writable
-    croak $self->error unless $self->is_connected;
-
-    my $bytes = syswrite($self->out_fh, $msg->encode . $Argon::EOL);
-
-    if (!defined $bytes) {
-        $self->close_with_error($!);
-    } elsif ($bytes == 0) {
-        $self->close_with_error('connection was closed');
-    }
-
-    return $bytes;
-}
-
-#-------------------------------------------------------------------------------
-# Reads a chunk of data from the socket. Returns the number of bytes read.
-#-------------------------------------------------------------------------------
-sub read_chunk {
-    my $self = shift;
-    croak $self->error unless $self->is_connected;
-
-    my $bytes = sysread(
-        $self->in_fh,
-        $self->{buffer},
-        $Argon::CHUNK_SIZE,
-        $self->offset,
-    );
-
-    if (!defined $bytes) {
-        return if $! == EWOULDBLOCK;
-        $self->close_with_error($!);
-    } elsif ($bytes == 0) {
-        $self->close_with_error('connection was closed');
-    } else {
-        $self->inc_offset($bytes);
-    }
-
-    return $bytes;
-}
-
-#-------------------------------------------------------------------------------
-# Reads the next available message from the socket and returns it.
-#-------------------------------------------------------------------------------
-sub read_message {
-    my ($self, %param) = @_;
-    my $eol = $param{eol} || $Argon::EOL;
-
-    my $eol_index = -1;
-    while ($eol_index == -1) {
-        $eol_index = index($self->{buffer}, $eol);
-
-        if ($eol_index == -1) {
-            Coro::AnyEvent::readable($self->in_fh);
-            $self->read_chunk;
-        }
-
-        unless ($self->is_connected) {
-            croak $self->error;
-        }
-    }
-
-    my $line   = substr($self->{buffer}, 0, $eol_index);
-    my $offset = $eol_index + length($eol);
-
-    substr($self->{buffer}, 0, $offset) = '';
-    $self->dec_offset($offset);
-
-    my $msg = Argon::Message::decode($line);
-
-    return $msg;
+    croak $self->out_chan->error unless $self->out_chan->is_connected;
+    $self->out_chan->send($msg->encode . $Argon::EOL);
 }
 
 #-------------------------------------------------------------------------------
@@ -376,29 +273,18 @@ sub close {
     my $self = shift;
     $self->is_connected(0);
 
-    if (defined $self->in_fh) {
-        $self->in_fh->close;
-        $self->unset_in_fh;
+    if (defined $self->in_chan) {
+        $self->unset_in_chan;
     }
     
-    if (defined $self->out_fh) {
-        $self->out_fh->close;
-        $self->unset_out_fh;
+    if (defined $self->out_chan) {
+        $self->unset_out_chan;
     }
 
     foreach my $msgid ($self->all_pending) {
         $self->get_pending($msgid)->put(0);
         $self->del_pending($msgid);
     }
-}
-
-#-------------------------------------------------------------------------------
-# Closes the stream and records an error.
-#-------------------------------------------------------------------------------
-sub close_with_error {
-    my ($self, $error) = @_;
-    $self->error($error);
-    $self->close;
 }
 
 #-------------------------------------------------------------------------------

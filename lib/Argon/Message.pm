@@ -99,7 +99,9 @@ sub encode {
 }
 
 sub decode {
+    confess 'expected message string' unless defined $_[0];
     my ($cmd, $pri, $id, $timestamp, $payload) = split $Argon::MESSAGE_SEPARATOR, $_[0];
+    croak "Invalid message: $_[0]" unless defined $cmd && defined $id;
     my $msg = Argon::Message->new(command => $cmd, priority => $pri, id => $id, timestamp => $timestamp);
     $msg->encoded($payload) if $payload ne '-';
     return $msg;

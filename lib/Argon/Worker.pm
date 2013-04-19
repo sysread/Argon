@@ -14,6 +14,9 @@ use AnyEvent       qw//;
 use AnyEvent::Util qw//;
 use Time::HiRes    qw/sleep/;
 use Argon          qw/:logging :commands/;
+use Argon::Stream;
+use Argon::IO::InChannel;
+use Argon::IO::OutChannel;
 
 # Nabbed from AnyEvent::Worker
 our $FD_MAX = eval { POSIX::sysconf(&POSIX::_SC_OPEN_MAX) - 1 } || 1023;
@@ -27,11 +30,11 @@ has 'request_count' => (
 	handles  => { inc => 'inc' },
 );
 
-has 'pipe' => (
+has 'stream' => (
     is       => 'rw',
-    isa      => 'Argon::IO::Pipe',
+    isa      => 'Argon::Stream',
     init_arg => undef,
-	clearer  => 'clear_pipe',
+	clearer  => 'clear_stream',
 );
 
 has 'child_pid' => (
@@ -48,8 +51,7 @@ has 'child_pid' => (
 sub process {
     my ($self, $msg) = @_;
     $self->inc;
-    $self->pipe->send($msg);
-    return $self->pipe->receive;
+    return $self->stream->send($msg);
 }
 
 #-------------------------------------------------------------------------------
@@ -68,7 +70,7 @@ sub start {
     if ($pid) {
 		close $parent;
 		AnyEvent::Util::fh_nonblocking $child, 1;
-        $self->stream(Argon::Stream->new(in_fh => $child, out_fh => $child));
+        $self->stream(Argon::Stream->create($child));
 		$self->child_pid($pid);
     }
     # Child process
@@ -169,7 +171,7 @@ sub kill_child {
             }
         }
 
-		$self->clear_pipe;
+		$self->clear_stream;
 		$self->clear_child_pid;
 	}
 }
