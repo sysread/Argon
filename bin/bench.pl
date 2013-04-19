@@ -13,8 +13,7 @@ use Argon       qw/:commands :logging/;
 use Argon::Client;
 
 # Default values
-my $host     = 'localhost';
-my $port;
+my $address;
 my $total    = 1000;
 my $conc     = 4;
 my $delay    = 0.05;
@@ -22,8 +21,7 @@ my $variance = 0;
 my $help;
 
 my $got_options = GetOptions(
-    'address=s'     => \$host,
-    'port=i'        => \$port,
+    'address=s'     => \$address,
     'number=i'      => \$total,
     'concurrency=i' => \$conc,
     'delay=f'       => \$delay,
@@ -31,10 +29,18 @@ my $got_options = GetOptions(
     'help'          => \$help,
 );
 
-if (!$got_options || $help || !$port) {
+if (!$got_options || $help || !$address) {
     pod2usage(2);
-    exit 1 if !$got_options || !$port;
+    exit 1 if !$got_options || !$address;
     exit 0;
+}
+
+# Process address name
+my ($host, $port) = split ':', $address;
+unless (defined $host && defined $port) {
+    warn "Invalid address. Please specify host:port.\n";
+    pod2usage(2);
+    exit 1;
 }
 
 # If the delay is 0, use the variance to calculate an average such that the
