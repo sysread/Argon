@@ -1,10 +1,10 @@
 #-------------------------------------------------------------------------------
 # TODO
-#   * Refactor Argon::Stream to use Argon::IO::Pipe
 #   * Trap sigint for clean shutdown
 #   * Worker API for other languages/platforms
 #   * Track ping times and report lag between cluster/node
 #     * Adjust cluster's node selection to account for lag time
+#   * Switch from use of Queue to Coro::PrioChannel
 #-------------------------------------------------------------------------------
 package Argon;
 

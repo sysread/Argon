@@ -18,6 +18,7 @@ lib/Argon/IO/Channel.pm
 lib/Argon/IO/InChannel.pm
 lib/Argon/IO/OutChannel.pm
 
+t/TestProcessClass.pm
 t/00-load.t
 t/01-Argon.t
 t/02-Argon-IO-OutChannel.t
