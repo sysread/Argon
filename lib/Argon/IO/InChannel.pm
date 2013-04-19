@@ -155,7 +155,7 @@ sub state_read {
         $self->chunk_size,
         $self->offset,
     );
-
+    
     # I/O Error
     if (!defined $bytes) {
         if ($! == EAGAIN) {

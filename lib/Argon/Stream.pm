@@ -91,7 +91,7 @@ sub watch_in_chan {
     if (defined $in_chan) {
         $self->inbox(Coro::Channel->new());
         $self->is_connected(1);
-        $self->poll_fh;
+        $self->poll_loop;
     }
 }
 
@@ -99,7 +99,7 @@ sub watch_in_chan {
 # Polls the file handle for new messages and adds them to the appropriate
 # channel (inbox or pending). Handles the special case of PING requests.
 #-------------------------------------------------------------------------------
-sub poll_fh {
+sub poll_loop {
     my ($self) = @_;
     async {
         while ($self->is_connected) {
@@ -135,6 +135,7 @@ sub ping {
     my $start = time;
     my $ping  = Argon::Message->new(command => CMD_PING);
     my $reply = $self->send($ping);
+    return unless defined $reply;
     return time - $start;
 }
 
@@ -145,15 +146,14 @@ sub ping {
 sub monitor {
     my ($self, $on_fail) = @_;
     async {
-        while (1) {
-            my $ping = eval { $self->ping };
-            if ($@) {
-                $on_fail->($self, $@);
-                last;
-            } else {
-                Coro::AnyEvent::sleep $Argon::POLL_INTERVAL;
-            }
+        while ($self->is_connected) {
+            my $ping = $self->ping;
+            last unless defined $ping;
+            Coro::AnyEvent::sleep $Argon::POLL_INTERVAL;
         }
+
+        $self->is_connected(0);
+        $on_fail->($self, $self->in_chan->last_error);
     };
 }
 
@@ -246,7 +246,7 @@ sub send {
 #-------------------------------------------------------------------------------
 sub get_response {
     my ($self, $msg_id) = @_;
-    croak $self->in_chan->error unless $self->in_chan->is_connected;
+    croak $self->in_chan->last_error unless $self->in_chan->is_connected;
     croak sprintf('dead lock detected: msg %s not pending', $msg_id)
         unless $self->has_pending($msg_id);
 
@@ -262,7 +262,7 @@ sub get_response {
 #-------------------------------------------------------------------------------
 sub send_message {
     my ($self, $msg) = @_;
-    croak $self->out_chan->error unless $self->out_chan->is_connected;
+    croak $self->out_chan->last_error unless $self->out_chan->is_connected;
     $self->out_chan->send($msg->encode . $Argon::EOL);
 }
 
