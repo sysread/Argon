@@ -88,6 +88,15 @@ has 'queue_check' => (
 );
 
 #-------------------------------------------------------------------------------
+# Is set to true when running.
+#-------------------------------------------------------------------------------
+has 'is_running' => (
+    is       => 'rw',
+    default  => 0,
+    init_arg => undef,
+);
+
+#-------------------------------------------------------------------------------
 # Message queue storing tuples of [Argon::Stream, Argon::Message].
 #-------------------------------------------------------------------------------
 has 'queue' => (
@@ -146,12 +155,31 @@ sub start {
     async { Argon::CHAOS };
     async { $self->process_messages };
 
-    while (1) {
-        Coro::AnyEvent::readable($sock);
-        my $client = $sock->accept;
-        my $stream = Argon::Stream->create($client);
-        $self->service($stream);
+    # Signal handling
+    my $signal_handler = K('shutdown', $self);
+    my @signals = (
+        AnyEvent->signal(signal => 'TERM', cb => $signal_handler),
+        AnyEvent->signal(signal => 'INT',  cb => $signal_handler),
+    );
+
+    $self->is_running(1);
+
+    while ($self->is_running) {
+        if (Coro::AnyEvent::readable($sock, 1)) {
+            my $client = $sock->accept;
+            my $stream = Argon::Stream->create($client);
+            $self->service($stream);
+        }
     }
+
+    INFO 'Shutting down';
+    close $sock;
+}
+
+sub shutdown {
+    INFO 'Shutdown called';
+    my $self = shift;
+    $self->is_running(0);
 }
 
 #-------------------------------------------------------------------------------
@@ -235,7 +263,6 @@ sub dispatch {
     }
 }
 
-no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;
