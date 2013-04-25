@@ -68,7 +68,7 @@ sub BUILD {
 # Close connections to nodes
 # TODO fail pending tasks
 #-------------------------------------------------------------------------------
-after 'shutdown' => sub {
+before 'shutdown' => sub {
     my $self = shift;
     foreach my $node ($self->nodes) {
         INFO 'Closing connection to %s', $node->address;

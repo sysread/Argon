@@ -58,21 +58,6 @@ has 'sigint' => (
 sub BUILD {
     my $self = shift;
     $self->respond_to(CMD_QUEUE, K('request_queue', $self));
-
-    # Add watcher for sigint
-    $self->sigint(AnyEvent->signal(
-        signal => 'INT',
-        cb     => sub {
-            INFO 'Shutting down workers';
-
-            while ($self->workers > 0) {
-                my $worker = $self->checkout;
-                $worker->kill_child(1);
-            }
-
-            exit 0;
-        }
-    ));
 }
 
 #-------------------------------------------------------------------------------
@@ -89,6 +74,19 @@ before 'start' => sub {
     if ($self->is_managed) {
         INFO 'Notifying manager of availability';
         $self->notify;
+    }
+};
+
+#-------------------------------------------------------------------------------
+# Shut down workers
+# TODO fail pending tasks
+#-------------------------------------------------------------------------------
+before 'shutdown' => sub {
+    my $self = shift;
+    INFO 'Shutting down workers';
+    while ($self->workers > 0) {
+        my $worker = $self->checkout;
+        $worker->kill_child(1);
     }
 };
 

@@ -14,19 +14,13 @@ lib/Argon/Server.pm
 lib/Argon/Stream.pm
 lib/Argon/Worker.pm
 lib/Argon/Role/Task.pm
-lib/Argon/IO/Channel.pm
-lib/Argon/IO/InChannel.pm
-lib/Argon/IO/OutChannel.pm
 
-t/TestProcessClass.pm
-t/00-load.t
-t/01-Argon.t
-t/02-Argon-IO-OutChannel.t
-t/03-Argon-IO-InChannel.t
-t/04-Argon-Message.t
-t/05-Argon-Process.t
 
 t/boilerplate.t
 t/manifest.t
 t/pod-coverage.t
 t/pod.t
+
+t/00-load.t
+t/01-Argon.t
+t/02-Argon-Message.t

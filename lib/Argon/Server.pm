@@ -186,7 +186,8 @@ sub start {
 }
 
 #-------------------------------------------------------------------------------
-# Closes connections to serviced streams.
+# Closes connections to serviced streams. Any overriding methods should use
+# "before", as this method exits.
 #-------------------------------------------------------------------------------
 sub shutdown {
     my $self = shift;
@@ -199,6 +200,8 @@ sub shutdown {
         close $self->listener->fh;
         $self->clear_listener;
     }
+    
+    exit 0;
 }
 
 #-------------------------------------------------------------------------------
