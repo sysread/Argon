@@ -13,7 +13,7 @@ use Time::HiRes  qw/time/;
 use Data::UUID   qw//;
 use MIME::Base64 qw//;
 use Storable     qw//;;
-use Argon        qw/:priorities/;
+use Argon        qw/:priorities :logging/;
 
 enum 'Argon::Message::Priority', [PRI_MAX .. PRI_MIN];
 
@@ -101,7 +101,12 @@ sub encode {
 sub decode {
     confess 'expected message string' unless defined $_[0];
     my ($cmd, $pri, $id, $timestamp, $payload) = split $Argon::MESSAGE_SEPARATOR, $_[0];
-    croak "Invalid message: $_[0]" unless defined $cmd && defined $id;
+    
+    unless (defined $cmd && defined $id) {
+        ERROR 'Invalid message: [%s]', $_[0];
+        croak "Invalid message: [$_[0]]";
+    }
+    
     my $msg = Argon::Message->new(command => $cmd, priority => $pri, id => $id, timestamp => $timestamp);
     $msg->encoded($payload) if $payload ne '-';
     return $msg;

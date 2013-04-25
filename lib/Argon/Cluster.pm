@@ -65,6 +65,18 @@ sub BUILD {
 }
 
 #-------------------------------------------------------------------------------
+# Close connections to nodes
+# TODO fail pending tasks
+#-------------------------------------------------------------------------------
+after 'shutdown' => sub {
+    my $self = shift;
+    foreach my $node ($self->nodes) {
+        INFO 'Closing connection to %s', $node->address;
+        $node->close;
+    }
+};
+
+#-------------------------------------------------------------------------------
 # Adds a little logging to start up.
 #-------------------------------------------------------------------------------
 before 'start' => sub {
@@ -109,7 +121,6 @@ sub register_node {
     ));
 
     INFO 'Registered worker node %s', $address;
-
     $stream->monitor(K('unregister_node', $self));
 }
 
@@ -139,11 +150,13 @@ sub request_add_node {
     eval { $self->register_node($stream, $address, $workers) };
 
     if ($@) {
+        my $error = $@;
+        ERROR 'Error registering node: %s', $error;
         my $reply = $msg->reply(CMD_ERROR);
-        $reply->set_payload($@);
+        $reply->set_payload($error);
         return $reply;
     } else {
-        $self->stop_service($stream->address);
+        $self->stop_service($stream);
         return $msg->reply(CMD_ACK);
     }
 }

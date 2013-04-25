@@ -11,6 +11,7 @@ use namespace::autoclean;
 use AnyEvent;
 use Coro;
 use Coro::AnyEvent;
+use Coro::Handle qw/unblock/;
 use IO::Socket::INET;
 use Socket qw/getnameinfo/;
 
@@ -29,6 +30,14 @@ has 'host' => (
     is       => 'ro',
     isa      => 'Str',
     default  => 'localhost',
+);
+
+has 'listener' => (
+    is        => 'rw',
+    isa       => 'Coro::Handle',
+    init_arg  => undef,
+    clearer   => 'clear_listener',
+    predicate => 'has_listener',
 );
 
 #-------------------------------------------------------------------------------
@@ -56,7 +65,7 @@ has 'handler' => (
 #-------------------------------------------------------------------------------
 has 'service_loop' => (
     is       => 'ro',
-    isa      => 'HashRef[Int]',
+    isa      => 'HashRef[Argon::Stream]',
     init_arg => undef,
     default  => sub {{}},
     traits   => ['Hash'],
@@ -65,6 +74,7 @@ has 'service_loop' => (
         get_service => 'get',
         del_service => 'delete',
         has_service => 'exists',
+        serviced    => 'values',
     }
 );
 
@@ -145,7 +155,6 @@ sub start {
         exit 1;
     }
 
-    $sock->listen or croak $!;
     INFO 'Starting service on %s:%d (queue limit: %d, starvation check: %0.2fs)',
         $self->host,
         $self->port,
@@ -162,24 +171,34 @@ sub start {
         AnyEvent->signal(signal => 'INT',  cb => $signal_handler),
     );
 
+    $self->listener(unblock $sock);
+    $self->listener->listen or croak $!;
     $self->is_running(1);
 
     while ($self->is_running) {
-        if (Coro::AnyEvent::readable($sock, 1)) {
-            my $client = $sock->accept;
-            my $stream = Argon::Stream->create($client);
-            $self->service($stream);
-        }
+        my $client = $self->listener->accept or last;
+        my $stream = Argon::Stream->create($client);
+        $self->service($stream);
     }
 
     INFO 'Shutting down';
-    close $sock;
+    $self->clear_listener;
 }
 
+#-------------------------------------------------------------------------------
+# Closes connections to serviced streams.
+#-------------------------------------------------------------------------------
 sub shutdown {
-    INFO 'Shutdown called';
     my $self = shift;
+    INFO 'Shutdown: signaling active clients';
+
+    $self->stop_service($_) foreach values %{$self->service_loop};
     $self->is_running(0);
+
+    if ($self->has_listener) {
+        close $self->listener->fh;
+        $self->clear_listener;
+    }
 }
 
 #-------------------------------------------------------------------------------
@@ -220,12 +239,17 @@ sub service {
     my ($self, $stream) = @_;
     my $addr = $stream->address;
 
-    $self->set_service($addr, 1);
+    $self->set_service($addr, $stream);
 
     async {
-        while ($stream->is_connected && $self->has_service($stream->address)) {
+        while ($self->is_running
+            && $stream->is_connected
+            && $self->has_service($stream->address))
+        {
             # Pull next message. On failure, stop serving stream.
-            my $msg = $stream->next_message or last;
+            my $msg = $stream->receive;
+            
+            last unless defined $msg && $stream->is_connected;
 
             if ($self->queue_is_full) {
                 my $reply = $msg->reply(CMD_REJECTED);
@@ -235,7 +259,7 @@ sub service {
             }
         }
 
-        $self->stop_service($stream->address);
+        $self->stop_service($stream);
     };
 }
 

@@ -47,7 +47,7 @@ sub process {
 
     croak 'not connected' unless $self->stream;
 
-    my $msg = Argon::Message->new(command  => CMD_QUEUE);
+    my $msg = Argon::Message->new(command => CMD_QUEUE);
     $msg->set_payload([$class, $params]);
 
     return $self->stream->send_retry($msg);

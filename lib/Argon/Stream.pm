@@ -2,7 +2,7 @@ package Argon::Stream;
 
 use strict;
 use warnings;
-use Carp;
+use Carp          qw/carp croak cluck confess/;
 
 use Moose;
 use MooseX::StrictConstructor;
@@ -10,39 +10,37 @@ use MooseX::StrictConstructor;
 use Coro;
 use Coro::AnyEvent;
 use Coro::Channel;
-use AnyEvent;
-use AnyEvent::Util qw//;
+use Coro::Handle   qw/unblock/;
 use IO::Socket     qw/SOCK_STREAM/;
+use Socket         qw/getnameinfo NI_NUMERICSERV/;
 use Argon          qw/:logging :commands/;
 use Argon::Message;
-use Argon::IO::InChannel;
-use Argon::IO::OutChannel;
 
 has 'is_connected' => (
     is       => 'rw',
     isa      => 'Int',
-    default  => 0,
+    default  => 1,
 );
 
 has 'in_chan' => (
     is       => 'ro',
-    isa      => 'Argon::IO::InChannel',
-    clearer  => 'unset_in_chan',
-    trigger  => \&watch_in_chan,
+    isa      => 'Coro::Handle',
+    trigger  => \&trigger_in_chan,
 );
 
 has 'out_chan' => (
     is       => 'ro',
-    isa      => 'Argon::IO::OutChannel',
+    isa      => 'Coro::Handle',
     clearer  => 'unset_out_chan',
 );
 
 has 'inbox' => (
-    is       => 'rw',
-    isa      => 'Coro::Channel',
-    init_arg => undef,
-    handles  => {
-        next_message => 'get',
+    is        => 'rw',
+    isa       => 'Coro::Channel',
+    init_arg  => undef,
+    clearer   => 'clear_inbox',
+    handles   => {
+        receive => 'get',
     }
 );
 
@@ -61,17 +59,6 @@ has 'pending' => (
     }
 );
 
-sub fh {
-    my ($self, $fh) = @_;
-
-    if (defined $fh) {
-        $self->in_fh($fh);
-        $self->out_fh($fh);
-    }
-
-    return ($self->in_fh, $self->out_fh);
-}
-
 #-------------------------------------------------------------------------------
 # Class method: returns true if an error message represents a connection error.
 #-------------------------------------------------------------------------------
@@ -79,19 +66,21 @@ sub is_connection_error {
     my $msg = shift;
     return $msg =~ /disconnected/
         || $msg =~ /Connection reset by peer/
-        || $msg =~ /Broken pipe/;
+        || $msg =~ /Broken pipe/
+        || $msg =~ /Bad file descriptor/;
 }
 
 #-------------------------------------------------------------------------------
 # Trigger (in_chan): starts a thread that watches for new messages while the
 # stream is connected.
 #-------------------------------------------------------------------------------
-sub watch_in_chan {
+sub trigger_in_chan {
     my ($self, $in_chan, $old_in_chan) = @_;
     if (defined $in_chan) {
         $self->inbox(Coro::Channel->new());
-        $self->is_connected(1);
         $self->poll_loop;
+    } else {
+        $self->is_connected(0);
     }
 }
 
@@ -103,13 +92,11 @@ sub poll_loop {
     my ($self) = @_;
     async {
         while ($self->is_connected) {
-            my $line = $self->in_chan->receive;
-
-            unless (defined $line && $self->in_chan->is_connected) {
-                WARN('Connection error: %s', $self->in_chan->last_error)
-                    unless is_connection_error($self->in_chan->last_error);
-                last;
-            }
+            my $line = $self->in_chan->readline($Argon::EOL);
+            last unless defined $line;
+            
+            do { local $/ = $Argon::EOL; chomp $line; };
+            #INFO 'RECV [%s]: [%s]', $self->address, $line;
 
             my $msg = Argon::Message::decode($line);
 
@@ -122,8 +109,9 @@ sub poll_loop {
             }
         }
 
-        $self->inbox->shutdown;
         $self->is_connected(0);
+        $self->close;
+        $self->inbox->shutdown;
     };
 }
 
@@ -153,7 +141,7 @@ sub monitor {
         }
 
         $self->is_connected(0);
-        $on_fail->($self, $self->in_chan->last_error);
+        $on_fail->($self, $!);
     };
 }
 
@@ -162,10 +150,25 @@ sub monitor {
 #-------------------------------------------------------------------------------
 sub address {
     my $self = shift;
-    return
-        defined $self->in_chan ? $self->in_chan->address
-      : defined $self->out_chan ? $self->out_chan->address
-      : '<not connected>';
+    return '<not connected>' unless $self->is_connected;
+
+    my $handle
+        = defined $self->in_chan  ? $self->in_chan
+        : defined $self->out_chan ? $self->out_chan
+        : undef;
+
+    if (defined $handle) {
+        if ($handle->can('peername')) {
+            my $host = $handle->peerhost;
+            my $port = $handle->peerport;
+            return sprintf('sock<%s:%s @%d>', $host, $port, $self);
+        }
+        elsif (defined $self->handle) {
+            return sprintf('file<fd:%s @%d>', $handle->fileno, $self);
+        }
+    } else {
+        return sprintf('none<%s>', $self);
+    }
 }
 
 #-------------------------------------------------------------------------------
@@ -185,13 +188,11 @@ sub connect {
         Type     => SOCK_STREAM,
     ) or croak $!;
 
-    AnyEvent::Util::fh_nonblocking $sock, 1;
-    Coro::AnyEvent::writable($sock);
-    
-    my $in_chan  = Argon::IO::InChannel->new(handle => $sock);
-    my $out_chan = Argon::IO::OutChannel->new(handle => $sock);
-
-    return $class->new(in_chan => $in_chan, out_chan => $out_chan);
+    my $handle = unblock $sock;
+    return $class->new(
+        in_chan  => $handle,
+        out_chan => $handle,
+    );
 }
 
 #-------------------------------------------------------------------------------
@@ -199,9 +200,10 @@ sub connect {
 #-------------------------------------------------------------------------------
 sub create {
     my ($class, $handle) = @_;
-    return $class->new(
-        in_chan  => Argon::IO::InChannel->new(handle => $handle),
-        out_chan => Argon::IO::OutChannel->new(handle => $handle),
+    $handle = unblock($handle) unless $handle->isa('Coro::Handle');
+    $class->new(
+        in_chan  => $handle,
+        out_chan => $handle,
     );
 }
 
@@ -235,6 +237,7 @@ sub send_retry {
 #-------------------------------------------------------------------------------
 sub send {
     my ($self, $msg) = @_;
+    croak 'not connected' unless $self->is_connected;
     $self->set_pending($msg->id, Coro::Channel->new(1));
     $self->send_message($msg);
     return $self->get_response($msg->id);
@@ -246,14 +249,14 @@ sub send {
 #-------------------------------------------------------------------------------
 sub get_response {
     my ($self, $msg_id) = @_;
-    croak $self->in_chan->last_error unless $self->in_chan->is_connected;
+    croak 'not connected' unless $self->is_connected;
     croak sprintf('dead lock detected: msg %s not pending', $msg_id)
         unless $self->has_pending($msg_id);
 
     my $reply = $self->get_pending($msg_id)->get;
     $self->del_pending($msg_id);
 
-    croak $self->error if $reply == 0;
+    croak $! if $reply == 0;
     return $reply;
 }
 
@@ -262,8 +265,9 @@ sub get_response {
 #-------------------------------------------------------------------------------
 sub send_message {
     my ($self, $msg) = @_;
-    croak $self->out_chan->last_error unless $self->out_chan->is_connected;
-    $self->out_chan->send($msg->encode . $Argon::EOL);
+    croak 'not connected' unless $self->is_connected;
+    #INFO 'SEND [%s]: [%s]', $self->address, $msg->encode;
+    $self->out_chan->print($msg->encode . $Argon::EOL);
 }
 
 #-------------------------------------------------------------------------------
@@ -274,17 +278,19 @@ sub close {
     $self->is_connected(0);
 
     if (defined $self->in_chan) {
-        $self->unset_in_chan;
+        close $self->in_chan->fh;
     }
-    
+
     if (defined $self->out_chan) {
-        $self->unset_out_chan;
+        close $self->out_chan->fh;
     }
 
     foreach my $msgid ($self->all_pending) {
         $self->get_pending($msgid)->put(0);
         $self->del_pending($msgid);
     }
+
+    $self->inbox->shutdown; # wake anyone waiting on a message
 }
 
 #-------------------------------------------------------------------------------

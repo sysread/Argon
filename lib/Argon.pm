@@ -96,7 +96,7 @@ sub K {
 our $LISTEN_QUEUE_SIZE  = 128;      # queue size for listening sockets
 our $TIMEOUT            = 3;        # number of seconds to wait for a read/write op on a socket
 our $CHUNK_SIZE         = 1024 * 4; # number of bytes to read at a time
-our $EOL                = "\0";     # end of line/message character(s)
+our $EOL                = "\n";     # end of line/message character(s)
 our $MESSAGE_SEPARATOR  = ' ';      # separator between parts of a message (command, priority, payload, etc)
 our $TRACK_MESSAGES     = 10;       # number of message times to track for computing avg processing time at a host
 our $POLL_INTERVAL      = 2;        # number of seconds between polls for connectivity between cluster/node
@@ -154,10 +154,6 @@ sub error {
 #
 # TODO: more configurable
 #-------------------------------------------------------------------------------
-our $LOG_MESSAGES = Coro::Channel->new;
-our $LOG_OUT      = \*STDERR;
-fh_nonblocking $LOG_OUT, 1;
-
 sub LOG ($@) {
     my ($format, @args) = @_;
     chomp $format;
@@ -165,14 +161,6 @@ sub LOG ($@) {
     my $ts  = strftime("%F %T", localtime);
     warn sprintf("[%s] [%d] %s\n", $ts, $$, $msg);
 }
-
-async {
-    while (1) {
-        my $msg = $LOG_MESSAGES->get;
-        Coro::AnyEvent::writable $LOG_OUT;
-        print $LOG_OUT $msg;
-    }
-};
 
 #-------------------------------------------------------------------------------
 # Logging functions

@@ -24,7 +24,7 @@ use_ok('Argon::IO::InChannel');
     # Read data from pipe
     foreach my $msg (@msgs) {
         my $result = $in->receive;
-        ok($result eq $msg, "I/O test: $msg");
+        ok($result eq $msg, "I/O test: '$msg'");
     }
 
     # Close other side of the connection
@@ -32,5 +32,5 @@ use_ok('Argon::IO::InChannel');
 
     my $failure = $in->receive;
     ok(!defined $failure, 'I/O disconnect - read result');
-    ok($in->state->curr_state->name eq 'DONE', 'I/O disconnect - state');   
+    ok(!$in->is_connected, 'I/O disconnect - state');
 }

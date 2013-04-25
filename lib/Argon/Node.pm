@@ -133,6 +133,7 @@ sub notify {
                 # sockets.
                 if ($@) {
                     $error = sprintf 'Error connecting to manager: %s', $@;
+                    die $error;
                 }
                 # Check validity of response
                 elsif ($reply->command == CMD_ACK) {
@@ -175,8 +176,6 @@ sub notify {
             }
         }
     };
-
-    cede;
 }
 
 #-------------------------------------------------------------------------------

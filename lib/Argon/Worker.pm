@@ -14,9 +14,7 @@ use AnyEvent       qw//;
 use AnyEvent::Util qw//;
 use Time::HiRes    qw/sleep/;
 use Argon          qw/:logging :commands/;
-use Argon::Stream;
-use Argon::IO::InChannel;
-use Argon::IO::OutChannel;
+use Argon::Stream  qw//;
 
 # Nabbed from AnyEvent::Worker
 our $FD_MAX = eval { POSIX::sysconf(&POSIX::_SC_OPEN_MAX) - 1 } || 1023;
@@ -62,14 +60,11 @@ sub start {
     my ($child, $parent) = AnyEvent::Util::portable_socketpair
         or croak "error creating pipe: $!";
 
-    binmode $parent, ':raw';
-    binmode $child,  ':raw';
     my $pid = fork;
 
     # Parent process
     if ($pid) {
         close $parent;
-        AnyEvent::Util::fh_nonblocking $child, 1;
         $self->stream(Argon::Stream->create($child));
         $self->child_pid($pid);
     }
@@ -84,28 +79,20 @@ sub start {
             }
         }
 
-        # Kill all Coros apart from the child thread itself.
-        Coro::killall;
-
-        local $| = 1;
-        AnyEvent::Util::fh_nonblocking $parent, 0;
-        $parent->autoflush(1);
-
+        my $stream = Argon::Stream->create($parent);
         my $exit_code = 0;
 
-        while (my $line = do { local $/ = $Argon::EOL; <$parent> }) {
-            unless (defined $line) {
-                WARN 'Parent terminated connection';
+        while (1) {
+            my $msg = $stream->receive;
 
+            unless (defined $msg) {
+                WARN 'Parent terminated connection';
                 $exit_code = 1;
                 last;
             }
-
-            my $msg   = Argon::Message::decode($line);
+            
             my $reply = $self->process_task($msg);
-
-            $parent->print($reply->encode . $Argon::EOL);
-            $parent->flush();
+            $stream->send_message($reply);
         }
 
         INFO 'Worker exiting';
