@@ -12,7 +12,7 @@ use Coro;
 use Coro::AnyEvent;
 use AnyEvent;
 
-use Argon::Worker;
+use Argon::Process;
 use Argon qw/K :commands :logging/;
 
 extends 'Argon::Server';
@@ -86,7 +86,7 @@ before 'shutdown' => sub {
     INFO 'Shutting down workers';
     while ($self->workers > 0) {
         my $worker = $self->checkout;
-        $worker->kill_child(1);
+        $self->stop_worker($worker);
     }
 };
 
@@ -177,13 +177,12 @@ sub notify {
 }
 
 #-------------------------------------------------------------------------------
-# Returns a new AnyEvent::Worker process configured to handle Argon::Message
-# tasks.
+# Returns a new AnyEvent::Process configured to handle Argon::Message tasks.
 #-------------------------------------------------------------------------------
 sub start_worker {
     my $self   = shift;
-    my $worker = Argon::Worker->new();
-    $worker->start();
+    my $worker = Argon::Process->new();
+    $worker->spawn();
     return $worker;
 }
 
@@ -194,7 +193,7 @@ sub start_worker {
 #-------------------------------------------------------------------------------
 sub stop_worker {
     my ($self, $worker) = @_;
-    $worker->kill_child;
+    $worker->kill;
 }
 
 #-------------------------------------------------------------------------------
@@ -208,7 +207,7 @@ sub request_queue {
     if (   $self->counts_requests
         && $worker->request_count >= $self->max_requests)
     {
-        $worker->kill_child;
+        $self->stop_worker($worker);
         $worker = $self->start_worker;
     }
 

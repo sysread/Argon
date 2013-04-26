@@ -3,7 +3,7 @@
 #   * Worker API for other languages/platforms
 #   * Track ping times and report lag between cluster/node
 #     * Adjust cluster's node selection to account for lag time
-#   * Switch from use of Queue to Coro::PrioChannel
+#   * Multi-platform process module
 #-------------------------------------------------------------------------------
 package Argon;
 

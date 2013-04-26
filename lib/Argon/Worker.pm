@@ -8,101 +8,35 @@ use Moose;
 use MooseX::StrictConstructor;
 use namespace::autoclean;
 
-use Coro           qw//;
-use POSIX          qw/:sys_wait_h/;
-use AnyEvent       qw//;
-use AnyEvent::Util qw//;
-use Time::HiRes    qw/sleep/;
-use Argon          qw/:logging :commands/;
+use Coro::Handle   qw/unblock/;
+use Argon          qw/:commands :logging/;
 use Argon::Stream  qw//;
 
-# Nabbed from AnyEvent::Worker
-our $FD_MAX = eval { POSIX::sysconf(&POSIX::_SC_OPEN_MAX) - 1 } || 1023;
-
-has 'request_count' => (
-    is       => 'ro',
-    isa      => 'Int',
-    init_arg => undef,
-    default  => 0,
-    traits   => ['Counter'],
-    handles  => { inc => 'inc' },
-);
-
-has 'stream' => (
-    is       => 'rw',
-    isa      => 'Argon::Stream',
-    init_arg => undef,
-    clearer  => 'clear_stream',
-);
-
-has 'child_pid' => (
-    is       => 'rw',
-    isa      => 'Int',
-    init_arg => undef,
-    clearer  => 'clear_child_pid',
-);
-
-#-------------------------------------------------------------------------------
-# Forwards message to child process for processing and returns the result. Also
-# increments the request_count attribute.
-#-------------------------------------------------------------------------------
-sub process {
-    my ($self, $msg) = @_;
-    $self->inc;
-    return $self->stream->send($msg);
-}
-
-#-------------------------------------------------------------------------------
-# Starts the child process.
-#-------------------------------------------------------------------------------
-sub start {
+sub loop {
     my $self = shift;
-    my ($child, $parent) = AnyEvent::Util::portable_socketpair
-        or croak "error creating pipe: $!";
+    my $exit_code = 0;
+    
+    INFO 'Worker process starting';
 
-    my $pid = fork;
+    my $reader = unblock \*STDIN;
+    my $writer = unblock \*STDOUT;
+    my $stream = Argon::Stream->new(in_chan => $reader, out_chan => $writer);
 
-    # Parent process
-    if ($pid) {
-        close $parent;
-        $self->stream(Argon::Stream->create($child));
-        $self->child_pid($pid);
-    }
-    # Child process
-    elsif (defined $pid) {
-        $SIG{INT} = 'IGNORE';
+    # Listen for tasks
+    while (1) {
+        my $msg = $stream->receive;
 
-        # Close open handles (nabbed from AnyEvent::Worker)
-        foreach my $fileno ($^F + 1 .. $FD_MAX) {
-            unless ($fileno == $parent->fileno) {
-                POSIX::close $fileno;
-            }
+        unless (defined $msg) {
+            WARN 'Parent terminated connection';
+            $exit_code = 1;
+            last;
         }
 
-        my $stream = Argon::Stream->create($parent);
-        my $exit_code = 0;
-
-        while (1) {
-            my $msg = $stream->receive;
-
-            unless (defined $msg) {
-                WARN 'Parent terminated connection';
-                $exit_code = 1;
-                last;
-            }
-            
-            my $reply = $self->process_task($msg);
-            $stream->send_message($reply);
-        }
-
-        INFO 'Worker exiting';
-        kill 9, $$ if AnyEvent::WIN32;
-        POSIX::_exit $exit_code;
+        my $reply = $self->process_task($msg);
+        $stream->send_message($reply);
     }
-    else {
-        ERROR 'Error starting worker process: %s', $!;
-        croak $!;
-    }
+    
+    INFO 'Exiting';
 }
 
 #-------------------------------------------------------------------------------
@@ -113,7 +47,9 @@ sub process_task {
 
     my $result = eval {
         my ($class, $params) = @{$msg->get_payload};
-        require "$class.pm";
+
+        require UNIVERSAL::require;
+        $class->require or die $@;
 
         unless ($class->does('Argon::Role::Task')) {
             croak 'Tasks must implement Argon::Role::Task';
@@ -137,41 +73,6 @@ sub process_task {
     return $reply;
 }
 
-#-------------------------------------------------------------------------------
-# Kills the worker process.
-#-------------------------------------------------------------------------------
-sub kill_child {
-    my ($self, $wait) = @_;
-
-    if ($self->child_pid) {
-        my $pid = $self->child_pid;
-
-        kill(0, $pid)
-            && kill(9, $pid)
-            || $!{ESRCH}
-            || ERROR("Error killing pid %d: %s", $pid, $!);
-
-        if ($wait) {
-            while ($pid > 0) {
-                $pid = waitpid($pid, WNOHANG);
-                sleep 0.1 if $pid > 0;
-            }
-        }
-
-        $self->clear_stream;
-        $self->clear_child_pid;
-    }
-}
-
-#-------------------------------------------------------------------------------
-# Ensures that the child process is killed when the parent process is destroyed.
-#-------------------------------------------------------------------------------
-sub DEMOLISH {
-    my $self = shift;
-    $self->kill_child(1);
-}
-
-no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;

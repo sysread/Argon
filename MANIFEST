@@ -10,6 +10,7 @@ lib/Argon/Message.pm
 lib/Argon/Node.pm
 lib/Argon/NodeTracker.pm
 lib/Argon/Queue.pm
+lib/Argon/Process.pm
 lib/Argon/Server.pm
 lib/Argon/Stream.pm
 lib/Argon/Worker.pm
@@ -24,3 +25,4 @@ t/pod.t
 t/00-load.t
 t/01-Argon.t
 t/02-Argon-Message.t
+t/03-Argon-Process.t

@@ -25,6 +25,7 @@ WriteMakefile(
         'MooseX::StrictConstructor' => 0,
         'namespace::autoclean'      => 0,
         'String::Escape'            => 0,
+        'UNIVERSAL::require'        => 0,
     },
 
     BUILD_REQUIRES => {
