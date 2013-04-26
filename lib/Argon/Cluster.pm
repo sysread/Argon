@@ -156,7 +156,8 @@ sub request_add_node {
         $reply->set_payload($error);
         return $reply;
     } else {
-        $self->stop_service($stream);
+        # Do not service this stream for requests (default behavior of Server)
+        $self->del_service($stream);
         return $msg->reply(CMD_ACK);
     }
 }

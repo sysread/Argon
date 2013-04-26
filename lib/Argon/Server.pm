@@ -88,16 +88,6 @@ has 'queue_limit' => (
 );
 
 #-------------------------------------------------------------------------------
-# Queue check time (float seconds). Controls the length of time a message may
-# spend in the queue before it's priority is increased to prevent starvation.
-#-------------------------------------------------------------------------------
-has 'queue_check' => (
-    is       => 'ro',
-    isa      => 'Num',
-    required => 1,
-);
-
-#-------------------------------------------------------------------------------
 # Is set to true when running.
 #-------------------------------------------------------------------------------
 has 'is_running' => (
@@ -119,7 +109,6 @@ has 'queue' => (
         'queue_put'     => 'put',
         'queue_get'     => 'get',
         'queue_is_full' => 'is_full',
-        'queue_filter'  => 'filter',
     }
 );
 
@@ -128,10 +117,7 @@ has 'queue' => (
 #-------------------------------------------------------------------------------
 sub build_queue {
     my $self = shift;
-    return Argon::Queue->new(
-        limit => $self->queue_limit,
-        check => $self->queue_check,
-    );
+    return Argon::Queue->new(max_size => $self->queue_limit);
 }
 
 #-------------------------------------------------------------------------------
@@ -155,11 +141,10 @@ sub start {
         exit 1;
     }
 
-    INFO 'Starting service on %s:%d (queue limit: %d, starvation check: %0.2fs)',
+    INFO 'Starting service on %s:%d (queue limit: %d)',
         $self->host,
         $self->port,
         $self->queue_limit,
-        $self->queue_check;
 
     async { Argon::CHAOS };
     async { $self->process_messages };
@@ -193,7 +178,7 @@ sub shutdown {
     my $self = shift;
     INFO 'Shutdown: signaling active clients';
 
-    $self->stop_service($_) foreach values %{$self->service_loop};
+    $self->del_service($_) foreach values %{$self->service_loop};
     $self->is_running(0);
 
     if ($self->has_listener) {
@@ -212,10 +197,12 @@ sub process_messages {
     my $self = shift;
     while (1) {
         my ($stream, $msg) = @{ $self->queue_get };
-        async {
-            my $reply = $self->dispatch($msg, $stream);
-            $self->reply($stream, $reply);
-        };
+        if ($self->has_service($stream->address)) {
+            async {
+                my $reply = $self->dispatch($msg, $stream);
+                $self->reply($stream, $reply);
+            };
+        }
     }
 }
 
@@ -262,17 +249,8 @@ sub service {
             }
         }
 
-        $self->stop_service($stream);
+        $self->del_service($stream);
     };
-}
-
-#-------------------------------------------------------------------------------
-# Removes a stream from the service set.
-#-------------------------------------------------------------------------------
-sub stop_service {
-    my ($self, $stream) = @_;
-    $self->del_service($stream);
-    $self->queue_filter(sub { $_->[0] ne $stream });
 }
 
 #-------------------------------------------------------------------------------

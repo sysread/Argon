@@ -14,7 +14,6 @@ use Pod::Usage;
 my $port;
 my $workers = 4;
 my $limit   = 64;
-my $check   = 2;
 my $manager;
 my $max_reqs;
 my $help;
@@ -25,7 +24,6 @@ my $got_options = GetOptions(
     'manager=s'  => \$manager,
     'requests=i' => \$max_reqs,
     'limit=i'    => \$limit,
-    'check=i'    => \$check,
     'help'       => \$help,
 );
 
@@ -39,7 +37,6 @@ my %param = (
     concurrency => $workers,
     port        => $port,
     queue_limit => $limit,
-    queue_check => $check,
 );
 
 $param{max_requests} = $max_reqs if $max_reqs;
@@ -105,12 +102,6 @@ accepts requests independently of the manager.
 
 Sets the maximum number of messages which may build up in the queue before new
 tasks are rejected. Optional; default value 64.
-
-=item B<-[c]heck>
-
-Starvation in the queue is prevented by increasing messages' priority after they
-have spent a certain amount of time in the queue. Setting -check configures how
-long this time period is. Optional; default value 2 (seconds).
 
 =back
 

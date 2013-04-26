@@ -12,13 +12,11 @@ use Argon::Cluster;
 # Default values
 my $help  = 0;
 my $limit = 64;
-my $check = 2;
 my $port;
 
 my $got_options = GetOptions(
     'help'    => \$help,
     'limit=i' => \$limit,
-    'check=i' => \$check,
     'port=i'  => \$port,
 );
 
@@ -28,13 +26,12 @@ if (!$got_options || $help || !$port) {
     exit 0;
 }
 
-my $node = Argon::Cluster->new(
+my $cluster = Argon::Cluster->new(
     port        => $port,
     queue_limit => $limit,
-    queue_check => $check,
 );
 
-$node->start;
+$cluster->start;
 
 EV::run();
 
@@ -75,12 +72,6 @@ The port on which the cluster listens.
 
 Sets the maximum number of messages which may build up in the queue before new
 tasks are rejected. Optional; default value 64.
-
-=item B<-[c]heck>
-
-Starvation in the queue is prevented by increasing messages' priority after they
-have spent a certain amount of time in the queue. Setting -check configures how
-long this time period is. Optional; default value 2 (seconds).
 
 =back
 
