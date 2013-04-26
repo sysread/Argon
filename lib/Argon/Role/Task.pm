@@ -12,6 +12,6 @@ use namespace::autoclean;
 
 requires 'run';
 
-no Moose;
+;
 
 1;

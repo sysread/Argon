@@ -131,7 +131,7 @@ sub est_proc_time {
     return $self->avg_proc_time * ($self->num_pending + 1);
 }
 
-no Moose;
+;
 __PACKAGE__->meta->make_immutable;
 
 1;

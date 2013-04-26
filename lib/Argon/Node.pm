@@ -220,7 +220,7 @@ sub request_queue {
     return $reply;
 }
 
-no Moose;
+;
 __PACKAGE__->meta->make_immutable;
 
 1;

@@ -1,5 +1,5 @@
 #-------------------------------------------------------------------------------
-# 
+#
 #-------------------------------------------------------------------------------
 package Argon::Queue;
 
@@ -52,7 +52,7 @@ sub get {
     my $self = shift;
     my $item = $self->queue->get;
     $self->dec_count;
-    return $item;    
+    return $item;
 }
 
 __PACKAGE__->meta->make_immutable;

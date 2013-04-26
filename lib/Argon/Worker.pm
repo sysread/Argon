@@ -15,7 +15,7 @@ use Argon::Stream  qw//;
 sub loop {
     my $self = shift;
     my $exit_code = 0;
-    
+
     INFO 'Worker process starting';
 
     my $reader = unblock \*STDIN;
@@ -35,7 +35,7 @@ sub loop {
         my $reply = $self->process_task($msg);
         $stream->send_message($reply);
     }
-    
+
     INFO 'Exiting';
 }
 

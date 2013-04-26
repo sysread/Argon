@@ -185,7 +185,7 @@ sub shutdown {
         close $self->listener->fh;
         $self->clear_listener;
     }
-    
+
     exit 0;
 }
 
@@ -238,7 +238,7 @@ sub service {
         {
             # Pull next message. On failure, stop serving stream.
             my $msg = $stream->receive;
-            
+
             last unless defined $msg && $stream->is_connected;
 
             if ($self->queue_is_full) {

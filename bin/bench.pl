@@ -63,7 +63,7 @@ INFO 'Benchmark plan:';
 INFO 'Host: %s:%d', $host, $port;
 INFO 'Will send %d tasks over %d concurrent connections', $total, $conc;
 INFO 'Simulated task will average %0.4fs (+/-%0.4fs) to complete.', $delay, $variance;
-INFO '--------------------------------------------------------------------------------';
+INFO '------------------------------------------------------------';
 
 # Create connections
 my $clients = Coro::Channel->new();
@@ -130,7 +130,7 @@ $_->join foreach @threads;
 # Output summary
 my $taken = time - $start_time;
 my $avg   = $taken / $complete;
-INFO '--------------------------------------------------------------------------------';
+INFO '------------------------------------------------------------';
 INFO $format, $complete, $total, $taken, $avg;
 INFO 'Savings / Overhead: %0.4fs/task', ($avg - $delay);
 

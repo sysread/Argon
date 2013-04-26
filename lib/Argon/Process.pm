@@ -152,7 +152,7 @@ sub kill {
                 && kill(9, $pid)
                 || $!{ESRCH}
                 || ERROR("Error killing pid %d: %s", $pid, $!);
-        
+
             while ($pid > 0) {
                 $pid = waitpid($pid, WNOHANG);
                 if ($pid > 0) {
@@ -160,10 +160,10 @@ sub kill {
                 }
             }
         }
-    
+
         $self->stream->close;
         $self->stderr->close;
-    
+
         $self->clear_pid;
         $self->clear_stream;
         $self->clear_stderr;

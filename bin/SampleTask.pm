@@ -3,6 +3,7 @@ package SampleTask;
 use strict;
 use warnings;
 use Carp;
+use namespace::autoclean;
 
 use Moose;
 use Argon::Role::Task;
@@ -19,7 +20,7 @@ sub run {
     return $self->num;
 }
 
-no Moose;
+;
 __PACKAGE__->meta->make_immutable;
 
 1;

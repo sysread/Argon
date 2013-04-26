@@ -94,7 +94,7 @@ sub poll_loop {
         while ($self->is_connected) {
             my $line = $self->in_chan->readline($Argon::EOL);
             last unless defined $line;
-            
+
             do { local $/ = $Argon::EOL; chomp $line; };
             #INFO 'RECV [%s]: [%s]', $self->address, $line;
 
@@ -301,7 +301,7 @@ sub DEMOLISH {
     $self->close;
 }
 
-no Moose;
+;
 __PACKAGE__->meta->make_immutable;
 
 1;

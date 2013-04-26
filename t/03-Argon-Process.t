@@ -16,7 +16,7 @@ ok($proc->spawn, 'spawn process');
 for my $i (0 .. 9) {
     my $msg = Argon::Message->new(command => CMD_QUEUE);
     $msg->set_payload(['Test::DoublerTask', [n => $i]]);
-    
+
     my $expected = $i * 2;
     my $reply    = $proc->process($msg);
     my $payload  = $reply->get_payload;
