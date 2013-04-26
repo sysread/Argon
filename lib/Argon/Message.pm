@@ -125,3 +125,85 @@ sub reply {
 __PACKAGE__->meta->make_immutable;
 
 1;
+
+=pod
+
+=head1 NAME
+
+Argon::Message
+
+=head1 SYNOPSIS
+
+    use Argon::Message;
+    use Argon qw/:commands :priorities/;
+
+    my $msg = Argon::Message->new(
+        command  => CMD_QUEUE,
+        priority => PRI_NORMAL,
+    );
+
+    $msg->set_payload(['Tasks::Adder', [numbers => [3, 4]]);
+
+
+    my $reply = $msg->reply(CMD_COMPLETE);
+    $reply->set_payload('Good work!');
+
+    my $encoded = $reply->encode;
+    my $decoded = Argon::Message::decode($encoded);
+
+=head1 DESCRIPTION
+
+Argon::Message encodes and decodes messages sent across the wire in
+an Argon cluster.
+
+=head1 METHODS
+
+=over
+
+=item id()
+
+Returns the unique ID of the message.
+
+=item priority()
+
+Returns the priority of the message.
+
+=item command()
+
+Returns the message command.
+
+=item set_payload($payload)
+
+Sets the payload for the message. B<WARNING>: large payloads will
+result in slow transmission. While the system will not become overly
+bogged down as a result, individual requests will take significantly
+longer.
+
+=item get_payload()
+
+Returns the message's payload.
+
+=item encode()
+
+Encodes the message as a string for transmission over the wire.
+
+=item decode($line)
+
+B<Class method>: decodes a string into a new Argon::Message.
+
+=item reply($cmd)
+
+Returns a new copy of the Argon::Message instance with a different
+command.
+
+=back
+
+=head1 AUTHOR
+
+Jeff Ober L<mailto:jeffober@gmail.com>
+
+=head1 LICENSE
+
+BSD license
+
+=cut

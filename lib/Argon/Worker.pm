@@ -12,6 +12,10 @@ use Coro::Handle   qw/unblock/;
 use Argon          qw/:commands :logging/;
 use Argon::Stream  qw//;
 
+#-------------------------------------------------------------------------------
+# Runs the work processing loop for the worker process, reading new tasks off of
+# the wire, executing them, and emiting the results back to the parent process.
+#-------------------------------------------------------------------------------
 sub loop {
     my $self = shift;
     my $exit_code = 0;

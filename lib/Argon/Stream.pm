@@ -60,6 +60,42 @@ has 'pending' => (
 );
 
 #-------------------------------------------------------------------------------
+# CLASS METHOD:
+# Connects to a remote host and creates a new Stream object. Accepts two named
+# parameters, 'host' and 'port'. Returns the new stream object.
+#-------------------------------------------------------------------------------
+sub connect {
+    my ($class, %param) = @_;
+    my $host = $param{host} || croak 'expected host';
+    my $port = $param{port} || croak 'expected port';
+
+    my $sock = IO::Socket::INET->new(
+        PeerHost => $host,
+        PeerPort => $port,
+        Proto    => 'tcp',
+        Type     => SOCK_STREAM,
+    ) or croak $!;
+
+    my $handle = unblock $sock;
+    return $class->new(
+        in_chan  => $handle,
+        out_chan => $handle,
+    );
+}
+
+#-------------------------------------------------------------------------------
+# Creates a new stream using a single handle as both input and output channels.
+#-------------------------------------------------------------------------------
+sub create {
+    my ($class, $handle) = @_;
+    $handle = unblock($handle) unless $handle->isa('Coro::Handle');
+    $class->new(
+        in_chan  => $handle,
+        out_chan => $handle,
+    );
+}
+
+#-------------------------------------------------------------------------------
 # Class method: returns true if an error message represents a connection error.
 #-------------------------------------------------------------------------------
 sub is_connection_error {
@@ -96,8 +132,6 @@ sub poll_loop {
             last unless defined $line;
 
             do { local $/ = $Argon::EOL; chomp $line; };
-            #INFO 'RECV [%s]: [%s]', $self->address, $line;
-
             my $msg = Argon::Message::decode($line);
 
             if ($msg->command == CMD_PING) {
@@ -172,67 +206,6 @@ sub address {
 }
 
 #-------------------------------------------------------------------------------
-# CLASS METHOD:
-# Connects to a remote host and creates a new Stream object. Accepts two named
-# parameters, 'host' and 'port'. Returns the new stream object.
-#-------------------------------------------------------------------------------
-sub connect {
-    my ($class, %param) = @_;
-    my $host = $param{host} || croak 'expected host';
-    my $port = $param{port} || croak 'expected port';
-
-    my $sock = IO::Socket::INET->new(
-        PeerHost => $host,
-        PeerPort => $port,
-        Proto    => 'tcp',
-        Type     => SOCK_STREAM,
-    ) or croak $!;
-
-    my $handle = unblock $sock;
-    return $class->new(
-        in_chan  => $handle,
-        out_chan => $handle,
-    );
-}
-
-#-------------------------------------------------------------------------------
-# Creates a new stream using a single handle as both input and output channels.
-#-------------------------------------------------------------------------------
-sub create {
-    my ($class, $handle) = @_;
-    $handle = unblock($handle) unless $handle->isa('Coro::Handle');
-    $class->new(
-        in_chan  => $handle,
-        out_chan => $handle,
-    );
-}
-
-#-------------------------------------------------------------------------------
-# Sends a message and waits for the response. If the message is rejected,
-# continues to resend the message after longer and longer delays until it is
-# accepted.
-#-------------------------------------------------------------------------------
-sub send_retry {
-    my ($self, $msg) = @_;
-    my $attempts = 0;
-
-    while (1) {
-        ++$attempts;
-        my $reply = $self->send($msg);
-
-        # If the task was rejected, sleep a short (but lengthening) amount of
-        # time before attempting again.
-        if ($reply->command == CMD_REJECTED) {
-            my $sleep_time = log($attempts + 1) / log(10);
-            Coro::AnyEvent::sleep($sleep_time);
-        }
-        else {
-            return $reply;
-        }
-    }
-}
-
-#-------------------------------------------------------------------------------
 # Sends a message and returns the reply.
 #-------------------------------------------------------------------------------
 sub send {
@@ -266,7 +239,6 @@ sub get_response {
 sub send_message {
     my ($self, $msg) = @_;
     croak 'not connected' unless $self->is_connected;
-    #INFO 'SEND [%s]: [%s]', $self->address, $msg->encode;
     $self->out_chan->print($msg->encode . $Argon::EOL);
 }
 

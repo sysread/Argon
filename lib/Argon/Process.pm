@@ -59,7 +59,8 @@ sub DEMOLISH {
 }
 
 #-------------------------------------------------------------------------------
-#
+# Return the full path to the perl binary used to launch the parent in order to
+# ensure that children are run on the same perl version.
 #-------------------------------------------------------------------------------
 sub get_command_path {
     my $self = shift;
@@ -72,7 +73,9 @@ sub get_command_path {
 }
 
 #-------------------------------------------------------------------------------
-#
+# Returns a string of parameters that will be passed to the perl executable.
+# These include any user-specified arguments passed to the constructor as well
+# as the include paths for the currently executing perl interpreter.
 #-------------------------------------------------------------------------------
 sub get_args {
     my $self  = shift;
@@ -86,7 +89,11 @@ sub get_args {
 }
 
 #-------------------------------------------------------------------------------
+# Executes the child process and configures streams and handles for IPC. Also
+# starts loop that forwards STDERR data from the child to the current process
+# (for logging).
 #
+# Croaks (as well as emitting log entries) on failure.
 #-------------------------------------------------------------------------------
 sub spawn {
     my ($self) = @_;
@@ -140,7 +147,7 @@ sub spawn {
 }
 
 #-------------------------------------------------------------------------------
-#
+# Kills the child process. Blocks until the process has been completely reaped.
 #-------------------------------------------------------------------------------
 sub kill {
     my $self = shift;

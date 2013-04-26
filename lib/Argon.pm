@@ -3,7 +3,6 @@
 #   * Worker API for other languages/platforms
 #   * Track ping times and report lag between cluster/node
 #     * Adjust cluster's node selection to account for lag time
-#   * Multi-platform process module
 #-------------------------------------------------------------------------------
 package Argon;
 
