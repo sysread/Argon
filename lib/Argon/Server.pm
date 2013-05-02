@@ -150,7 +150,7 @@ sub start {
 
     unless ($sock) {
         ERROR 'Error creating server socket: %s', $!;
-        exit 1;
+        croak $!;
     }
 
     INFO 'Starting service on %s:%d (queue limit: %d)',

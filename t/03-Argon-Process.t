@@ -15,8 +15,8 @@ use Argon::Message;
 
 unshift @INC, 't';
 
-use_ok('Argon::Process');
-require_ok('Test::DoublerTask');
+use_ok('Argon::Process')        or BAIL_OUT('unable to load Argon::Process');
+require_ok('Test::DoublerTask') or BAIL_OUT('unable to load task class');
 
 # Test basic usage
 {

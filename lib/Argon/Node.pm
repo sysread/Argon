@@ -263,6 +263,9 @@ Argon::Node is the workhorse of an Argon cluster. It maintains a pool of worker
 processes to which it delegates incoming requests. Nodes may be configured as a
 standalone service or as a member of a larger Argon cluster.
 
+Nodes monitor their connection to the cluster and will automatically reconnect
+when a cluster becomes temporarily unavailable.
+
 Argon::Node inherits Argon::Server.
 
 =head1 METHODS

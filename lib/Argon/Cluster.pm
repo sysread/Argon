@@ -244,6 +244,12 @@ cluster manages nodes registered in this way and routes Argon::Messages to the
 most available node (based on past performance and the number of tasks it has
 queued vs the number of worker processes it has available).
 
+If a node disconnects, it is automatically unregistered from the cluster until
+such a time as it reconnects. Any messages which had been routed to the node
+will fail and an error message returned to the requesting client (since it is
+impossible to retry the task without knowing what state it was in when the node
+failed).
+
 Argon::Cluster inherits Argon::Server.
 
 =head1 METHODS

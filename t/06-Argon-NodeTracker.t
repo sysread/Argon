@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Carp;
 
-use Test::More qw/no_plan/;
+use Test::More tests => 11;
 use Coro;
 use Coro::AnyEvent;
 use Coro::Semaphore;
