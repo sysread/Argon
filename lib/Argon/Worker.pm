@@ -1,3 +1,11 @@
+#-------------------------------------------------------------------------------
+# Argon::Worker sits in a loop, waiting for new jobs to show up and then
+# processing them and sending the response back. It reads messages in from
+# STDIN and writes responses back to STDOUT.
+#
+# Workers are not normally created directly. They are launched in a separate
+# process by Argon::Process.
+#-------------------------------------------------------------------------------
 package Argon::Worker;
 
 use strict;

@@ -1,3 +1,8 @@
+#-------------------------------------------------------------------------------
+# Because Argon::Process is tied to Argon::Worker (Argon::Process is hard-coded
+# to run an Argon::Worker), Argon::Worker is exersized here a bit via the
+# Test::DoublerTask.
+#-------------------------------------------------------------------------------
 use strict;
 use warnings;
 use Carp;

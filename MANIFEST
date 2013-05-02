@@ -27,3 +27,4 @@ t/01-Argon.t
 t/02-Argon-Message.t
 t/03-Argon-Process.t
 t/04-Argon-Queue.t
+t/05-Argon-Stream.t

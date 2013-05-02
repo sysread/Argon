@@ -1,3 +1,7 @@
+#-------------------------------------------------------------------------------
+# Tracks the length of time it takes to process requests for a node. Used by
+# Argon::Cluster to monitor Node responsiveness.
+#-------------------------------------------------------------------------------
 package Argon::NodeTracker;
 
 use strict;
