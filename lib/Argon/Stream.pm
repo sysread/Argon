@@ -1,3 +1,7 @@
+#-------------------------------------------------------------------------------
+# Argon::Stream manages an input and output handle (see Coro::Handle), making it
+# far simpler to send and receive messages.
+#-------------------------------------------------------------------------------
 package Argon::Stream;
 
 use strict;
@@ -16,24 +20,38 @@ use Socket         qw/getnameinfo NI_NUMERICSERV/;
 use Argon          qw/:logging :commands/;
 use Argon::Message;
 
+#-------------------------------------------------------------------------------
+# Flag set to true when connected.
+#-------------------------------------------------------------------------------
 has 'is_connected' => (
-    is       => 'rw',
-    isa      => 'Int',
-    default  => 1,
+    is        => 'rw',
+    isa       => 'Int',
+    default   => 1,
 );
 
+#-------------------------------------------------------------------------------
+# Input channel
+#-------------------------------------------------------------------------------
 has 'in_chan' => (
-    is       => 'ro',
-    isa      => 'Coro::Handle',
-    trigger  => \&trigger_in_chan,
+    is        => 'ro',
+    isa       => 'Coro::Handle',
+    trigger   => \&trigger_in_chan,
+    predicate => 'has_in_chan',
 );
 
+#-------------------------------------------------------------------------------
+# Output channel
+#-------------------------------------------------------------------------------
 has 'out_chan' => (
-    is       => 'ro',
-    isa      => 'Coro::Handle',
-    clearer  => 'unset_out_chan',
+    is        => 'ro',
+    isa       => 'Coro::Handle',
+    clearer   => 'unset_out_chan',
+    predicate => 'has_out_chan',
 );
 
+#-------------------------------------------------------------------------------
+# Queue of messages that have come in from the input channel
+#-------------------------------------------------------------------------------
 has 'inbox' => (
     is        => 'rw',
     isa       => 'Coro::Channel',
@@ -44,6 +62,9 @@ has 'inbox' => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Tracks messages that have been sent out using send().
+#-------------------------------------------------------------------------------
 has 'pending' => (
     is       => 'ro',
     isa      => 'HashRef[Coro::Channel]',
@@ -143,9 +164,7 @@ sub poll_loop {
             }
         }
 
-        $self->is_connected(0);
         $self->close;
-        $self->inbox->shutdown;
     };
 }
 
@@ -210,7 +229,9 @@ sub address {
 #-------------------------------------------------------------------------------
 sub send {
     my ($self, $msg) = @_;
-    croak 'not connected' unless $self->is_connected;
+    croak 'not connected'                unless $self->is_connected;
+    croak 'no output channel configured' unless $self->has_out_chan;
+    croak 'no input channel configured'  unless $self->has_in_chan;
     $self->set_pending($msg->id, Coro::Channel->new(1));
     $self->send_message($msg);
     return $self->get_response($msg->id);
@@ -223,6 +244,7 @@ sub send {
 sub get_response {
     my ($self, $msg_id) = @_;
     croak 'not connected' unless $self->is_connected;
+    croak 'no input channel configured' unless $self->has_in_chan;
     croak sprintf('dead lock detected: msg %s not pending', $msg_id)
         unless $self->has_pending($msg_id);
 
@@ -239,6 +261,7 @@ sub get_response {
 sub send_message {
     my ($self, $msg) = @_;
     croak 'not connected' unless $self->is_connected;
+    croak 'no output channel configured' unless $self->has_out_chan;
     $self->out_chan->print($msg->encode . $Argon::EOL);
 }
 
@@ -248,6 +271,9 @@ sub send_message {
 sub close {
     my $self = shift;
     $self->is_connected(0);
+
+    $self->inbox->shutdown # wake anyone waiting on a message
+        if defined $self->inbox;
 
     if (defined $self->in_chan) {
         close $self->in_chan->fh;
@@ -261,8 +287,6 @@ sub close {
         $self->get_pending($msgid)->put(0);
         $self->del_pending($msgid);
     }
-
-    $self->inbox->shutdown; # wake anyone waiting on a message
 }
 
 #-------------------------------------------------------------------------------
@@ -277,3 +301,108 @@ sub DEMOLISH {
 __PACKAGE__->meta->make_immutable;
 
 1;
+
+=pod
+
+=head1 NAME
+
+Argon::Stream
+
+=head1 SYNOPSIS
+
+    use Coro::Handle;
+    use Argon::Stream;
+
+    # Create a stream manually
+    my $stream = Argon::Stream->new(
+        in_chan  => unblock(*STDIN),
+        out_chan => unblock(*STDOUT),
+    );
+
+    # Create stream by directly connecting to a remote host
+    my $stream = Argon::Stream->connect(host => 'someserver', port => 8888);
+
+    # Create stream from a single existing 2-way channel (e.g. a socket)
+    my $stream = Argon::Stream->create($sock);
+
+    # Send a message and wait for a response (yields to Coro loop).
+    my $reply = $stream->send($msg);
+
+    # Send a message manually
+    $stream->send_message($msg);
+
+    # Get the reply
+    my $reply = $stream->receive;
+
+    # Disconnect
+    $stream->close;
+
+=head1 DESCRIPTION
+
+Argon::Stream wraps an input and output handle to make sending and receiving
+messages easier. It also facilitates some of the monitoring between
+Argon::Cluster and Argon::Node objects.
+
+=head1 METHDOS
+
+=over
+
+=item new(in_chan => Coro::Handle, out_chan => Coro::Handle)
+
+Creates a new Argon::Stream using two Coro::Handle objects. Note that neither
+handle is required, allowing unidirectional streams to be created.
+
+=item create(IO::Handle)
+
+Creates a new Argon::Stream using a single, bidirectional IO::Handle object.
+
+=item connect(host => 'someserver', port => 8888)
+
+Creates a new Argon::Stream by connecting directly to a remote host.
+
+=item monitor($on_fail)
+
+Begins monitoring the channel for connectivity. WARNING: this method assumes
+that the other end of the connection is controlled by an Argon::Stream as well.
+If connectivity breaks, subroutine $on_fail is triggered with two arguments: the
+stream object and the error message.
+
+=item address()
+
+Returns the address of this stream. Note that this is NOT just the URL or IP
+address. Since the stream is composed of (possibly) two handles, this is simply
+an identifier that may be used to uniquely identify the stream as well as to
+create a human-readable description of it.
+
+=item send_message($msg)
+
+Sends an Argon::Message. Croaks if not connected or if the output handle has not
+been configured.
+
+=item receive()
+
+Blocks until the next Argon::Message is available on the stream. Croaks if an
+input handle has not been configured.
+
+=item send($msg)
+
+Sends an Argon::Message and returns the response (another Argon::Message).
+Blocks until the response is available. Croaks if either the output or input
+handles have not been configured.
+
+=item close()
+
+Closes and disconnects the stream. The instance is not left in a useable or
+reconnectable state.
+
+=back
+
+=head1 AUTHOR
+
+Jeff Ober L<mailto:jeffober@gmail.com>
+
+=head1 LICENSE
+
+BSD license
+
+=cut
