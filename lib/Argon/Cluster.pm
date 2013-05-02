@@ -1,3 +1,8 @@
+#-------------------------------------------------------------------------------
+# Argon::Cluster is a manager on an Argon network. Argon::Nodes are configured
+# to notify a Cluster of their availability. Once registered in this way, the
+# Cluster will route Argon::Messages to it based on its availability.
+#-------------------------------------------------------------------------------
 package Argon::Cluster;
 
 use strict;
@@ -211,5 +216,91 @@ END
 
 ;
 __PACKAGE__->meta->make_immutable;
+
+=pod
+
+=head1 NAME
+
+Argon::Cluster
+
+=head1 SYNOPSIS
+
+    use EV; # use libev as event loop (see AnyEvent for details)
+    use Argon::Cluster;
+
+    my $cluster = Argon::Cluster->new(
+        port         => 8000,
+        host         => 'localhost',
+        queue_limit  => 128,
+    );
+
+    $cluster->start;
+
+=head1 DESCRIPTION
+
+An Argon::Cluster is a manager on an Argon network. Argon::Nodes are configured
+(via the I<manager> parameter) to report their availability to the cluster. The
+cluster manages nodes registered in this way and routes Argon::Messages to the
+most available node (based on past performance and the number of tasks it has
+queued vs the number of worker processes it has available).
+
+Argon::Cluster inherits Argon::Server.
+
+=head1 METHODS
+
+=over
+
+=item new(host => ..., port => ...)
+
+Creates a new Argon::Cluster. The node does not automatically start listening.
+
+Parameters:
+
+=over
+
+=item host
+
+Required. Hostname of the device to listen on.
+
+=item port
+
+Required. Port number on which to listen.
+
+=item queue_limit
+
+Required. Size of the message queue. Any messages that come in after the queue
+has been filled with be rejected. It is up to the client to retry rejected
+messages.
+
+Setting a large queue_limit will decrease the number of rejected messages but
+will make the server vulnerable to spikes in traffic density (e.g. a DOS attack
+or an unanticipated increase in traffic). Setting a lower queue_limit ensures
+that high traffic volumes do not cause the server to become bogged down and
+unresponsive. Note that in either case, the client will be waiting a longer
+time for a response; in the second case, however, the server will bounce back
+from traffic spikes much more quickly than in the first.
+
+=back
+
+=item start
+
+Starts the server. Blocks until I<shutdown> is called.
+
+=item shutdown
+
+Causes the server to stop at the next available cycle. Onced called, each client
+will be disconnected and any pending messages will be failed.
+
+=back
+
+=head1 AUTHOR
+
+Jeff Ober L<mailto:jeffober@gmail.com>
+
+=head1 LICENSE
+
+BSD license
+
+=cut
 
 1;

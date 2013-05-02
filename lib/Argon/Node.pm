@@ -1,3 +1,7 @@
+#-------------------------------------------------------------------------------
+# Argon::Node is a TCP/IP server which accepts Argon::Messages and processes
+# them within a configurable process pool.
+#-------------------------------------------------------------------------------
 package Argon::Node;
 
 use strict;
@@ -17,25 +21,38 @@ use Argon qw/K :commands :logging/;
 
 extends 'Argon::Server';
 
+#-------------------------------------------------------------------------------
+# Number of worker processes to maintain
+#-------------------------------------------------------------------------------
 has 'concurrency' => (
     is        => 'ro',
     isa       => 'Int',
     required  => 1,
 );
 
+#-------------------------------------------------------------------------------
+# Max requests per worker process before restarting the process to reclaim
+# memory
+#-------------------------------------------------------------------------------
 has 'max_requests' => (
     is        => 'ro',
     isa       => 'Int',
     predicate => 'counts_requests',
 );
 
+#-------------------------------------------------------------------------------
+# Argon::Cluster to notify of availability
+#-------------------------------------------------------------------------------
 has 'manager' => (
     is        => 'ro',
     isa       => 'Str',
-    required  => 0,
     predicate => 'is_managed',
 );
 
+#-------------------------------------------------------------------------------
+# Maintains the pool of worker processes, allowing code to block until a
+# worker is available to handle a job
+#-------------------------------------------------------------------------------
 has 'pool' => (
     is        => 'rw',
     isa       => 'Coro::Channel',
@@ -45,11 +62,6 @@ has 'pool' => (
         'checkout' => 'get',
         'workers'  => 'size',
     }
-);
-
-has 'sigint' => (
-    is        => 'rw',
-    init_arg  => undef,
 );
 
 #-------------------------------------------------------------------------------
@@ -222,5 +234,107 @@ sub request_queue {
 
 ;
 __PACKAGE__->meta->make_immutable;
+
+=pod
+
+=head1 NAME
+
+Argon::Node
+
+=head1 SYNOPSIS
+
+    use EV; # use libev as event loop (see AnyEvent for details)
+    use Argon::Node;
+
+    my $node = Argon::Node->new(
+        port         => 8000,
+        host         => 'localhost',
+        queue_limit  => 128,
+        concurrency  => 8,
+        max_requests => 512,
+        manager      => 'otherhost:8000',
+    );
+
+    $node->start;
+
+=head1 DESCRIPTION
+
+Argon::Node is the workhorse of an Argon cluster. It maintains a pool of worker
+processes to which it delegates incoming requests. Nodes may be configured as a
+standalone service or as a member of a larger Argon cluster.
+
+Argon::Node inherits Argon::Server.
+
+=head1 METHODS
+
+=over
+
+=item new(host => ..., port => ...)
+
+Creates a new Argon::Node. The node does not automatically start listening.
+
+Parameters:
+
+=over
+
+=item host
+
+Required. Hostname of the device to listen on.
+
+=item port
+
+Required. Port number on which to listen.
+
+=item queue_limit
+
+Required. Size of the message queue. Any messages that come in after the queue
+has been filled with be rejected. It is up to the client to retry rejected
+messages.
+
+Setting a large queue_limit will decrease the number of rejected messages but
+will make the server vulnerable to spikes in traffic density (e.g. a DOS attack
+or an unanticipated increase in traffic). Setting a lower queue_limit ensures
+that high traffic volumes do not cause the server to become bogged down and
+unresponsive. Note that in either case, the client will be waiting a longer
+time for a response; in the second case, however, the server will bounce back
+from traffic spikes much more quickly than in the first.
+
+=item concurrency
+
+Required. Number of worker processes to maintain.
+
+=item max_requests
+
+Optional. Maximum number of requests any worker process may handle before it is
+terminated and a new process is spawned to replace it. This saves memory but may
+result in spiky responsiveness if set too low.
+
+=item manager
+
+Optional. Configures the Node to notify a manager of its availability to handle
+requests. Without this parameter, the Node is configured as a standalone server.
+
+=back
+
+=item start
+
+Starts the server. Blocks until I<shutdown> is called.
+
+=item shutdown
+
+Causes the server to stop at the next available cycle. Onced called, each client
+will be disconnected and any pending messages will be failed.
+
+=back
+
+=head1 AUTHOR
+
+Jeff Ober L<mailto:jeffober@gmail.com>
+
+=head1 LICENSE
+
+BSD license
+
+=cut
 
 1;
