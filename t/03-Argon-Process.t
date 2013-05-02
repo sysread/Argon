@@ -20,13 +20,17 @@ require_ok('Test::DoublerTask');
 
 # Test basic usage
 {
-    my $proc = new_ok('Argon::Process');
-    ok(!$proc->is_running, 'process does not run initially');
+    my $proc = new_ok('Argon::Process')
+        or BAIL_OUT('unable to continue without process object');
 
-    ok(my $pid = $proc->spawn, 'spawn process');
-    ok($pid =~ /\d+/, 'pid is correctly set');
+    ok(!$proc->is_running, 'is_running (1)');
 
-    ok($proc->is_running, 'process running after spawn');
+    ok(my $pid = $proc->spawn, 'spawn (1)')
+        or BAIL_OUT('unable to launch process');
+
+    ok($pid =~ /\d+/, 'spawn (2)');
+
+    ok($proc->is_running, 'is_running (2)');
 
     for my $i (0 .. 9) {
         my $msg = Argon::Message->new(command => CMD_QUEUE);
@@ -36,12 +40,12 @@ require_ok('Test::DoublerTask');
         my $reply    = $proc->process($msg);
         my $payload  = $reply->get_payload;
 
-        ok($reply->command eq CMD_COMPLETE, "process task ($i)");
-        ok($payload eq $expected, "received expected result ($expected)");
+        ok($reply->command eq CMD_COMPLETE, "process task ($i) - cmd");
+        ok($payload eq $expected, "process task ($i) - payload");
     }
 
-    ok($proc->kill(1), 'kill process');
-    ok(!$proc->is_running, 'process not running');
+    ok($proc->kill(1), 'kill');
+    ok(!$proc->is_running, 'is_running (3)');
 }
 
 # Test automatic shutdown of a process when it goes out of scope
@@ -49,5 +53,5 @@ require_ok('Test::DoublerTask');
     my $proc = new_ok('Argon::Process');
     my $pid  = $proc->spawn;
     undef $proc;
-    ok(!kill(0, $pid), 'process self-terminated on DESTROY');
+    ok(!kill(0, $pid), 'process self-terminates on DESTROY');
 }

@@ -13,7 +13,7 @@ use_ok('Argon::NodeTracker');
     my $tracker = new_ok('Argon::NodeTracker', [
         tracking => 4,
         workers  => 4,
-    ]);
+    ]) or BAIL_OUT('cannot continue without nodetracker object');
 
     for my $i (1 .. 4) {
         $tracker->start_request($i);

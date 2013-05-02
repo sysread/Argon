@@ -4,17 +4,20 @@ use Carp;
 
 use Test::More tests => 8;
 
+use Argon qw/:priorities :commands/;
+
 require_ok('Argon::Message');
 use_ok('Argon::Message');
-
-use Argon qw/:priorities :commands/;
 
 my $pri = PRI_LOW;
 my $cmd = CMD_QUEUE;
 my $pay = { foo => 'bar', secret => 42 };
 
 # Construction
-my $msg = Argon::Message->new(priority => $pri, command => $cmd);
+my $msg = new_ok('Argon::Message', [
+    priority => $pri,
+    command  => $cmd,
+]) or BAIL_OUT('cannot continue without message object');
 $msg->set_payload($pay);
 
 ok($msg->id, 'New message gets ID');

@@ -8,7 +8,8 @@ use_ok('Argon::Queue');
 
 # Positive path
 {
-    my $q = new_ok('Argon::Queue', [ max_size => 2 ]);
+    my $q = new_ok('Argon::Queue', [ max_size => 2 ])
+        or BAIL_OUT('unable to continue without queue object');
 
     ok($q->count == 0, 'initial count 0');
     ok($q->is_empty, 'is_empty (1)');
