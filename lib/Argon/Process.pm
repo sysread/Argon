@@ -177,7 +177,8 @@ sub kill {
             }
 
             if ($block) {
-                waitpid($pid, 0);                    
+                waitpid($pid, 0);
+
             } else {
                 while ($pid > 0) {
                     $pid = waitpid($pid, WNOHANG);
@@ -211,12 +212,12 @@ Argon::Process
 =head1 SYNOPSIS
 
     use Argon::Process;
-    
+
     my $proc = Argon::Process->new();
     $proc->spawn;
-    
+
     my $result = $proc->process($msg);
-    
+
     $proc->kill;
 
 =head1 DESCRIPTION

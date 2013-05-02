@@ -25,9 +25,10 @@ Argon::Role::Task
     use Moose;
 
     with 'Argon::Role::Task';
-    
+
     sub run {
-        ...        
+        ...
+
     }
 
 =head1 DESCRIPTION

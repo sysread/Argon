@@ -144,7 +144,6 @@ Argon::Message
 
     $msg->set_payload(['Tasks::Adder', [numbers => [3, 4]]);
 
-
     my $reply = $msg->reply(CMD_COMPLETE);
     $reply->set_payload('Good work!');
 
