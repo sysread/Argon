@@ -154,6 +154,14 @@ sub error {
 #-------------------------------------------------------------------------------
 sub LOG ($@) {
     my ($format, @args) = @_;
+    
+    if ($format =~ /(?<!%)%/) {
+        foreach my $arg (@args) {
+            carp 'Use of uninitialized value in LOG'
+                unless defined $arg;
+        }
+    }
+    
     chomp $format;
     my $msg = error(sprintf($format, @args));
     my $ts  = strftime("%F %T", localtime);

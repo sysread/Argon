@@ -86,7 +86,7 @@ before 'shutdown' => sub {
     INFO 'Shutting down workers';
     while ($self->workers > 0) {
         my $worker = $self->checkout;
-        $self->stop_worker($worker);
+        $self->stop_worker($worker, 1);
     }
 };
 
@@ -192,8 +192,8 @@ sub start_worker {
 # worker process is still in the pool, the results could be unexpected!
 #-------------------------------------------------------------------------------
 sub stop_worker {
-    my ($self, $worker) = @_;
-    $worker->kill;
+    my ($self, $worker, $block) = @_;
+    $worker->kill($block);
 }
 
 #-------------------------------------------------------------------------------
@@ -207,7 +207,7 @@ sub request_queue {
     if (   $self->counts_requests
         && $worker->request_count >= $self->max_requests)
     {
-        $self->stop_worker($worker);
+        $self->stop_worker($worker, 0);
         $worker = $self->start_worker;
     }
 

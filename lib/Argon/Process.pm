@@ -15,6 +15,7 @@ use IPC::Open3     qw/open3/;
 use POSIX          qw/:sys_wait_h/;
 use String::Escape qw/backslash qqbackslash/;
 use Symbol         qw/gensym/;
+use Time::HiRes    qw//;
 
 use Argon::Stream  qw//;
 use Argon          qw/:logging/;
@@ -29,7 +30,8 @@ has 'args' => (
 has 'pid' => (
     is        => 'rw',
     isa       => 'Int',
-    predicate => 'is_running',
+    init_arg  => undef,
+    predicate => 'has_pid',
     clearer   => 'clear_pid',
 );
 
@@ -53,9 +55,19 @@ has 'stderr' => (
 #-------------------------------------------------------------------------------
 # Ensures that the child process is killed when the parent process is destroyed.
 #-------------------------------------------------------------------------------
-sub DEMOLISH {
+DESTROY {
     my $self = shift;
     $self->kill(1);
+}
+
+#-------------------------------------------------------------------------------
+# Returns true if process is currently running.
+#-------------------------------------------------------------------------------
+sub is_running {
+    my $self = shift;
+    return $self->has_pid
+        && kill(0, $self->pid)
+        && !$!{ESRCH};
 }
 
 #-------------------------------------------------------------------------------
@@ -113,7 +125,7 @@ sub spawn {
     );
 
     # Test that process spawned correctly
-    $stderr->timeout(3); # allow a bit of time for the process to launch
+    $stderr->timeout(10); # allow a bit of time for the process to launch
     my $line = $stderr->readline($Argon::EOL);
     if (!defined $line || $line !~ /Worker process starting/) {
         ERROR 'Worker error: %s', $line;
@@ -147,23 +159,30 @@ sub spawn {
 }
 
 #-------------------------------------------------------------------------------
-# Kills the child process. Blocks until the process has been completely reaped.
+# Kills the child process. Returns after the process has been reaped. If the
+# process is not running, returns immediately. If the optional second parameter
+# is provided and is true, this method will block the program until it has
+# finished (the default behavior is to yield while waiting for the child
+# process to die).
 #-------------------------------------------------------------------------------
 sub kill {
-    my $self = shift;
-    my $pid = $self->pid;
+    my ($self, $block) = @_;
 
     if ($self->is_running) {
-        if ($self->pid) {
-            kill(0, $pid)
-                && kill(9, $pid)
-                || $!{ESRCH}
-                || ERROR("Error killing pid %d: %s", $pid, $!);
+        my $pid = $self->pid;
+        if ($pid) {
+            if (kill(0, $pid)) {
+                ERROR("Error killing pid %d: %s", $pid, $!)
+                    unless kill(9, $pid) || $!{ESRCH};
+            }
 
-            while ($pid > 0) {
-                $pid = waitpid($pid, WNOHANG);
-                if ($pid > 0) {
-                    Coro::AnyEvent::sleep(0.1);
+            if ($block) {
+                waitpid($pid, 0);                    
+            } else {
+                while ($pid > 0) {
+                    $pid = waitpid($pid, WNOHANG);
+                    Coro::AnyEvent::sleep(0.1)
+                        if $pid > 0;
                 }
             }
         }
@@ -182,3 +201,71 @@ sub kill {
 __PACKAGE__->meta->make_immutable;
 
 1;
+
+=pod
+
+=head1 NAME
+
+Argon::Process
+
+=head1 SYNOPSIS
+
+    use Argon::Process;
+    
+    my $proc = Argon::Process->new();
+    $proc->spawn;
+    
+    my $result = $proc->process($msg);
+    
+    $proc->kill;
+
+=head1 DESCRIPTION
+
+Argon::Process implements external Perl processes (Argon::Workers) in a
+platform-independent way.
+
+=head1 METHODS
+
+=over
+
+=item new(args => [...])
+
+Creates a new Argon::Process. The process object is then ready to be launched
+using C<spawn()>.
+
+Optional parameter C<args> may be passed to specify command-line arguments to
+the Perl interpreter.
+
+=item is_running()
+
+Returns true if the process has been launched as is currently running.
+
+=item spawn()
+
+Launches the external Perl process and waits for it to connect back. Throws an
+error if unable to launch the process or if the process itself does not launch
+correctly. Returns the PID of the newly created process.
+
+=item process($msg)
+
+Sends an Argon::Message to the process. The message will be processed and the
+results returned to the caller. This method yields to the loop then returns the
+resulting Argon::Message received from the child process.
+
+=item kill([1])
+
+Kills the process and returns once complete. If the optional second parameter is
+specified, this method will block execution until the process has been reaped.
+The default behavior is to yield and sleep until the process has been reaped.
+
+=back
+
+=head1 AUTHOR
+
+Jeff Ober L<mailto:jeffober@gmail.com>
+
+=head1 LICENSE
+
+BSD license
+
+=cut
