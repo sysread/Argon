@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Carp;
 
-use Test::More tests => 8;
+use Test::More tests => 9;
 
 use Argon qw/:priorities :commands/;
 
