@@ -89,6 +89,8 @@ sub _retry {
 # the remote host is not connected. By default, there is no limit to the number
 # of retries when the system is under load and a task is rejected. This may be
 # controlled using the retries parameter.
+#
+# TODO support parameter "retries"
 #-------------------------------------------------------------------------------
 sub process {
     my ($self, %param) = @_;
@@ -102,7 +104,7 @@ sub process {
     my $msg = Argon::Message->new(command => CMD_QUEUE);
     $msg->set_payload([$class, $params]);
 
-    my $reply = $self->stream->_retry($msg, $retries);
+    my $reply = $self->stream->send($msg);
     if ($reply->command == CMD_COMPLETE) {
         return $reply->get_payload;
     } else {

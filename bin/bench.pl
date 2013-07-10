@@ -8,6 +8,7 @@ use EV;
 use Coro;
 use Getopt::Long;
 use Pod::Usage;
+use POSIX       qw/ceil/;
 use Time::HiRes qw/time/;
 use Argon       qw/:commands :logging/;
 use Argon::Client;
@@ -74,7 +75,7 @@ foreach (1 .. $conc) {
 }
 
 # Configure reporting
-my $report_every = $total / 10;
+my $report_every = ceil($total / 10);
 my $int_padding  = length "$total";
 my $format       = "%0${int_padding}d/%0${int_padding}d complete in %.4fs (avg %.4fs/task)";
 
@@ -101,22 +102,27 @@ while (my $task = shift @tasks) {
     my $client = $clients->get;
 
     push @threads, async {
-        my $result = $client->process(
-            class  => 'SampleTask',
-            params => $task,
-        );
+        my $result = eval {
+            $client->process(
+                class  => 'SampleTask',
+                params => $task,
+            )
+        };
 
-        my $finish = time;
+        my $error = $@;
         $clients->put($client);
 
-        if ($result->command == CMD_ERROR) {
-            ERROR 'Error: %s', $result->get_payload;
-            push @tasks, $task;
+        if ($@) {
+            if ($@ =~ /No workers available/) {
+                push @tasks, $task;
+            } else {
+                ERROR $@;
+            }
         } else {
             ++$complete;
 
             if ($complete % $report_every == 0) {
-                my $taken = $finish - $start_time;
+                my $taken = time - $start_time;
                 my $avg   = $taken / $complete;
                 INFO $format, $complete, $total, $taken, $avg;
             }
@@ -143,11 +149,10 @@ bench.pl - runs a benchmark against a node or cluster
 
 =head1 SYNOPSIS
 
-bench.pl -p 8888 [-i somehost] [-n 2000] [-c 8] [-d 0.5] [-v 0.25]
+bench.pl -a localhost:8888 [-n 2000] [-c 8] [-d 0.5] [-v 0.25]
 
  Options:
-   -[p]ort          port to which the client should connect
-   -[a]ddress       host to which the client should connect
+   -[a]ddress       host:port to which the client should connect
    -[n]umber        total number of messages to send
    -[c]oncurrency   number of concurrent connections to use
    -[d]elay         the amount of time to simulate each task taking
@@ -165,10 +170,6 @@ B<bench.pl> runs a stress test against an Argon node or cluster.
 =item B<-[h]elp>
 
 Print a brief help message and exits.
-
-=item B<-[p]ort>
-
-The port to which the client connects.
 
 =item B<-[a]ddress>
 

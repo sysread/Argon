@@ -20,7 +20,6 @@ WriteMakefile(
         'Coro'                      => 0,
         'Coro::PrioChanel'          => '0.005',
         'Data::UUID'                => 0,
-        'FSA::Rules'                => 0,
         'Moose'                     => 0,
         'MooseX::StrictConstructor' => 0,
         'namespace::autoclean'      => 0,
@@ -31,5 +30,6 @@ WriteMakefile(
     BUILD_REQUIRES => {
         'IO::Capture::Stderr'       => 0,
         'Test::More'                => 0,
+        'Test::Refcount'            => 0,
     },
 );
