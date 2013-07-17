@@ -270,9 +270,7 @@ Argon::Node inherits Argon::Server.
 
 =head1 METHODS
 
-=over
-
-=item new(host => ..., port => ...)
+=head2 new(host => ..., port => ...)
 
 Creates a new Argon::Node. The node does not automatically start listening.
 
@@ -319,16 +317,14 @@ requests. Without this parameter, the Node is configured as a standalone server.
 
 =back
 
-=item start
+=head2 start
 
 Starts the server. Blocks until I<shutdown> is called.
 
-=item shutdown
+=head2 shutdown
 
 Causes the server to stop at the next available cycle. Onced called, each client
 will be disconnected and any pending messages will be failed.
-
-=back
 
 =head1 AUTHOR
 

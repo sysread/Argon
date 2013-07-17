@@ -227,9 +227,7 @@ platform-independent way.
 
 =head1 METHODS
 
-=over
-
-=item new(args => [...])
+=head2 new(args => [...])
 
 Creates a new Argon::Process. The process object is then ready to be launched
 using C<spawn()>.
@@ -237,29 +235,27 @@ using C<spawn()>.
 Optional parameter C<args> may be passed to specify command-line arguments to
 the Perl interpreter.
 
-=item is_running()
+=head2 is_running()
 
 Returns true if the process has been launched as is currently running.
 
-=item spawn()
+=head2 spawn()
 
 Launches the external Perl process and waits for it to connect back. Throws an
 error if unable to launch the process or if the process itself does not launch
 correctly. Returns the PID of the newly created process.
 
-=item process($msg)
+=head2 process($msg)
 
 Sends an Argon::Message to the process. The message will be processed and the
 results returned to the caller. This method yields to the loop then returns the
 resulting Argon::Message received from the child process.
 
-=item kill([1])
+=head2 kill([1])
 
 Kills the process and returns once complete. If the optional second parameter is
 specified, this method will block execution until the process has been reaped.
 The default behavior is to yield and sleep until the process has been reaped.
-
-=back
 
 =head1 AUTHOR
 

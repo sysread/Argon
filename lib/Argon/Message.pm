@@ -157,45 +157,41 @@ an Argon cluster.
 
 =head1 METHODS
 
-=over
-
-=item id()
+=head2 id()
 
 Returns the unique ID of the message.
 
-=item priority()
+=head2 priority()
 
 Returns the priority of the message.
 
-=item command()
+=head2 command()
 
 Returns the message command.
 
-=item set_payload($payload)
+=head2 set_payload($payload)
 
 Sets the payload for the message. B<WARNING>: large payloads will
 result in slow transmission. While the system will not become overly
 bogged down as a result, individual requests will take significantly
 longer.
 
-=item get_payload()
+=head2 get_payload()
 
 Returns the message's payload.
 
-=item encode()
+=head2 encode()
 
 Encodes the message as a string for transmission over the wire.
 
-=item decode($line)
+=head2 decode($line)
 
 B<Class method>: decodes a string into a new Argon::Message.
 
-=item reply($cmd)
+=head2 reply($cmd)
 
 Returns a new copy of the Argon::Message instance with a different
 command.
-
-=back
 
 =head1 AUTHOR
 

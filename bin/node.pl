@@ -16,6 +16,7 @@ my $workers = 4;
 my $limit   = 64;
 my $manager;
 my $max_reqs;
+my @include;
 my $help;
 
 my $got_options = GetOptions(
@@ -24,6 +25,7 @@ my $got_options = GetOptions(
     'manager=s'  => \$manager,
     'requests=i' => \$max_reqs,
     'limit=i'    => \$limit,
+    'include=s'  => \@include,
     'help'       => \$help,
 );
 
@@ -32,6 +34,8 @@ if (!$got_options || $help || !$port) {
     exit 1 if !$got_options || !$port;
     exit 0;
 }
+
+push @INC, @include;
 
 my %param = (
     concurrency => $workers,
@@ -66,6 +70,7 @@ node.pl -p 8888 [-m somehost:8000] [-w 4] [-r 1000] [-q 50] [-c 2]
    -[m]anager       host:port of manager (optional; default none)
    -[l]limit        max items permitted to queue (optional; default 64)
    -[c]heck         seconds before queue reprioritization (optional; default 2)
+   -[i]include      include path where workers will look for perl libs
    -[h]elp          prints this help message
 
 =head1 DESCRIPTION

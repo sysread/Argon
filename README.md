@@ -1,6 +1,7 @@
 Argon
 =====
-Note: Argon is still under active development. Many features are not complete.
+Note: Argon is still under active development. Most features are complete, but
+it is still being tested for robustness.
 
 Argon is a platform for distributed services written in Modern Perl. Its goals
 are:
@@ -79,7 +80,7 @@ interrupting service for existing clients.
 
 Usage
 =====
-See `/bin` for examples of usage. More to come as the design is solidified.
+See `/bin` for examples of usage.
 
 LICENSE AND COPYRIGHT
 =====================

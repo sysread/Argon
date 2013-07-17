@@ -140,20 +140,18 @@ instance and a simple API for sending tasks and retrieving the results.
 
 =head1 METHODS
 
-=over
-
-=item new(port => ..., host => ...)
+=head2 new(port => ..., host => ...)
 
 Creates a new Argon::Client that will connect to I<host:port>. Port must be a
 valid port number and host a valid hostname to which the current system can
 connect.
 
-=item connect()
+=head2 connect()
 
 Creates a connection to the remote host. An error is thrown if the connection
 fails.
 
-=item process(class => '...', params => [...], priority => PRI_HIGH)
+=head2 process(class => '...', params => [...], priority => PRI_HIGH)
 
 Queues a task on the remote host and returns the results. If the task resulted
 in an error, it is rethrown here. Otherwise, the result of calling the I<run>
@@ -169,8 +167,6 @@ create a large backlog. When this happens, Argon::Client silently retries the
 task indefinitely until it is accepted and completed. To control this behavior,
 the optional parameter I<retries> may be specified to limit the number of
 retries.
-
-=back
 
 =head1 AUTHOR
 

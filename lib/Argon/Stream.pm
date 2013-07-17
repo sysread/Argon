@@ -345,57 +345,53 @@ Argon::Cluster and Argon::Node objects.
 
 =head1 METHDOS
 
-=over
-
-=item new(in_chan => Coro::Handle, out_chan => Coro::Handle)
+=head2 new(in_chan => Coro::Handle, out_chan => Coro::Handle)
 
 Creates a new Argon::Stream using two Coro::Handle objects. Note that neither
 handle is required, allowing unidirectional streams to be created.
 
-=item create(IO::Handle)
+=head2 create(IO::Handle)
 
 Creates a new Argon::Stream using a single, bidirectional IO::Handle object.
 
-=item connect(host => 'someserver', port => 8888)
+=head2 connect(host => 'someserver', port => 8888)
 
 Creates a new Argon::Stream by connecting directly to a remote host.
 
-=item monitor($on_fail)
+=head2 monitor($on_fail)
 
 Begins monitoring the channel for connectivity. WARNING: this method assumes
 that the other end of the connection is controlled by an Argon::Stream as well.
 If connectivity breaks, subroutine $on_fail is triggered with two arguments: the
 stream object and the error message.
 
-=item address()
+=head2 address()
 
 Returns the address of this stream. Note that this is NOT just the URL or IP
 address. Since the stream is composed of (possibly) two handles, this is simply
 an identifier that may be used to uniquely identify the stream as well as to
 create a human-readable description of it.
 
-=item send_message($msg)
+=head2 send_message($msg)
 
 Sends an Argon::Message. Croaks if not connected or if the output handle has not
 been configured.
 
-=item receive()
+=head2 receive()
 
 Blocks until the next Argon::Message is available on the stream. Croaks if an
 input handle has not been configured.
 
-=item send($msg)
+=head2 send($msg)
 
 Sends an Argon::Message and returns the response (another Argon::Message).
 Blocks until the response is available. Croaks if either the output or input
 handles have not been configured.
 
-=item close()
+=head2 close()
 
 Closes and disconnects the stream. The instance is not left in a useable or
 reconnectable state.
-
-=back
 
 =head1 AUTHOR
 
