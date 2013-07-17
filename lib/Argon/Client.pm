@@ -68,7 +68,7 @@ sub _retry {
         ++$attempts;
 
         croak "failed after $retries retries"
-            if defined $attempts && $attempts > $retries;
+            if defined $retries && $attempts > $retries;
 
         my $reply = $self->stream->send($msg);
 
@@ -104,7 +104,7 @@ sub process {
     my $msg = Argon::Message->new(command => CMD_QUEUE);
     $msg->set_payload([$class, $params]);
 
-    my $reply = $self->stream->send($msg);
+    my $reply = $self->_retry($msg, $retries);
     if ($reply->command == CMD_COMPLETE) {
         return $reply->get_payload;
     } else {
