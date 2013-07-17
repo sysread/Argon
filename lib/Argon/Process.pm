@@ -55,7 +55,7 @@ has 'stderr' => (
 #-------------------------------------------------------------------------------
 # Ensures that the child process is killed when the parent process is destroyed.
 #-------------------------------------------------------------------------------
-DESTROY {
+sub DEMOLISH {
     my $self = shift;
     $self->kill(1);
 }
