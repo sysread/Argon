@@ -40,11 +40,11 @@ __END__
 
 =head1 NAME
 
-cluster.pl - runs an Argon cluster
+cluster - runs an Argon cluster
 
 =head1 SYNOPSIS
 
-cluster.pl -p 8888 [-q 50] [-c 2]
+cluster -p 8888 [-q 50] [-c 2]
 
  Options:
    -[p]ort          port on which to listen
@@ -54,7 +54,7 @@ cluster.pl -p 8888 [-q 50] [-c 2]
 
 =head1 DESCRIPTION
 
-B<cluster.pl> runs an Argon cluster on the selected port.
+B<cluster> runs an Argon cluster on the selected port.
 
 =head1 OPTIONS
 

@@ -7,7 +7,7 @@
 #-------------------------------------------------------------------------------
 package Argon;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use strict;
 use warnings;
@@ -205,13 +205,13 @@ Argon
 =head1 SYNOPSIS
 
     # Start a manager on port 8000
-    cluster.pl -p 8000
+    cluster -p 8000
     
     # Start a stand-alone node with 4 workers on port 8000
-    node.pl -w 4 -p 8000
+    node -w 4 -p 8000
     
     # Start a node and attach to a manager
-    node.pl -w 4 -p 8001 -m somehost:8000
+    node -w 4 -p 8001 -m somehost:8000
 
 =head1 DESCRIPTION
 
@@ -236,14 +236,14 @@ The number of worker processes is controlled with the -w parameter.
 
 To start a basic node with 4 worker processes, listening on port 8000, use:
 
-    node.pl -w 4 -p 8000
+    node -w 4 -p 8000
 
 Note that by default, 4 workers are started, so -w isn't truly necessary here.
 
 A node must know where to find any code that is used in the tasks it is given.
 This is accomplished with the -i parameter:
 
-    node.pl -p 8000 -i /path/to/libs -i /path/to/otherlibs
+    node -p 8000 -i /path/to/libs -i /path/to/otherlibs
 
 As with any long-running process, workers started by the node may end up
 consuming a significant amount of memory. To address this, the node accepts the
@@ -251,14 +251,14 @@ consuming a significant amount of memory. To address this, the node accepts the
 it is restarted to release any memory it is holding. By default, workers may
 handle an indefinite number of tasks.
 
-    node.pl -p 8000 -i /path/to/libs -r 250
+    node -p 8000 -i /path/to/libs -r 250
 
 =head2 Managed nodes
 
 A managed node is one that registers itself with a manager/cluster process. The
 manager is added with the -m parameter:
 
-    node.pl -p 8000 -i /path/to/libs -r 250 -m manager:8000
+    node -p 8000 -i /path/to/libs -r 250 -m manager:8000
 
 Once started, the node will connect to the server I<manager> on port I<8000>
 and attempt to register. Once registered, the node is immediately available to
@@ -277,7 +277,7 @@ assigned.
 
 Managers are started very simply:
 
-    cluster.pl -p 8000
+    cluster -p 8000
 
 Managers do not execute arbitrary code and therefore do not need to know where
 any libraries are stored.
@@ -320,11 +320,11 @@ system:
     );
 
 The only requirement is that all nodes in the system know where C<Some::Class>
-is located. See the -i parameter above to node.pl.
+is located. See the -i parameter above to node.
 
 =head2 Multiplexing clients
 
-L<Argon::Client::process> does not return until the task has been completed.
+L<Argon::Client/process> does not return until the task has been completed.
 However, Argon is implemented using L<Coro>, allowing the process method to
 yield to other threads while it waits for its result. This makes it extremely
 simple to process multiple tasks through multiple clients at the same time.
@@ -370,13 +370,13 @@ simple to process multiple tasks through multiple clients at the same time.
     # Wait on each thread to complete
     $_->join foreach @pending;
 
-See bin/bench.pl for a more robust implementation.
+See bin/bench for a more robust implementation.
 
 =head2 Task design
 
 Tasks must use the L<Argon::Role::Task> class. Tasks will be created by
 instantiating the class with the parameters provided to the
-L<Argon::Client::process> method. Task classes must also have a C<run>
+L<Argon::Client/process> method. Task classes must also have a C<run>
 method which performs the task's work and returns the result.
 
 =head2 CAVEATS

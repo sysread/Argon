@@ -145,11 +145,11 @@ __END__
 
 =head1 NAME
 
-bench.pl - runs a benchmark against a node or cluster
+bench - runs a benchmark against a node or cluster
 
 =head1 SYNOPSIS
 
-bench.pl -a localhost:8888 [-n 2000] [-c 8] [-d 0.5] [-v 0.25]
+bench -a localhost:8888 [-n 2000] [-c 8] [-d 0.5] [-v 0.25]
 
  Options:
    -[a]ddress       host:port to which the client should connect
@@ -161,7 +161,7 @@ bench.pl -a localhost:8888 [-n 2000] [-c 8] [-d 0.5] [-v 0.25]
 
 =head1 DESCRIPTION
 
-B<bench.pl> runs a stress test against an Argon node or cluster.
+B<bench> runs a stress test against an Argon node or cluster.
 
 =head1 OPTIONS
 

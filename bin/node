@@ -57,11 +57,11 @@ __END__
 
 =head1 NAME
 
-node.pl - runs an Argon worker node
+node - runs an Argon worker node
 
 =head1 SYNOPSIS
 
-node.pl -p 8888 [-m somehost:8000] [-w 4] [-r 1000] [-q 50] [-c 2]
+node -p 8888 [-m somehost:8000] [-w 4] [-r 1000] [-q 50] [-c 2]
 
  Options:
    -[p]ort          port on which to listen
@@ -75,7 +75,7 @@ node.pl -p 8888 [-m somehost:8000] [-w 4] [-r 1000] [-q 50] [-c 2]
 
 =head1 DESCRIPTION
 
-B<node.pl> runs an Argon node on the selected port.
+B<node> runs an Argon node on the selected port.
 
 =head1 OPTIONS
 
