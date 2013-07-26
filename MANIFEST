@@ -1,6 +1,7 @@
 Changes
 Makefile.PL
 MANIFEST
+README
 README.md
 
 lib/Argon.pm
@@ -16,12 +17,15 @@ lib/Argon/Stream.pm
 lib/Argon/Worker.pm
 lib/Argon/Role/Task.pm
 
+bin/cluster
+bin/node
 
 t/boilerplate.t
 t/manifest.t
 t/pod-coverage.t
 t/pod.t
 
+t/Test/DoublerTask.pm
 t/00-load.t
 t/01-Argon.t
 t/02-Argon-Message.t
@@ -29,3 +33,6 @@ t/03-Argon-Process.t
 t/04-Argon-Queue.t
 t/05-Argon-Stream.t
 t/06-Argon-NodeTracker.t
+t/07-Argon-Node.t
+t/08-Argon-Cluster.t
+t/09-Argon-Client.t
