@@ -16,7 +16,7 @@ use Coro::AnyEvent;
 use Coro::Channel;
 use Coro::Handle   qw/unblock/;
 use IO::Socket     qw/SOCK_STREAM/;
-use Socket         qw/getnameinfo NI_NUMERICSERV/;
+use Socket;
 use Argon          qw/:logging :commands/;
 use Argon::Message;
 
