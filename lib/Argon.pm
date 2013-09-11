@@ -165,7 +165,7 @@ sub LOG ($@) {
 
     chomp $format;
     my $msg = error(sprintf($format, @args));
-    my $ts  = strftime("%F %T", localtime);
+    my $ts  = strftime("%Y-%m-%d %H:%M:%S", localtime);
     warn sprintf("[%s] [%d] %s\n", $ts, $$, $msg);
 }
 
