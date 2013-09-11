@@ -275,13 +275,13 @@ sub close {
     $self->inbox->shutdown # wake anyone waiting on a message
         if defined $self->inbox;
 
-    if (defined $self->in_chan) {
-        close $self->in_chan->fh;
-    }
+    close $self->in_chan->fh
+        if defined $self->in_chan
+        && defined $self->in_chan->fh;
 
-    if (defined $self->out_chan) {
-        close $self->out_chan->fh;
-    }
+    close $self->out_chan->fh
+        if defined $self->out_chan
+        && defined $self->out_chan->fh;
 
     foreach my $msgid ($self->all_pending) {
         $self->get_pending($msgid)->put(0);
@@ -297,8 +297,7 @@ sub DEMOLISH {
     $self->close;
 }
 
-;
-__PACKAGE__->meta->make_immutable;
+no Moose;
 
 1;
 

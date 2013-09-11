@@ -19,6 +19,6 @@ sub run {
     return $self->n * 2;
 }
 
-__PACKAGE__->meta->make_immutable;
+no Moose;
 
 1;
