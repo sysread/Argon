@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use Carp;
 
-use Test::More tests => 31;
+use Test::More;
 
 use POSIX      qw/:sys_wait_h/;
 use Argon      qw/:commands/;
@@ -55,3 +55,5 @@ require_ok('Test::DoublerTask') or BAIL_OUT('unable to load task class');
     undef $proc;
     ok(!kill(0, $pid), 'process self-terminates on DESTROY');
 }
+
+done_testing;

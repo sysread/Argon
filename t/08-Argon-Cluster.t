@@ -2,6 +2,8 @@ use strict;
 use warnings;
 use Carp;
 
-use Test::More qw/no_plan/;
+use Test::More;
 
-ok(1)
+ok(1);
+
+done_testing;

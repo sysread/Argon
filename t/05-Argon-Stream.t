@@ -2,13 +2,13 @@ use strict;
 use warnings;
 use Carp;
 
-use Test::More tests => 7;
+use Test::More;
 
 use Coro;
 use AnyEvent::Util;
 use Coro::Handle;
 use Argon::Message;
-use Argon qw/:commands/;
+use Argon qw/:logging :commands/;
 
 use_ok('Argon::Stream');
 
@@ -39,7 +39,9 @@ use_ok('Argon::Stream');
     ok(defined $reply && $reply->get_payload eq 42, 'send_messge -> receive');
 
     # send
-    async {
+    my @threads;
+
+    push @threads, async {
         $msg = Argon::Message->new(command => CMD_QUEUE);
         $msg->set_payload('What is the meaning of life, the universe and everything?');
 
@@ -48,22 +50,25 @@ use_ok('Argon::Stream');
         ok($reply->get_payload eq 42, 'send (2) - payload');
     };
 
-    async {
+    push @threads, async {
         my $msg = $right->receive;
         my $reply = $msg->reply(CMD_COMPLETE);
         $reply->set_payload(42);
         $right->send_message($reply);
     };
 
-    cede;
+    $_->join foreach @threads;
 
-    # Monitoring
+    # monitor
     my $flag = 0;
+    my $monitor = $right->monitor(sub { $flag = 1 });
+    $left->close;
+    $monitor->join;
 
-    $left->monitor(sub { $flag = 1 });
-    Coro::AnyEvent::sleep($Argon::POLL_INTERVAL);
-
-    $fh2->close;
-    Coro::AnyEvent::sleep($Argon::POLL_INTERVAL);
     ok($flag, 'monitor');
+
+    # clean up
+    $right->close;
 }
+
+done_testing;

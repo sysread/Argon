@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Carp;
 
-use Test::More tests => 13;
+use Test::More;
 
 use_ok('Argon::Queue');
 
@@ -28,3 +28,5 @@ use_ok('Argon::Queue');
     ok($q->get(2) == 2, 'get (2)');
     ok($q->is_empty, 'is_empty (3)');
 }
+
+done_testing;

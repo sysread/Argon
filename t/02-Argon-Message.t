@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Carp;
 
-use Test::More tests => 9;
+use Test::More;
 
 use Argon qw/:priorities :commands/;
 
@@ -33,3 +33,5 @@ my $reply = $msg->reply(CMD_ACK);
 ok($reply->command eq CMD_ACK, 'Reply constructed correctly');
 ok(!defined $reply->get_payload, 'Reply does not contain payload');
 ok($reply->id eq $msg->id, 'Reply reuses id');
+
+done_testing;

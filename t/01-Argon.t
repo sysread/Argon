@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Carp;
 
-use Test::More tests => 14;
+use Test::More;
 use Test::Refcount;
 use IO::Capture::Stderr;
 
@@ -66,3 +66,5 @@ use IO::Capture::Stderr;
     ok($capture->read =~ /^$prefix error$/, 'ERROR()');
     ok($capture->read =~ /^$prefix info 2$/, 'ERROR()');
 }
+
+done_testing;

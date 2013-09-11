@@ -182,20 +182,31 @@ sub ping {
 
 #-------------------------------------------------------------------------------
 # Launches a coro that perpetually pings the loop. Returns control to $on_fail
-# should the connection be interrupted.
+# should the connection be interrupted. Does not return until the monitor
+# thread has actually started.
 #-------------------------------------------------------------------------------
 sub monitor {
     my ($self, $on_fail) = @_;
-    async {
+    my $started = AnyEvent->condvar;
+
+    my $thread = async {
+        $started->send;
+
         while ($self->is_connected) {
-            my $ping = $self->ping;
-            last unless defined $ping;
+            my $ping = eval { $self->ping };
+
+            if ($@ || !defined $ping) {
+                $on_fail->($self, $@);
+                $self->is_connected(0);
+                last;
+            }
+
             Coro::AnyEvent::sleep $Argon::POLL_INTERVAL;
         }
-
-        $self->is_connected(0);
-        $on_fail->($self, $!);
     };
+
+    $started->recv;
+    return $thread;
 }
 
 #-------------------------------------------------------------------------------
@@ -275,17 +286,14 @@ sub close {
     $self->inbox->shutdown # wake anyone waiting on a message
         if defined $self->inbox;
 
-    close $self->in_chan->fh
-        if defined $self->in_chan
-        && defined $self->in_chan->fh;
-
-    close $self->out_chan->fh
-        if defined $self->out_chan
-        && defined $self->out_chan->fh;
+    $self->in_chan->close  if defined $self->in_chan;
+    $self->out_chan->close if defined $self->out_chan;
 
     foreach my $msgid ($self->all_pending) {
-        $self->get_pending($msgid)->put(0);
-        $self->del_pending($msgid);
+        if ($self->has_pending($msgid)) {
+            $self->get_pending($msgid)->put(0);
+            $self->del_pending($msgid);
+        }
     }
 }
 

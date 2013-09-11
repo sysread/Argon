@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Carp;
 
-use Test::More tests => 11;
+use Test::More;
 use Coro;
 use Coro::AnyEvent;
 use Coro::Semaphore;
@@ -33,3 +33,5 @@ use_ok('Argon::NodeTracker');
         $est = $tracker->est_proc_time;
     }
 }
+
+done_testing;
