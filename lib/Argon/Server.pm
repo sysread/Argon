@@ -16,7 +16,7 @@ use Coro;
 use Coro::AnyEvent;
 use Coro::Handle qw/unblock/;
 use IO::Socket::INET;
-use Socket qw/getnameinfo/;
+use Socket ':all';
 
 use Argon::Stream;
 use Argon::Message;
