@@ -10,6 +10,9 @@ use Coro::Handle;
 use Argon::Message;
 use Argon qw/:logging :commands/;
 
+BEGIN { use AnyEvent::Impl::Perl }
+
+
 use_ok('Argon::Stream');
 
 # Positive path
@@ -64,7 +67,6 @@ use_ok('Argon::Stream');
     my $monitor = $right->monitor(sub { $flag = 1 });
     $left->close;
     $monitor->join;
-
     ok($flag, 'monitor');
 
     # clean up

@@ -149,6 +149,7 @@ sub poll_loop {
     my ($self) = @_;
     async {
         while ($self->is_connected) {
+            next unless Coro::AnyEvent::readable($self->in_chan->fh, 0.5);
             my $line = $self->in_chan->readline($Argon::EOL);
             last unless defined $line;
 

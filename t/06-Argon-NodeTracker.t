@@ -1,11 +1,8 @@
 use strict;
 use warnings;
 use Carp;
-
+use Time::HiRes qw/sleep/;
 use Test::More;
-use Coro;
-use Coro::AnyEvent;
-use Coro::Semaphore;
 
 use_ok('Argon::NodeTracker');
 
@@ -20,7 +17,7 @@ use_ok('Argon::NodeTracker');
         ok($tracker->capacity == (4 - $i), "capacity ($i)");
     }
 
-    Coro::AnyEvent::sleep(0.5);
+    sleep(0.5);
     $tracker->end_request($_) for (1 .. 4);
 
     my $avg = $tracker->avg_proc_time;

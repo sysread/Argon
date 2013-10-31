@@ -4,6 +4,9 @@ use Carp;
 
 use Test::More;
 
+BEGIN { use AnyEvent::Impl::Perl }
+
+
 use_ok('Argon::Queue');
 
 # Positive path
@@ -20,6 +23,8 @@ use_ok('Argon::Queue');
 
     ok($q->is_full, 'is_full (2)');
     ok(!$q->is_empty, 'is_empty (2)');
+
+    ok($q->count == 2, 'count (1)') or BAIL_OUT;
 
     eval { $q->put(3) };
     ok($@ =~ 'queue is full', 'over-fill croaks');

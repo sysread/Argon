@@ -8,6 +8,7 @@ use warnings;
 use Carp;
 
 use Moose;
+use MooseX::AttributeShortcuts;
 use MooseX::StrictConstructor;
 use namespace::autoclean;
 
@@ -27,16 +28,15 @@ use Argon qw/:commands :logging K/;
 # Listener port
 #-------------------------------------------------------------------------------
 has 'port' => (
-    is       => 'ro',
+    is       => 'rwp',
     isa      => 'Int',
-    required => 1,
 );
 
 #-------------------------------------------------------------------------------
 # Listener interface
 #-------------------------------------------------------------------------------
 has 'host' => (
-    is       => 'ro',
+    is       => 'rwp',
     isa      => 'Str',
     default  => 'localhost',
 );
@@ -45,12 +45,36 @@ has 'host' => (
 # Listening socket
 #-------------------------------------------------------------------------------
 has 'listener' => (
-    is        => 'rw',
+    is        => 'lazy',
     isa       => 'Coro::Handle',
     init_arg  => undef,
     clearer   => 'clear_listener',
     predicate => 'has_listener',
 );
+
+sub _build_listener {
+    my $self = shift;
+
+    my $sock = IO::Socket::INET->new(
+        LocalAddr => $self->host,
+        LocalPort => $self->port,
+        Proto     => 'tcp',
+        Type      => SOCK_STREAM,
+        Listen    => $Argon::LISTEN_QUEUE_SIZE,
+        ReuseAddr => 1,
+        Blocking  => 0,
+    );
+
+    $self->_set_port($sock->sockport);
+    $self->_set_host($sock->sockhost);
+
+    unless ($sock) {
+        ERROR 'Error creating server socket: %s', $!;
+        croak $!;
+    }
+
+    return unblock($sock);
+}
 
 #-------------------------------------------------------------------------------
 # Stores callbacks for a given command.
@@ -112,11 +136,9 @@ has 'is_running' => (
 # Message queue storing tuples of [Argon::Stream, Argon::Message].
 #-------------------------------------------------------------------------------
 has 'queue' => (
-    is       => 'rw',
+    is       => 'lazy',
     isa      => 'Argon::Queue',
     init_arg => undef,
-    builder  => 'build_queue',
-    lazy     => 1,
     handles  => {
         'queue_put'     => 'put',
         'queue_get'     => 'get',
@@ -124,10 +146,7 @@ has 'queue' => (
     }
 );
 
-#-------------------------------------------------------------------------------
-# Queue constructor.
-#-------------------------------------------------------------------------------
-sub build_queue {
+sub _build_queue {
     my $self = shift;
     return Argon::Queue->new(max_size => $self->queue_limit);
 }
@@ -138,25 +157,14 @@ sub build_queue {
 sub start {
     my $self = shift;
 
-    my $sock = IO::Socket::INET->new(
-        LocalAddr => $self->host,
-        LocalPort => $self->port,
-        Proto     => 'tcp',
-        Type      => SOCK_STREAM,
-        Listen    => $Argon::LISTEN_QUEUE_SIZE,
-        ReuseAddr => 1,
-        Blocking  => 0,
-    );
-
-    unless ($sock) {
-        ERROR 'Error creating server socket: %s', $!;
-        croak $!;
-    }
-
     INFO 'Starting service on %s:%d (queue limit: %d)',
         $self->host,
         $self->port,
         $self->queue_limit,
+
+    # Start listener
+    $self->listener->listen or croak $!;
+    $self->is_running(1);
 
     async { Argon::CHAOS };
     async { $self->process_messages };
@@ -167,10 +175,6 @@ sub start {
         AnyEvent->signal(signal => 'TERM', cb => $signal_handler),
         AnyEvent->signal(signal => 'INT',  cb => $signal_handler),
     );
-
-    $self->listener(unblock $sock);
-    $self->listener->listen or croak $!;
-    $self->is_running(1);
 
     while ($self->is_running) {
         my $client = $self->listener->accept or last;

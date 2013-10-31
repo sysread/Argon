@@ -29,7 +29,7 @@ has 'max_size' => (
 # Current count of items in the queue
 #-------------------------------------------------------------------------------
 has 'count' => (
-    is       => 'rw',
+    is       => 'ro',
     isa      => 'Int',
     init_arg => undef,
     default  => 0,
@@ -49,6 +49,14 @@ has 'queue' => (
     init_arg => undef,
     default  => sub { Coro::PrioChannel->new },
 );
+
+#-------------------------------------------------------------------------------
+# Ensure that any waiters are woken up before object destruction.
+#-------------------------------------------------------------------------------
+sub DEMOLISH {
+    my $self = shift;
+    $self->queue->shutdown if $self->queue;
+}
 
 #-------------------------------------------------------------------------------
 # Predicates

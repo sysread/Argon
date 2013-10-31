@@ -13,6 +13,9 @@ use POSIX      qw/:sys_wait_h/;
 use Argon      qw/:commands/;
 use Argon::Message;
 
+BEGIN { use AnyEvent::Impl::Perl }
+
+
 unshift @INC, 't';
 
 use_ok('Argon::Process')        or BAIL_OUT('unable to load Argon::Process');
