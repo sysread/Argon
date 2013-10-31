@@ -172,12 +172,10 @@ sub poll_loop {
 # Sends a ping across the stream and waits for an acknowledgement.
 #-------------------------------------------------------------------------------
 sub ping {
-    my $self  = shift;
-    my $start = time;
-    my $ping  = Argon::Message->new(command => CMD_PING);
+    my $self = shift;
+    my $ping = Argon::Message->new(command => CMD_PING);
     my $reply = $self->send($ping);
-    return unless defined $reply;
-    return time - $start;
+    return defined $reply;
 }
 
 #-------------------------------------------------------------------------------
@@ -194,15 +192,13 @@ sub monitor {
 
         while ($self->is_connected) {
             my $ping = eval { $self->ping };
-
-            if ($@ || !defined $ping) {
-                $on_fail->($self, $@);
-                $self->is_connected(0);
-                last;
-            }
-
+            last if $@ || !$ping;
             Coro::AnyEvent::sleep $Argon::POLL_INTERVAL;
         }
+
+        INFO 'Monitoring service detected disconnection.';
+        $self->close;
+        $on_fail->($self, $@);
     };
 
     $started->recv;
@@ -245,7 +241,8 @@ sub send {
     croak 'no input channel configured'  unless $self->has_in_chan;
     $self->set_pending($msg->id, Coro::Channel->new(1));
     $self->send_message($msg);
-    return $self->get_response($msg->id);
+    my $reply = $self->get_response($msg->id);
+    return $reply;
 }
 
 #-------------------------------------------------------------------------------
