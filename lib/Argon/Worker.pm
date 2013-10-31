@@ -58,17 +58,29 @@ sub process_task {
     my ($self, $msg) = @_;
 
     my $result = eval {
-        my ($class, $params) = @{$msg->get_payload};
+        my $data = $msg->get_payload;
 
-        require UNIVERSAL::require;
-        $class->require or die $@;
-
-        unless ($class->does('Argon::Role::Task')) {
-            croak 'Tasks must implement Argon::Role::Task';
+        if (exists $data->{code}) {
+            my $params = $data->{params} || [];
+            $data->{code}->(@$params);
         }
+        elsif ($data->{class}) {
+            my $class  = $data->{class};
+            my $params = $data->{params} || [];
 
-        my $instance = $class->new(@$params);
-        $instance->run;
+            require UNIVERSAL::require;
+            $class->require or die $@;
+
+            unless ($class->does('Argon::Role::Task')) {
+                croak 'Tasks must implement Argon::Role::Task';
+            }
+
+            my $instance = $class->new(@$params);
+            $instance->run;
+        }
+        else {
+            croak 'Unknown task format';
+        }
     };
 
     my $reply;

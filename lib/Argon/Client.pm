@@ -9,6 +9,7 @@ use Carp;
 
 use Moose;
 use MooseX::StrictConstructor;
+use Moose::Meta::Class;
 use namespace::autoclean;
 
 use Argon::Stream;
@@ -102,9 +103,22 @@ sub process {
     croak 'not connected' unless $self->stream;
 
     my $msg = Argon::Message->new(command => CMD_QUEUE);
-    $msg->set_payload([$class, $params]);
+    $msg->set_payload({class => $class, params => $params});
 
     my $reply = $self->_retry($msg, $retries);
+    if ($reply->command == CMD_COMPLETE) {
+        return $reply->get_payload;
+    } else {
+        croak $reply->get_payload;
+    }
+}
+
+sub run {
+    my ($self, $f, @params) = @_;
+    my $msg = Argon::Message->new(command => CMD_QUEUE);
+    $msg->set_payload({code => $f, params => \@params});
+
+    my $reply = $self->_retry($msg);
     if ($reply->command == CMD_COMPLETE) {
         return $reply->get_payload;
     } else {

@@ -22,6 +22,7 @@ WriteMakefile(
         'Coro::PrioChannel'         => '0.005',
         'Data::UUID'                => 0,
         'Moose'                     => 0,
+        'MooseX::AttributeShortcuts'=> 0,
         'MooseX::StrictConstructor' => 0,
         'namespace::autoclean'      => 0,
         'String::Escape'            => 0,

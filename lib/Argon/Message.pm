@@ -72,9 +72,9 @@ sub payload {
 
 sub set_payload {
     my ($self, $data) = @_;
+    local $Storable::Deparse = 1;
     my $image   = Storable::nfreeze([$data]);
     my $payload = MIME::Base64::encode_base64($image, '');
-
     $self->clear_decoded;
     $self->encoded($payload);
 };
@@ -84,6 +84,7 @@ sub get_payload {
     return unless $self->is_encoded;
 
     unless ($self->is_decoded) {
+        local $Storable::Eval = 1;
         my $image   = MIME::Base64::decode_base64($self->encoded);
         my $payload = Storable::thaw($image);
         $self->decoded(@$payload);

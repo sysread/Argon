@@ -33,7 +33,7 @@ t/03-Argon-Process.t
 t/04-Argon-Queue.t
 t/05-Argon-Stream.t
 t/06-Argon-NodeTracker.t
-t/07-Argon-Service.t
+t/07-Argon-Server.t
 t/08-Argon-Node.t
 t/09-Argon-Cluster.t
 t/10-Argon-Client.t
