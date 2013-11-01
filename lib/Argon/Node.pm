@@ -216,6 +216,7 @@ sub request_queue {
     my $worker = $self->checkout;
 
     # Replace worker if necessary
+    # TODO move to around checkout wrapper
     if (   $self->counts_requests
         && $worker->request_count >= $self->max_requests)
     {

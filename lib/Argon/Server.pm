@@ -62,7 +62,6 @@ sub _build_listener {
         Type      => SOCK_STREAM,
         Listen    => $Argon::LISTEN_QUEUE_SIZE,
         ReuseAddr => 1,
-        Blocking  => 0,
     );
 
     $self->_set_port($sock->sockport);
@@ -155,7 +154,7 @@ sub _build_queue {
 # Starts the server listening for new requests.
 #-------------------------------------------------------------------------------
 sub start {
-    my $self = shift;
+    my ($self, $cv_initialized) = @_;
 
     INFO 'Starting service on %s:%d (queue limit: %d)',
         $self->host,
@@ -175,9 +174,15 @@ sub start {
         AnyEvent->signal(signal => 'TERM', cb => $signal_handler),
         AnyEvent->signal(signal => 'INT',  cb => $signal_handler),
     );
+    
+    if ($cv_initialized) {
+        $cv_initialized->send;
+    }
 
     while ($self->is_running) {
+        DEBUG 'Waiting for new connections';
         my $client = $self->listener->accept or last;
+        DEBUG 'New connection from %s:%d', $client->peerhost, $client->peerport;
         my $stream = Argon::Stream->create($client);
         $self->service($stream);
     }

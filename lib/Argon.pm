@@ -44,6 +44,7 @@ our %EXPORT_TAGS = (
     /],
 
     'logging' => [qw/
+        DEBUG
         INFO
         WARN
         ERROR
@@ -108,6 +109,7 @@ our $CHAOS_MONKEY       = 0;        # percent chance of causing service to die e
 use constant DEBUG_INFO  => 1 << 0;
 use constant DEBUG_WARN  => 1 << 1;
 use constant DEBUG_ERROR => 1 << 2;
+use constant DEBUG_DEBUG => 1 << 3;
 
 #-------------------------------------------------------------------------------
 # Commands
@@ -175,6 +177,7 @@ sub LOG ($@) {
 sub INFO  ($@) { goto \&LOG if $DEBUG & DEBUG_INFO  }
 sub WARN  ($@) { goto \&LOG if $DEBUG & DEBUG_WARN  }
 sub ERROR ($@) { goto \&LOG if $DEBUG & DEBUG_ERROR }
+sub DEBUG ($@) { goto \&LOG if $DEBUG & DEBUG_DEBUG }
 
 #-------------------------------------------------------------------------------
 # Chaos monkey
