@@ -29,17 +29,9 @@ ok($client->connect, 'connect');
 
 # run
 {
-    my @range = 0 .. 10;
-    my %result;
-    my @threads = map {
-        my $i = $_;
-        async { $result{$i} = $client->run(sub { 2 * shift }, $i) }
-    } @range;
-
-    $_->join foreach @threads;
-
-    for my $i (@range) {
-        is($result{$i}, $i * 2, 'run');
+    for my $i (0 .. 10) {
+        my $result = $client->run(sub { $_[0] * 2 }, $i);
+        is($result, $i * 2, 'process (code)');
     }
 }
 
@@ -51,7 +43,7 @@ ok($client->connect, 'connect');
             params => [n => $i],
         );
 
-        is($result, $i * 2, 'process');
+        is($result, $i * 2, 'process (class)');
     }
 }
 

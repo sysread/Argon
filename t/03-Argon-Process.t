@@ -37,14 +37,14 @@ require_ok('Test::DoublerTask') or BAIL_OUT('unable to load task class');
 
     for my $i (0 .. 9) {
         my $msg = Argon::Message->new(command => CMD_QUEUE);
-        $msg->set_payload(['Test::DoublerTask', [n => $i]]);
+        $msg->set_payload({class => 'Test::DoublerTask', params => [n => $i]});
 
         my $expected = $i * 2;
         my $reply    = $proc->process($msg);
         my $payload  = $reply->get_payload;
 
-        ok($reply->command eq CMD_COMPLETE, "process task ($i) - cmd");
-        ok($payload eq $expected, "process task ($i) - payload");
+        is($reply->command, CMD_COMPLETE, "process task ($i) - cmd");
+        is($payload, $expected, "process task ($i) - payload");
     }
 
     ok($proc->kill(1), 'kill');
