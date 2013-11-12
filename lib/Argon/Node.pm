@@ -151,6 +151,7 @@ sub notify {
                     $is_connected = 1;
                     $self->service($stream);
 
+                    # Start monitoring service
                     $stream->monitor(sub {
                         my ($stream, $reason) = @_;
                         WARN 'Lost connection to manager';

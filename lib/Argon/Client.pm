@@ -41,6 +41,9 @@ has 'stream' => (
     is       => 'rw',
     isa      => 'Argon::Stream',
     init_arg => undef,
+    handles  => {
+        send => 'send',
+    }
 );
 
 #-------------------------------------------------------------------------------
@@ -67,7 +70,7 @@ sub _retry {
 
     while (!defined $retries || $attempts < $retries) {
         ++$attempts;
-        my $reply = $self->stream->send($msg);
+        my $reply = $self->send($msg);
 
         # If the task was rejected, sleep a short (but lengthening) amount of
         # time before attempting again.

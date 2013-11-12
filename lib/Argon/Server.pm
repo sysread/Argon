@@ -165,8 +165,8 @@ sub start {
     $self->listener->listen or croak $!;
     $self->is_running(1);
 
-    async { Argon::CHAOS };
-    async { $self->process_messages };
+    async_pool { Argon::CHAOS };
+    async_pool { $self->process_messages };
 
     # Signal handling
     my $signal_handler = K('shutdown', $self);
@@ -174,10 +174,9 @@ sub start {
         AnyEvent->signal(signal => 'TERM', cb => $signal_handler),
         AnyEvent->signal(signal => 'INT',  cb => $signal_handler),
     );
-    
-    if ($cv_initialized) {
-        $cv_initialized->send;
-    }
+
+    # Notify callers if they provided a condition var
+    $cv_initialized->send if $cv_initialized;
 
     while ($self->is_running) {
         DEBUG 'Waiting for new connections';
@@ -219,7 +218,7 @@ sub process_messages {
     while (1) {
         my ($stream, $msg) = @{ $self->queue_get };
         if ($self->has_service($stream->address)) {
-            async {
+            async_pool {
                 my $reply = $self->dispatch($msg, $stream);
                 $self->reply($stream, $reply);
             };
@@ -252,7 +251,7 @@ sub service {
 
     $self->set_service($addr, $stream);
 
-    async {
+    async_pool {
         while ($self->is_running
             && $stream->is_connected
             && $self->has_service($stream->address))
@@ -289,6 +288,6 @@ sub dispatch {
     }
 }
 
-__PACKAGE__->meta->make_immutable;
 
+no Moose;
 1;

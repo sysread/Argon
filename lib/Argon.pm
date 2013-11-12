@@ -34,13 +34,14 @@ our %EXPORT_TAGS = (
 
     # Command verbs and responses
     'commands' => [qw/
-        CMD_ACK
+        CMD_PING
         CMD_QUEUE
+        CMD_ADD_NODE
+
+        CMD_ACK
         CMD_REJECTED
         CMD_COMPLETE
         CMD_ERROR
-        CMD_ADD_NODE
-        CMD_PING
     /],
 
     'logging' => [qw/
