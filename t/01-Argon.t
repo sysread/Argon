@@ -49,7 +49,7 @@ use IO::Capture::Stderr;
 {
     use Argon qw/:logging/;
 
-    my $prefix = qr/\[\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\] \[\d+\]/;
+    my $prefix = qr/\[\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\] \[\d+\] \[.+\]/;
 
     my $capture = IO::Capture::Stderr->new();
     $capture->start;

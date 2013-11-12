@@ -52,6 +52,22 @@ has 'stderr' => (
     clearer   => 'clear_stderr',
 );
 
+has 'request_count' => (
+    is        => 'ro',
+    isa       => 'Int',
+    init_arg  => undef,
+    default   => 0,
+    traits    => ['Counter'],
+    handles   => {
+        inc_request_count => 'inc',
+    }
+);
+
+#-------------------------------------------------------------------------------
+# Increments the count for the number of requests this process as served.
+#-------------------------------------------------------------------------------
+after process => sub { $_[0]->inc_request_count };
+
 #-------------------------------------------------------------------------------
 # Ensures that the child process is killed when the parent process is destroyed.
 #-------------------------------------------------------------------------------
@@ -153,7 +169,10 @@ sub spawn {
     $self->pid($pid);
 
     # Forward spawned process' STDERR messages to this process' logs
-    async { warn $self->stderr->readline("\n") while 1 }
+    async_pool {
+        local $Coro::current->{desc} = 'Worker process STDERR monitor';
+        warn $self->stderr->readline("\n") while 1;
+    }
 
     return $pid;
 }
@@ -198,6 +217,7 @@ sub kill {
 
     return 1;
 }
+
 
 no Moose;
 1;

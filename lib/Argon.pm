@@ -18,7 +18,7 @@ use Coro;
 use Coro::Channel;
 use AnyEvent::Util qw/fh_nonblocking/;
 use POSIX          qw/strftime/;
-use Scalar::Util   qw/weaken/;
+use Scalar::Util   qw/weaken refaddr/;
 
 require Exporter;
 use base qw/Exporter/;
@@ -169,7 +169,8 @@ sub LOG ($@) {
     chomp $format;
     my $msg = error(sprintf($format, @args));
     my $ts  = strftime("%Y-%m-%d %H:%M:%S", localtime);
-    warn sprintf("[%s] [%d] %s\n", $ts, $$, $msg);
+    my $cid = $Coro::current->desc || refaddr $Coro::current;
+    warn sprintf("[%s] [%d] [%s] %s\n", $ts, $$, $cid, $msg);
 }
 
 #-------------------------------------------------------------------------------
@@ -210,10 +211,10 @@ Argon
 
     # Start a manager on port 8000
     cluster -p 8000
-    
+
     # Start a stand-alone node with 4 workers on port 8000
     node -w 4 -p 8000
-    
+
     # Start a node and attach to a manager
     node -w 4 -p 8001 -m somehost:8000
 

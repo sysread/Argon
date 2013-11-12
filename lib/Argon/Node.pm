@@ -9,6 +9,7 @@ use warnings;
 use Carp;
 
 use Moose;
+use MooseX::AttributeShortcuts;
 use MooseX::StrictConstructor;
 use namespace::autoclean;
 
@@ -54,7 +55,7 @@ has 'manager' => (
 # worker is available to handle a job
 #-------------------------------------------------------------------------------
 has 'pool' => (
-    is        => 'rw',
+    is        => 'lazy',
     isa       => 'Coro::Channel',
     init_arg  => undef,
     handles   => {
@@ -63,6 +64,26 @@ has 'pool' => (
         'workers'  => 'size',
     }
 );
+
+sub _build_pool {
+    my $self = shift;
+    return Coro::Channel->new($self->concurrency + 1);
+}
+
+around checkout => sub {
+    my ($orig, $self) = @_;
+    my $worker = $self->$orig;
+
+    if ($self->counts_requests
+     && $worker->request_count >= $self->max_requests)
+    {
+        $self->stop_worker($worker, 0);
+        $worker = $self->start_worker;
+        DEBUG 'Node: replaced worker';
+    }
+
+    return $worker;
+};
 
 #-------------------------------------------------------------------------------
 # Configure responders
@@ -79,7 +100,6 @@ before 'start' => sub {
     my $self = shift;
     INFO 'Starting node with %d workers', $self->concurrency;
 
-    $self->pool(Coro::Channel->new($self->concurrency + 1));
     $self->checkin($self->start_worker)
         for 1 .. $self->concurrency;
 
@@ -109,7 +129,8 @@ sub notify {
     my $self = shift;
     my ($host, $port) = split ':', $self->manager;
 
-    async {
+    async_pool {
+        local $Coro::current->{desc} = 'Node manager connection service';
         INFO 'Connecting to manager: %s', $self->manager;
         my $is_connected = 0;
         my $attempts     = 0;
@@ -193,6 +214,7 @@ sub notify {
 # Returns a new AnyEvent::Process configured to handle Argon::Message tasks.
 #-------------------------------------------------------------------------------
 sub start_worker {
+    DEBUG 'Spawn worker';
     my $self   = shift;
     my $worker = Argon::Process->new();
     $worker->spawn();
@@ -205,6 +227,7 @@ sub start_worker {
 # worker process is still in the pool, the results could be unexpected!
 #-------------------------------------------------------------------------------
 sub stop_worker {
+    DEBUG 'Stop worker';
     my ($self, $worker, $block) = @_;
     $worker->kill($block);
 }
@@ -214,28 +237,26 @@ sub stop_worker {
 #-------------------------------------------------------------------------------
 sub request_queue {
     my ($self, $msg, $stream) = @_;
-    my $worker = $self->checkout;
+    DEBUG 'Node: received message %s from %s', $msg->id, $stream->address;
 
-    # Replace worker if necessary
-    # TODO move to around checkout wrapper
-    if (   $self->counts_requests
-        && $worker->request_count >= $self->max_requests)
-    {
-        $self->stop_worker($worker, 0);
-        $worker = $self->start_worker;
-    }
+    my $worker = $self->checkout;
+    DEBUG 'Node: selected worker %s for %s', $worker, $msg->id;
 
     # Process the task in a worker
+    DEBUG 'Node: sent to worker: %s', $msg->id;
     my $reply = $worker->process($msg);
+    DEBUG 'Node: received reply: %s', $msg->id;
 
     # Return worker to the pool
     $self->checkin($worker);
+    DEBUG 'Node: worker %s returned to pool', $worker;
 
     return $reply;
 }
 
-;
-__PACKAGE__->meta->make_immutable;
+
+no Moose;
+1;
 
 =pod
 

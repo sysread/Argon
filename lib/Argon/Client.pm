@@ -70,19 +70,23 @@ sub _retry {
 
     while (!defined $retries || $attempts < $retries) {
         ++$attempts;
+        DEBUG 'Client: attempt %d to send %s', $attempts, $msg->id;
         my $reply = $self->send($msg);
 
         # If the task was rejected, sleep a short (but lengthening) amount of
         # time before attempting again.
         if ($reply->command == CMD_REJECTED) {
             my $sleep_time = log($attempts + 1) / log(10);
+            DEBUG 'Client: message %s rejected; retry in %f seconds', $msg->id, $sleep_time;
             Coro::AnyEvent::sleep($sleep_time);
         }
         else {
+            DEBUG 'Client: message %s complete', $msg->id;
             return $reply;
         }
     }
 
+    DEBUG 'Client: message %s failed after %d attempts', $msg->id, $attempts;
     croak "failed after $attempts attempts";
 }
 
@@ -104,6 +108,7 @@ sub process {
     my $msg = Argon::Message->new(command => CMD_QUEUE);
     $msg->set_payload({class => $class, params => $params});
 
+    DEBUG 'Client: process message %s', $msg->id;
     my $reply = $self->_retry($msg, $retries);
     if ($reply->command == CMD_COMPLETE) {
         return $reply->get_payload;
@@ -120,6 +125,7 @@ sub run {
     my $msg = Argon::Message->new(command => CMD_QUEUE);
     $msg->set_payload({code => $f, params => \@params});
 
+    DEBUG 'Client: run message %s', $msg->id;
     my $reply = $self->_retry($msg);
     if ($reply->command == CMD_COMPLETE) {
         return $reply->get_payload;

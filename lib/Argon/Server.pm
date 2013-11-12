@@ -165,8 +165,15 @@ sub start {
     $self->listener->listen or croak $!;
     $self->is_running(1);
 
-    async_pool { Argon::CHAOS };
-    async_pool { $self->process_messages };
+    async_pool {
+        local $Coro::current->{desc} = 'CHAOS MONKEY';
+        Argon::CHAOS;
+    };
+
+    async_pool {
+        local $Coro::current->{desc} = 'Service msg processing loop';
+        $self->process_messages;
+    };
 
     # Signal handling
     my $signal_handler = K('shutdown', $self);
@@ -218,10 +225,14 @@ sub process_messages {
     while (1) {
         my ($stream, $msg) = @{ $self->queue_get };
         if ($self->has_service($stream->address)) {
+            DEBUG 'Starting message responder for msg %s', $msg->id;
             async_pool {
+                local $Coro::current->{desc} = sprintf 'Service msg responder: %s', $msg->id;
                 my $reply = $self->dispatch($msg, $stream);
                 $self->reply($stream, $reply);
             };
+        } else {
+            DEBUG 'Ignoring message %s - stream has no service', $msg->id;
         }
     }
 }
@@ -252,20 +263,27 @@ sub service {
     $self->set_service($addr, $stream);
 
     async_pool {
+        local $Coro::current->{desc} = sprintf 'Service client handler for %s', $addr;
+
         while ($self->is_running
             && $stream->is_connected
             && $self->has_service($stream->address))
         {
+            DEBUG 'Service: waiting on message';
+
             # Pull next message. On failure, stop serving stream.
             my $msg = $stream->receive;
-
             last unless defined $msg && $stream->is_connected;
 
-            if ($self->queue_is_full) {
+            DEBUG 'Service: received msg %s', $msg->id;
+
+            if (!$self->queue_is_full) {
+                DEBUG 'Service: accepted message %s', $msg->id;
+                $self->queue_put([$stream, $msg], $msg->priority);
+            } else {
+                DEBUG 'Rejecting message; queue is full at %d messages.', $self->queue->count;
                 my $reply = $msg->reply(CMD_REJECTED);
                 $self->reply($stream, $reply);
-            } else {
-                $self->queue_put([$stream, $msg], $msg->priority);
             }
         }
 

@@ -97,6 +97,6 @@ sub process_task {
     return $reply;
 }
 
-__PACKAGE__->meta->make_immutable;
 
+no Moose;
 1;

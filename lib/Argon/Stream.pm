@@ -6,18 +6,22 @@ package Argon::Stream;
 
 use strict;
 use warnings;
-use Carp          qw/carp croak cluck confess/;
 
 use Moose;
 use MooseX::StrictConstructor;
 
+use AnyEvent;
+use AnyEvent::Handle;
+use Carp qw(carp croak cluck confess);
 use Coro;
 use Coro::AnyEvent;
 use Coro::Channel;
-use Coro::Handle   qw/unblock/;
-use IO::Socket     qw/SOCK_STREAM/;
+use Coro::Handle qw(unblock);
+use IO::Socket qw(SOCK_STREAM);
+use Scalar::Util qw(refaddr);
 use Socket;
-use Argon          qw/:logging :commands/;
+
+use Argon qw(:logging :commands);
 use Argon::Message;
 
 #-------------------------------------------------------------------------------
@@ -143,13 +147,14 @@ sub trigger_in_chan {
 
 #-------------------------------------------------------------------------------
 # Polls the file handle for new messages and adds them to the appropriate
-# channel (inbox or pending). Handles the special case of PING requests.
+# channel (inbox or pending).
 #-------------------------------------------------------------------------------
 sub poll_loop {
     my ($self) = @_;
-    async {
+    async_pool {
+        local $Coro::current->{desc} = sprintf('Stream poll loop (%s)', refaddr $self);
+
         while ($self->is_connected) {
-            next unless Coro::AnyEvent::readable($self->in_chan->fh, 0.5);
             my $line = $self->in_chan->readline($Argon::EOL);
             last unless defined $line;
 
@@ -165,6 +170,7 @@ sub poll_loop {
             }
         }
 
+        DEBUG 'Stream closed';
         $self->close;
     };
 }
@@ -189,6 +195,7 @@ sub monitor {
     my $started = AnyEvent->condvar;
 
     my $thread = async {
+        local $Coro::current->{desc} = "Stream monitor service";
         $started->send;
 
         while ($self->is_connected) {
@@ -219,7 +226,7 @@ sub address {
         : undef;
 
     if (defined $handle) {
-        if ($handle->can('peername')) {
+        if ($handle->can('peerhost')) {
             my $host = $handle->peerhost;
             my $port = $handle->peerport;
             return sprintf('sock<%s:%s @%d>', $host, $port, $self);
@@ -271,6 +278,7 @@ sub send_message {
     my ($self, $msg) = @_;
     croak 'not connected' unless $self->is_connected;
     croak 'no output channel configured' unless $self->has_out_chan;
+    $self->out_chan->writable;
     $self->out_chan->print($msg->encode . $Argon::EOL);
 }
 
@@ -303,8 +311,8 @@ sub DEMOLISH {
     $self->close;
 }
 
-no Moose;
 
+no Moose;
 1;
 
 =pod

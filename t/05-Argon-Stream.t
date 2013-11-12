@@ -5,10 +5,14 @@ use Carp;
 use Test::More;
 
 use Coro;
+use Coro::Debug;
 use AnyEvent::Util;
 use Coro::Handle;
 use Argon::Message;
 use Argon qw/:logging :commands/;
+
+$Argon::DEBUG = $Argon::DEBUG | Argon::DEBUG_DEBUG;
+
 
 BEGIN { use AnyEvent::Impl::Perl }
 
@@ -24,10 +28,8 @@ use_ok('Argon::Stream');
     $fh2 = unblock $fh2;
 
     # Object creation
-    my $left = new_ok('Argon::Stream', [
-        in_chan  => $fh1,
-        out_chan => $fh1,
-    ]) or BAIL_OUT('unable to continue without stream object');
+    my $left = new_ok('Argon::Stream', [in_chan  => $fh1, out_chan => $fh1])
+        or BAIL_OUT('unable to continue without stream object');
 
     my $right = Argon::Stream->create($fh2);
     ok(defined $right && $right->isa('Argon::Stream'), 'create')
@@ -65,6 +67,7 @@ use_ok('Argon::Stream');
     # monitor
     my $flag = 0;
     my $monitor = $right->monitor(sub { $flag = 1 });
+
     $left->close;
     $monitor->join;
     ok($flag, 'monitor');
