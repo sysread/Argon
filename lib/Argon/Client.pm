@@ -65,12 +65,8 @@ sub _retry {
     my ($self, $msg, $retries) = @_;
     my $attempts = 0;
 
-    while (1) {
+    while (!defined $retries || $attempts < $retries) {
         ++$attempts;
-
-        croak "failed after $retries retries"
-            if defined $retries && $attempts > $retries;
-
         my $reply = $self->stream->send($msg);
 
         # If the task was rejected, sleep a short (but lengthening) amount of
@@ -83,6 +79,8 @@ sub _retry {
             return $reply;
         }
     }
+
+    croak "failed after $attempts attempts";
 }
 
 #-------------------------------------------------------------------------------
@@ -90,8 +88,6 @@ sub _retry {
 # the remote host is not connected. By default, there is no limit to the number
 # of retries when the system is under load and a task is rejected. This may be
 # controlled using the retries parameter.
-#
-# TODO support parameter "retries"
 #-------------------------------------------------------------------------------
 sub process {
     my ($self, %param) = @_;
@@ -113,6 +109,9 @@ sub process {
     }
 }
 
+#-------------------------------------------------------------------------------
+# Runs a function directly on the network.
+#-------------------------------------------------------------------------------
 sub run {
     my ($self, $f, @params) = @_;
     my $msg = Argon::Message->new(command => CMD_QUEUE);
@@ -126,8 +125,8 @@ sub run {
     }
 }
 
-__PACKAGE__->meta->make_immutable;
 
+no Moose;
 1;
 
 =pod

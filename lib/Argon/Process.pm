@@ -188,8 +188,8 @@ sub kill {
             }
         }
 
-        $self->stream->close;
-        $self->stderr->close;
+        $self->stream->close if $self->stream;
+        $self->stderr->close if $self->stderr;
 
         $self->clear_pid;
         $self->clear_stream;
@@ -199,8 +199,7 @@ sub kill {
     return 1;
 }
 
-__PACKAGE__->meta->make_immutable;
-
+no Moose;
 1;
 
 =pod
