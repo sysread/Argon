@@ -1,0 +1,71 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Pod::Usage;
+use Getopt::Long;
+use Argon::Client;
+use Coro;
+use Coro::Semaphore;
+use Guard;
+use Argon qw(:logging);
+
+my $addr = shift @ARGV;
+my $help;
+my $count;
+
+GetOptions(
+    'help'    => \$help,
+    'count=i' => \$count,
+) or pod2usage(1);
+
+$help  && pod2usage(0);
+$count || pod2usage(1);
+
+my ($host, $port) = split ':', $addr || pod2usage(1);
+
+my $client = Argon::Client->new(host => $host, port => $port);
+$client->connect;
+
+my $done = Coro::Semaphore->new(0);
+
+foreach my $i (1 .. $count) {
+    async_pool {
+        scope_guard { $done->up };
+
+        my $n = shift;
+        my $result = $client->defer(sub {
+            use Time::HiRes qw(sleep);
+            sleep 0.05;
+            my $n = $_[0];
+            return $n * 2;
+        }, [$n]);
+
+        INFO "2 * %03d = %04d\n", $n, $result->();
+    } $i;
+}
+
+$done->down for 1 .. $count;
+
+exit 0;
+__END__
+
+=head1 NAME
+
+test - run a test client
+
+=head1 SYNOPSIS
+
+    test hostname:port --count 10
+
+=head1 DESCRIPTION
+
+=head1 OPTIONS
+
+=over
+
+=item help
+
+=item count
+
+=back

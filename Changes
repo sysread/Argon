@@ -1,5 +1,6 @@
-0.6     2013-XX-XX
-    * Fixed stream monitoring service
+0.6     2013-12-??
+    * Major refactor
+    * Unified bin scripts
     * Fixed import errors for static builds (thanks folio - https://github.com/foilo)
 
 0.5     2013-??-??

@@ -2,7 +2,7 @@
 # Tracks the length of time it takes to process requests for a node. Used by
 # Argon::Cluster to monitor Node responsiveness.
 #-------------------------------------------------------------------------------
-package Argon::NodeTracker;
+package Argon::Tracker;
 
 use strict;
 use warnings;
@@ -10,7 +10,6 @@ use Carp;
 
 use Moose;
 use MooseX::StrictConstructor;
-use namespace::autoclean;
 
 use Time::HiRes qw/time/;
 
@@ -135,7 +134,7 @@ sub est_proc_time {
     return $self->avg_proc_time * ($self->num_pending + 1);
 }
 
-;
-__PACKAGE__->meta->make_immutable;
 
+no Moose;
+__PACKAGE__->meta->make_immutable;
 1;

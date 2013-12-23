@@ -3,205 +3,88 @@ package Argon::Message;
 use strict;
 use warnings;
 use Carp;
+use Data::UUID;
+use Storable qw(nfreeze thaw);
+use MIME::Base64 qw(encode_base64 decode_base64);
+use List::Util qw(first);
+use Argon qw(:priorities);
 
-use Moose;
-use MooseX::StrictConstructor;
-use Moose::Util::TypeConstraints;
-use namespace::autoclean;
-
-use Time::HiRes  qw/time/;
-use Data::UUID   qw//;
-use MIME::Base64 qw//;
-use Storable     qw//;;
-use Argon        qw/:priorities :logging/;
-
-enum 'Argon::Message::Priority', [PRI_MAX .. PRI_MIN];
-
-# Time stamp, used to sort incoming messages
-has 'timestamp' => (
-    is       => 'rw',
-    isa      => 'Num',
-    default  => sub { time },
+use fields qw(
+    id
+    cmd
+    pri
+    payload
+    key
 );
 
-# Message id, assigned at system entry point (UUID)
-has 'id' => (
-    is      => 'ro',
-    isa     => 'Str',
-    lazy    => 1,
-    default => sub { Data::UUID->new->create_str },
-);
-
-# Message priority, used when queueing messages at entry point
-has 'priority' => (
-    is      => 'ro',
-    isa     => 'Argon::Message::Priority',
-    default => PRI_NORMAL,
-);
-
-# Processing instruction
-has 'command' => (
-    is       => 'ro',
-    isa      => 'Int',
-    required => 1,
-);
-
-# Private - storage for encoded and decoded payloads
-has 'decoded' => (
-    is        => 'rw',
-    init_arg  => undef,
-    clearer   => 'clear_decoded',
-    predicate => 'is_decoded',
-);
-
-has 'encoded' => (
-    is        => 'rw',
-    init_arg  => undef,
-    clearer   => 'clear_encoded',
-    predicate => 'is_encoded',
-);
-
-sub update_timestamp {
-    my $self = shift;
-    $self->timestamp(time);
+sub new {
+    my ($class, %param) = @_;
+    defined $param{cmd} || croak 'expected parameter "cmd"';
+    my $self = fields::new($class);
+    $self->{id}  = $param{id}  || Data::UUID->new->create_str;
+    $self->{cmd} = $param{cmd};
+    $self->{pri} = $param{pri} || $PRI_NORMAL;
+    $self->{key} = $param{key} || 'OPEN';
+    $self->{payload} = $param{payload};
+    return $self;
 }
 
-sub payload {
-    return @_ == 1 ? $_[0]->get_payload : $_[0]->set_payload($_[1]);
-}
-
-sub set_payload {
-    no warnings 'once';
-    my ($self, $data) = @_;
-    local $Storable::Deparse = 1;
-    my $image   = Storable::nfreeze([$data]);
-    my $payload = MIME::Base64::encode_base64($image, '');
-    $self->clear_decoded;
-    $self->encoded($payload);
-};
-
-sub get_payload {
-    my $self = shift;
-    return unless $self->is_encoded;
-
-    unless ($self->is_decoded) {
-        no warnings 'once';
-        local $Storable::Eval = 1;
-        my $image   = MIME::Base64::decode_base64($self->encoded);
-        my $payload = Storable::thaw($image);
-        $self->decoded(@$payload);
-    }
-
-    return $self->decoded;
-}
+sub cmp     { $_[0]->{pri} <=> $_[1]->{pri} }
+sub id      { $_[0]->{id}      }
+sub cmd     { $_[0]->{cmd}     }
+sub pri     { $_[0]->{pri}     }
+sub key     { $_[0]->{key}     }
+sub payload { $_[0]->{payload} }
 
 sub encode {
     my $self = shift;
-    my $payload = $self->encoded || '-';
-    return join($Argon::MESSAGE_SEPARATOR, $self->command, $self->priority, $self->id, $self->timestamp, $payload);
+
+    local $Storable::Deparse = 1;
+    my $data = defined $self->{payload}
+        ? encode_base64(nfreeze([$self->{payload}]), '')
+        : '-';
+
+    my $line = join(
+        $Argon::MSG_SEPARATOR,
+        $self->{id},
+        $self->{cmd},
+        $self->{pri},
+        $self->{key},
+        $data,
+    );
+
+    return $line;
 }
 
 sub decode {
-    confess 'expected message string' unless defined $_[0];
-    my ($cmd, $pri, $id, $timestamp, $payload) = split $Argon::MESSAGE_SEPARATOR, $_[0];
+    my ($class, $line) = @_;
+    my ($id, $cmd, $pri, $key, $payload) = split $Argon::MSG_SEPARATOR, $line;
 
-    unless (defined $cmd && defined $id) {
-        ERROR 'Invalid message: [%s]', $_[0];
-        croak "Invalid message: [$_[0]]";
+    croak 'incomplete message'
+        unless defined $id
+            && defined $cmd
+            && defined $pri
+            && defined $key;
+
+    if ($payload eq '-') {
+        undef $payload;
+    } else {
+        local $Storable::Eval = 1;
+        $payload = thaw(decode_base64($payload))->[0];
     }
 
-    my $msg = Argon::Message->new(command => $cmd, priority => $pri, id => $id, timestamp => $timestamp);
-    $msg->encoded($payload) if $payload ne '-';
-    return $msg;
+    return $class->new(
+        id         => $id,
+        cmd        => $cmd,
+        pri        => $pri,
+        key        => $key,
+        payload    => $payload,
+    );
 }
 
-#-------------------------------------------------------------------------------
-# Creates a new Message object with the command verb as a reply. The payload is
-# not included in the reply.
-#-------------------------------------------------------------------------------
 sub reply {
-    my ($self, $cmd) = @_;
-    my $msg = Argon::Message->new(command => $cmd, id => $self->id, priority => $self->priority);
-    return $msg;
+    my ($self, %param) = @_;
+    return $self->new(%$self, %param)
 }
-
-__PACKAGE__->meta->make_immutable;
 
 1;
-
-=pod
-
-=head1 NAME
-
-Argon::Message
-
-=head1 SYNOPSIS
-
-    use Argon::Message;
-    use Argon qw/:commands :priorities/;
-
-    my $msg = Argon::Message->new(
-        command  => CMD_QUEUE,
-        priority => PRI_NORMAL,
-    );
-
-    $msg->set_payload(['Tasks::Adder', [numbers => [3, 4]]);
-
-    my $reply = $msg->reply(CMD_COMPLETE);
-    $reply->set_payload('Good work!');
-
-    my $encoded = $reply->encode;
-    my $decoded = Argon::Message::decode($encoded);
-
-=head1 DESCRIPTION
-
-Argon::Message encodes and decodes messages sent across the wire in
-an Argon cluster.
-
-=head1 METHODS
-
-=head2 id()
-
-Returns the unique ID of the message.
-
-=head2 priority()
-
-Returns the priority of the message.
-
-=head2 command()
-
-Returns the message command.
-
-=head2 set_payload($payload)
-
-Sets the payload for the message. B<WARNING>: large payloads will
-result in slow transmission. While the system will not become overly
-bogged down as a result, individual requests will take significantly
-longer.
-
-=head2 get_payload()
-
-Returns the message's payload.
-
-=head2 encode()
-
-Encodes the message as a string for transmission over the wire.
-
-=head2 decode($line)
-
-B<Class method>: decodes a string into a new Argon::Message.
-
-=head2 reply($cmd)
-
-Returns a new copy of the Argon::Message instance with a different
-command.
-
-=head1 AUTHOR
-
-Jeff Ober L<mailto:jeffober@gmail.com>
-
-=head1 LICENSE
-
-BSD license
-
-=cut

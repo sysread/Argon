@@ -4,13 +4,13 @@ use Carp;
 use Time::HiRes qw/sleep/;
 use Test::More;
 
-use_ok('Argon::NodeTracker');
+use_ok('Argon::Tracker') or BAIL_OUT;
 
 {
-    my $tracker = new_ok('Argon::NodeTracker', [
+    my $tracker = new_ok('Argon::Tracker', [
         tracking => 4,
         workers  => 4,
-    ]) or BAIL_OUT('cannot continue without nodetracker object');
+    ]) or BAIL_OUT('cannot continue without Tracker');
 
     for my $i (1 .. 4) {
         $tracker->start_request($i);
