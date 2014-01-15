@@ -22,7 +22,7 @@ our %EXPORT_TAGS = (
     # Command verbs and responses
     commands => [qw(
         $CMD_PING $CMD_QUEUE $CMD_REGISTER
-        $CMD_ACK $CMD_COMPLETE $CMD_ERROR
+        $CMD_ACK $CMD_COMPLETE $CMD_ERROR $CMD_REJECTED
     )],
 
     logging => [qw(DEBUG INFO WARN ERROR)],
@@ -97,6 +97,7 @@ const our $CMD_REGISTER => 2;  # Add a node to a cluster
 const our $CMD_ACK      => 3;  # Acknowledgement (respond OK)
 const our $CMD_COMPLETE => 4;  # Response - message is complete
 const our $CMD_ERROR    => 5;  # Response - error processing message or invalid message format
+const our $CMD_REJECTED => 6;  # Response - no available capacity for handling tasks
 
 #-------------------------------------------------------------------------------
 # Strips an error message of line number and file information.

@@ -7,6 +7,8 @@ use Getopt::Long;
 use UNIVERSAL::require;
 use EV;
 use Argon;
+use Argon::Manager;
+use Argon::Worker;
 
 # Determine type of service to run
 my $kind = shift @ARGV;
