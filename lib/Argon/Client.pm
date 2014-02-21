@@ -161,3 +161,109 @@ sub defer {
 no Moose;
 __PACKAGE__->meta->make_immutable;
 1;
+__DATA__
+
+=head1 NAME
+
+Argon::Client
+
+=head1 SYNOPSIS
+
+    use Argon::Client;
+
+    # Connect
+    my $client = Argon::Client->new(host => '...', port => XXXX);
+
+    # Send task and wait for result
+    my $the_answer = $client->queue(sub {
+        my ($x, $y) = @_;
+        return $x * $y;
+    }, [6, 7]);
+
+    # Send task and get a deferred result that can be synchronized later
+    my $deferred = $client->defer(sub {
+        my ($x, $y) = @_;
+        return $x * $y;
+    }, [6, 7]);
+
+    my $result = $deferred->();
+
+    # Close the client connection
+    $client->shutdown;
+
+=head1 DESCRIPTION
+
+Establishes a connection to an Argon network and provides methods for executing
+tasks and collecting the results.
+
+=head1 METHODS
+
+=head2 new(host => $host, port => $port)
+
+Creates a new C<Argon::Client>. The connection is made lazily when the first
+call to L</queue> or L</connect> is performed. The connection can be forced by
+calling L</connect>.
+
+=head2 connect
+
+Connects to the remote host.
+
+=head2 queue($f, $args)
+
+Sends a task to the Argon network to evaluate C<$f->(@$args)> and returns the
+result. Since Argon uses L<Coro>, this method does not actually block until the
+result is received. Instead, it yields execution priority to other threads
+until the result is available.
+
+If an error occurs in the execution of C<$f>, an error is thrown.
+
+=head2 defer($f, $args)
+
+Similar to L</queue>, but instead of waiting for the result, returns an
+anonymous function that, when called, waits and returns the result. If an error
+occurs when calling <$f>, it is re-thrown from the anonymous function.
+
+=head2 shutdown
+
+Disconnects from the Argon network.
+
+=head1 A NOTE ABOUT SCOPE
+
+L<Storable> is used to serialize code that is sent to the Argon network. This
+means that the code sent I<will not have access to variables and modules outside
+of itself> when executed. Therefore, the following I<will not work>:
+
+    my $x = 0;
+    $client->queue(sub { return $x + 1 }); # $x not found!
+
+The right way is to pass it to the function as part of the task's arguments:
+
+    my $x = 0;
+
+    $client->queue(sub {
+        my $x = shift;
+        return $x + 1;
+    }, [$x]);
+
+Similarly, module imports are not available to the function:
+
+    use Data::Dumper;
+
+    my $data = [1,2,3];
+    my $string = $client->queue(sub {
+        my $data = shift;
+        return Dumper($data); # Dumper not found
+    }, [$data]);
+
+The right way is to import the module inside the task:
+
+    my $data = [1,2,3];
+    my $string = $client->queue(sub {
+        use Data::Dumper;
+        my $data = shift;
+        return Dumper($data); # Dumper not found
+    }, [$data]);
+
+=head1 AUTHOR
+
+Jeff Ober <jeffober@gmail.com>

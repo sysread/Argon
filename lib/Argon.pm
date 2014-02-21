@@ -159,7 +159,7 @@ Managers are started with C<argon>:
 
     argon --manager --port 8000 --host mgrhost
 
-See <Argon::Manager>.
+See L<bin/argon>.
 
 =head1 WORKERS
 
@@ -186,7 +186,7 @@ option.
 
     argon --worker --port 8001 --host workerhost --manager somehost:8000 --workers 8
 
-See L<Argon::Worker>.
+See L<bin/argon>.
 
 =head1 CLIENTS
 

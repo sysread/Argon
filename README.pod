@@ -23,7 +23,7 @@ Managers are started with C<argon>:
 
     argon --manager --port 8000 --host mgrhost
 
-See <Argon::Manager>.
+See L<bin/argon>.
 
 =head1 WORKERS
 
@@ -50,17 +50,17 @@ option.
 
     argon --worker --port 8001 --host workerhost --manager somehost:8000 --workers 8
 
-See L<Argon::Worker>.
+See L<bin/argon>.
 
 =head1 CLIENTS
 
 Clients connect to the manager (or, if desired, directly to a "stand-alone"
-worker that was started without the C<--manager> option). Tasks can be launched
-in two different ways.
+worker that was started without the C<--manager> option). Tasks can be
+launched in two different ways.
 
-The first method is to send a task and wait for the results. Note that Argon
-uses Coro, so "waiting" for the result means that the current thread of
-execution yields until the result is ready, at which point it is awoken.
+The first method is to send a task and wait for the results. Note that
+Argon uses Coro, so "waiting" for the result means that the current thread
+of execution yields until the result is ready, at which point it is awoken.
 
     use Argon::Client;
 
@@ -98,10 +98,10 @@ required.
     # Synchronize to get the result
     my $result = $deferred->();
 
-Errors thrown in the execution of the task are trapped and re-thrown by the
-client when the result is returned. In the case of C<queue> that is done when
-call returns. In the case of C<defer>, it happens when the deferred result is
-synchronized.
+Errors thrown in the execution of the task are trapped and re-thrown by
+the client when the result is returned. In the case of C<queue> that is done
+when call returns. In the case of C<defer>, it happens when the deferred
+result is synchronized.
 
 See L<Argon::Client>.
 
