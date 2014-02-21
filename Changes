@@ -1,4 +1,7 @@
-0.6     2014-??-??
+0.61    2014-02-21
+    * Forgot to update Changes and MANIFEST
+
+0.6     2014-02-21
     * Major refactor
     * Unified bin scripts
     * Fixed import errors for static builds (thanks folio - https://github.com/foilo)

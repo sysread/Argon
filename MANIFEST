@@ -1,8 +1,7 @@
 Changes
 Makefile.PL
 MANIFEST
-README
-README.md
+README.pod
 
 bin/argon
 
