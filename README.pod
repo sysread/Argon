@@ -21,9 +21,9 @@ picked up and the manager will start shifting load to it as necessary.
 
 Managers are started with C<argon>:
 
-    argon --manager --port 8000 --host mgrhost
+    argon manager --port 8000 --host mgrhost
 
-See L<bin/argon>.
+See L<argon>.
 
 =head1 WORKERS
 
@@ -42,15 +42,15 @@ task are starved of resources while other types have underutilized workers.
 
 Workers are started with C<argon>:
 
-    argon --worker --port 8001 --host workerhost --manager somehost:8000
+    argon worker --port 8001 --host workerhost --manager somehost:8000
 
 By default, a worker will start a number of Perl processes that correlates to
 the number of CPUs on the system. This can be overridden with the C<--workers>
 option.
 
-    argon --worker --port 8001 --host workerhost --manager somehost:8000 --workers 8
+    argon worker --port 8001 --host workerhost --manager somehost:8000 --workers 8
 
-See L<bin/argon>.
+See L<argon>.
 
 =head1 CLIENTS
 

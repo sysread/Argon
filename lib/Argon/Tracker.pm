@@ -9,8 +9,6 @@ use warnings;
 use Carp;
 
 use Moose;
-use MooseX::StrictConstructor;
-
 use Time::HiRes qw/time/;
 
 #-------------------------------------------------------------------------------

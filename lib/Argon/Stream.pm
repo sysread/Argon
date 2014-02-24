@@ -75,6 +75,7 @@ sub read {
     my $self = shift;
     croak 'not connected' unless $self->is_connected;
     my $line = $self->handle->readline($Argon::EOL) or return;
+    do { local $\ = $Argon::EOL ; chomp $line };
     return Argon::Message->decode($line);
 }
 
