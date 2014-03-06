@@ -24,6 +24,7 @@ WriteMakefile(
         'Moose'                      => 0,
         'MooseX::AttributeShortcuts' => 0,
         'Data::UUID'                 => 0,
+        'UNIVERSAL::require'         => 0,
     },
     BUILD_REQUIRES => {
         'Test::More'       => 0,
