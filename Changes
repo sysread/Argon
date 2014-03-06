@@ -1,5 +1,6 @@
 0.9
     * Made bin/argon installable
+    * Fixed missing deps
 
 0.8     2014-02-24
     * No longer dies when decoding messages in older perl versions
