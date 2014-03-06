@@ -13,7 +13,8 @@ WriteMakefile(
         : ()),
     PL_FILES            => {},
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-    clean               => { FILES => 'Argon-*' },
+    clean               => { FILES => 'Argon-*', },
+    EXE_FILES           => [ 'bin/argon', ],
     PREREQ_PM => {
         'AnyEvent'                   => 0,
         'Const::Fast'                => 0,
