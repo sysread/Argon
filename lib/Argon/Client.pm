@@ -261,7 +261,7 @@ The right way is to import the module inside the task:
     my $string = $client->queue(sub {
         use Data::Dumper;
         my $data = shift;
-        return Dumper($data); # Dumper not found
+        return Dumper($data);
     }, [$data]);
 
 =head1 AUTHOR
