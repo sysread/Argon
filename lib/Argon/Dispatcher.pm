@@ -1,21 +1,22 @@
 package Argon::Dispatcher;
 
-use Moose;
-use MooseX::AttributeShortcuts;
+use Moo;
+use MooX::HandlesVia;
+use Types::Standard qw(-types);
 use Carp;
 
 extends 'Argon::Service';
 
 has _dispatch => (
-    is       => 'ro',
-    isa      => 'HashRef[CodeRef]',
-    init_arg => undef,
-    default  => sub {{}},
-    traits   => ['Hash'],
-    handles  => {
+    is          => 'ro',
+    isa         => Map[Int,CodeRef],
+    init_arg    => undef,
+    default     => sub {{}},
+    handles_via => 'Hash',
+    handles     => {
         respond_to   => 'set',
-        responds_to  => 'exists',
         get_callback => 'get',
+        responds_to  => 'exists',
     }
 );
 
@@ -27,6 +28,4 @@ sub dispatch {
     return $self->get_callback($cmd)->($msg, @_);
 }
 
-no Moose;
-__PACKAGE__->meta->make_immutable;
 1;

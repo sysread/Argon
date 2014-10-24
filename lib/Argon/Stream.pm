@@ -1,7 +1,7 @@
 package Argon::Stream;
 
-use Moose;
-use MooseX::AttributeShortcuts;
+use Moo;
+use Types::Standard qw(-types);
 use AnyEvent;
 use AnyEvent::Socket;
 use Carp;
@@ -13,18 +13,16 @@ use Argon qw(:logging);
 
 has handle => (
     is        => 'rwp',
-    isa       => 'Coro::Handle',
+    isa       => InstanceOf['Coro::Handle'],
     required  => 1,
     clearer   => '_clear_handle',
     predicate => 'is_connected',
-    handles   => {
-        fh => 'fh',
-    }
+    handles   => {fh => 'fh'}
 );
 
 has addr => (
     is  => 'lazy',
-    isa => 'Str',
+    isa => Str,
 );
 
 sub _build_addr {
@@ -79,6 +77,4 @@ sub read {
     return Argon::Message->decode($line);
 }
 
-no Moose;
-__PACKAGE__->meta->make_immutable;
 1;

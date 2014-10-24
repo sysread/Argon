@@ -1,7 +1,8 @@
 package Argon::Manager;
 
-use Moose;
-use MooseX::AttributeShortcuts;
+use Moo;
+use MooX::HandlesVia;
+use Types::Standard qw(-types);
 use Coro;
 use Coro::Semaphore;
 use Guard qw(scope_guard);
@@ -12,12 +13,12 @@ use Argon qw(K :logging :commands);
 extends 'Argon::Dispatcher';
 
 has workers => (
-    is       => 'ro',
-    isa      => 'HashRef[Argon::Client]',
-    init_arg => undef,
-    default  => sub {{}},
-    traits   => ['Hash'],
-    handles  => {
+    is          => 'ro',
+    isa         => Map[Str,InstanceOf['Argon::Client']],
+    init_arg    => undef,
+    default     => sub {{}},
+    handles_via => 'Hash',
+    handles     => {
         set_worker  => 'set',
         get_worker  => 'get',
         del_worker  => 'delete',
@@ -27,12 +28,12 @@ has workers => (
 );
 
 has tracking => (
-    is       => 'ro',
-    isa      => 'HashRef[Argon::Tracker]',
-    init_arg => undef,
-    default  => sub {{}},
-    traits   => ['Hash'],
-    handles  => {
+    is          => 'ro',
+    isa         => Map[Str,InstanceOf['Argon::Tracker']],
+    init_arg    => undef,
+    default     => sub {{}},
+    handles_via => 'Hash',
+    handles     => {
         set_tracking => 'set',
         get_tracking => 'get',
         del_tracking => 'delete',
@@ -41,7 +42,7 @@ has tracking => (
 
 has sem_capacity => (
     is       => 'ro',
-    isa      => 'Coro::Semaphore',
+    isa      => InstanceOf['Coro::Semaphore'],
     init_arg => undef,
     default  => sub { Coro::Semaphore->new(0) },
     handles  => {
@@ -51,15 +52,22 @@ has sem_capacity => (
 
 has capacity => (
     is       => 'ro',
-    isa      => 'Int',
+    isa      => Int,
     init_arg => undef,
     default  => 0,
-    traits   => ['Counter'],
-    handles  => {
-        inc_capacity => 'inc',
-        dec_capacity => 'dec',
-    }
 );
+
+sub inc_capacity {
+    my ($self, $amount) = @_;
+    $amount //= 1;
+    $self->{capacity} += $amount;
+}
+
+sub dec_capacity {
+    my ($self, $amount) = @_;
+    $amount //= 1;
+    $self->{capacity} -= $amount;
+}
 
 sub init {
     my $self = shift;
@@ -109,10 +117,7 @@ sub cmd_register {
     my $capacity = $msg->payload->{capacity};
 
     # Create client
-    my $client = Argon::Client->new(
-        host   => $host,
-        port   => $port,
-    );
+    my $client = Argon::Client->new(host => $host, port => $port);
 
     INFO 'Connecting to worker "%s"', $key;
     $client->connect;
@@ -191,6 +196,4 @@ sub cmd_queue {
     }
 }
 
-no Moose;
-__PACKAGE__->meta->make_immutable;
 1;

@@ -1,7 +1,8 @@
 package Argon::Service;
 
-use Moose;
-use MooseX::AttributeShortcuts;
+use Moo;
+use MooX::HandlesVia;
+use Types::Standard qw(-types);
 use Carp;
 use Coro;
 use Coro::Handle;
@@ -14,25 +15,25 @@ use Argon qw(:commands :logging);
 
 has port => (
     is  => 'rwp',
-    isa => 'Int',
+    isa => Int,
 );
 
 has host => (
     is  => 'rwp',
-    isa => 'Str',
+    isa => Str,
 );
 
 has address => (
     is  => 'rwp',
-    isa => 'Str',
+    isa => Str,
 );
 
 has stop_cb => (
-    is       => 'rwp',
-    isa      => 'CodeRef',
-    init_arg => undef,
-    traits   => ['Code'],
-    handles  => { stop => 'execute' }
+    is          => 'rwp',
+    isa         => CodeRef,
+    init_arg    => undef,
+    handles_via => 'Code',
+    handles     => { stop => 'execute' }
 );
 
 sub start {
@@ -103,6 +104,4 @@ sub init                { }
 sub client_connected    { }
 sub client_disconnected { }
 
-no Moose;
-__PACKAGE__->meta->make_immutable;
 1;

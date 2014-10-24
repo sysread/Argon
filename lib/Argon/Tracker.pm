@@ -8,7 +8,9 @@ use strict;
 use warnings;
 use Carp;
 
-use Moose;
+use Moo;
+use MooX::HandlesVia;
+use Types::Standard qw(-types);
 use Time::HiRes qw/time/;
 
 #-------------------------------------------------------------------------------
@@ -16,7 +18,7 @@ use Time::HiRes qw/time/;
 #-------------------------------------------------------------------------------
 has 'tracking' => (
     is       => 'ro',
-    isa      => 'Int',
+    isa      => Int,
     required => 1,
 );
 
@@ -25,7 +27,7 @@ has 'tracking' => (
 #-------------------------------------------------------------------------------
 has 'workers' => (
     is       => 'ro',
-    isa      => 'Int',
+    isa      => Int,
     required => 1,
 );
 
@@ -34,25 +36,27 @@ has 'workers' => (
 #-------------------------------------------------------------------------------
 has 'requests' => (
     is       => 'ro',
-    isa      => 'Int',
+    isa      => Int,
     init_arg => undef,
     default  => 0,
-    traits   => ['Counter'],
-    handles  => {
-        'inc_requests' => 'inc',
-    }
 );
+
+sub inc_requests {
+    my ($self, $amount) = @_;
+    $amount //= 0;
+    $self->{requests} += $amount;
+}
 
 #-------------------------------------------------------------------------------
 # Stores the last <tracking> request timings.
 #-------------------------------------------------------------------------------
 has 'history' => (
-    is       => 'ro',
-    isa      => 'ArrayRef[Num]',
-    init_arg => undef,
-    default  => sub {[]},
-    traits   => ['Array'],
-    handles  => {
+    is          => 'ro',
+    isa         => ArrayRef[Num],
+    init_arg    => undef,
+    default     => sub {[]},
+    handles_via => 'Array',
+    handles     => {
         add_history    => 'push',
         del_history    => 'shift',
         len_history    => 'count',
@@ -64,12 +68,12 @@ has 'history' => (
 # Hash of pending requests (msgid => tracking start time).
 #-------------------------------------------------------------------------------
 has 'pending' => (
-    is       => 'ro',
-    isa      => 'HashRef[Num]',
-    init_arg => undef,
-    default  => sub {{}},
-    traits   => ['Hash'],
-    handles  => {
+    is          => 'ro',
+    isa         => Map[Str,Num],
+    init_arg    => undef,
+    default     => sub {{}},
+    handles_via => 'Hash',
+    handles     => {
         set_pending => 'set',
         get_pending => 'get',
         del_pending => 'delete',
@@ -82,7 +86,7 @@ has 'pending' => (
 #-------------------------------------------------------------------------------
 has 'avg_proc_time' => (
     is       => 'rw',
-    isa      => 'Num',
+    isa      => Num,
     init_arg => undef,
     default  => 0,
 );
@@ -132,7 +136,4 @@ sub est_proc_time {
     return $self->avg_proc_time * ($self->num_pending + 1);
 }
 
-
-no Moose;
-__PACKAGE__->meta->make_immutable;
 1;

@@ -1,7 +1,8 @@
 package Argon::Client;
 
-use Moose;
-use MooseX::AttributeShortcuts;
+use Moo;
+use MooX::HandlesVia;
+use Types::Standard qw(-types);
 use Carp;
 use AnyEvent;
 use AnyEvent::Socket;
@@ -15,19 +16,19 @@ use Argon::Stream;
 
 has host => (
     is       => 'ro',
-    isa      => 'Str',
+    isa      => Str,
     required => 1,
 );
 
 has port => (
     is       => 'ro',
-    isa      => 'Int',
+    isa      => Int,
     required => 1,
 );
 
 has stream => (
     is       => 'lazy',
-    isa      => 'Argon::Stream',
+    isa      => InstanceOf['Argon::Stream'],
     init_arg => undef,
     handles  => [qw(addr)],
 );
@@ -43,30 +44,30 @@ after _build_stream => sub {
 };
 
 has pending => (
-    is       => 'ro',
-    isa      => 'HashRef',
-    init_arg => undef,
-    default  => sub {{}},
-    traits   => ['Hash'],
+    is          => 'ro',
+    isa         => HashRef,
+    init_arg    => undef,
+    default     => sub {{}},
+    handles_via => 'Hash',
     handles  => {
         set_pending => 'set',
         get_pending => 'get',
-        has_pending => 'exists',
         del_pending => 'delete',
+        has_pending => 'exists',
         all_pending => 'keys',
     }
 );
 
 has inbox => (
     is       => 'ro',
-    isa      => 'Coro::Channel',
+    isa      => InstanceOf['Coro::Channel'],
     init_arg => undef,
     default  => sub { Coro::Channel->new() },
 );
 
 has read_loop => (
     is       => 'lazy',
-    isa      => 'Coro',
+    isa      => InstanceOf['Coro'],
     init_arg => undef,
 );
 
@@ -158,8 +159,6 @@ sub defer {
     return sub { $cv->recv };
 }
 
-no Moose;
-__PACKAGE__->meta->make_immutable;
 1;
 __DATA__
 
