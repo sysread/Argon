@@ -1,4 +1,4 @@
-0.10    2014-??-??
+0.10    2014-10-24
     * Migrated to Moo and Types::Standard
     * Bug fixes in service initialization and shutdown
     * Added integration test
