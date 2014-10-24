@@ -15,7 +15,11 @@ extends 'Argon::Dispatcher';
 
 has manager => (
     is        => 'rwp',
-    isa       => sub {croak "'$_[0]' does not match host:port" if $_[0] !~ /^[\w\.]+:\d+$/ },
+    isa       => sub {
+        croak sprintf("'%s' does not match host:port", ($_[0] // 'undef'))
+            if !defined $_[0]
+            || $_[0] !~ /^[\w\.]+:\d+$/;
+    },
     predicate => 'is_managed',
 );
 
@@ -73,6 +77,14 @@ has manager_client_addr => (
     init_arg  => undef,
     clearer   => 'clear_manager_client_addr',
 );
+
+# Shut down the process pool when the server stops
+around stop => sub {
+    my $orig = shift;
+    my $self = shift;
+    $self->pool->shutdown;
+    $self->$orig(@_);
+};
 
 sub init {
     my $self = shift;
@@ -135,6 +147,7 @@ sub register {
         );
 
         $stream->write($msg);
+
         # Manager will connect as a client here before returning a reply
         my $reply = $stream->read;
 

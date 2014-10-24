@@ -28,6 +28,7 @@ WriteMakefile(
         'Types::Standard'    => 0,
     },
     BUILD_REQUIRES => {
+        'List::Util'       => 0,
         'Test::More'       => 0,
         'Test::TinyMocker' => 0,
     },

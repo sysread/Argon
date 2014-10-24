@@ -37,7 +37,7 @@ has stop_cb => (
 );
 
 sub start {
-    my $self = shift;
+    my ($self, $cb) = @_;
 
     $self->_set_stop_cb(rouse_cb);
     my $sigint  = AnyEvent->signal(signal => 'INT',  cb => $self->stop_cb);
@@ -59,6 +59,7 @@ sub start {
             $self->_set_host($host);
             $self->_set_address("$host:$port");
             $self->init;
+            $cb->($self->address) if $cb && ref $cb eq 'CODE';
         },
     );
 
