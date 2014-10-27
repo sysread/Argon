@@ -1,6 +1,7 @@
 0.11    2014-10-27
     * Tests now force use of AnyEvent::Loop (pure perl loop) for consistency
     * Force version 0.11 of Coro::ProcessPool, which fixes recursive Coro::Handle read bug
+    * Removed namespace::autoclean from Argon.pm (thanks CPAN testers)
 
 0.10    2014-10-24
     * Migrated to Moo and Types::Standard
