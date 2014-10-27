@@ -32,12 +32,12 @@ Coro::AnyEvent::sleep(3);
 my $client = Argon::Client->new(host => $manager->host, port => $manager->port);
 $client->connect;
 
-my @range    = 1 .. 100;
-my %deferred = map { $_ => $client->defer(sub { $_[0] * 2 }, [$_]) } @range;
+my @range    = 1 .. 1000;
+my %deferred = map { $_ => $client->defer(sub { $_[0] * $_[0] }, [$_]) } @range;
 my %results  = map { $_ => $deferred{$_}->() } keys %deferred;
 
 foreach my $i (shuffle @range) {
-    is($results{$i}, $i * 2, "expected results for $i");
+    is($results{$i}, $i * $i, "expected results for $i");
 }
 
 $client->shutdown;

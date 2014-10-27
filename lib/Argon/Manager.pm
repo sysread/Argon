@@ -4,6 +4,7 @@ use Moo;
 use MooX::HandlesVia;
 use Types::Standard qw(-types);
 use Coro;
+use Coro::PrioChannel;
 use Coro::Semaphore;
 use Guard qw(scope_guard);
 use Argon::Client;
@@ -56,6 +57,82 @@ has capacity => (
     init_arg => undef,
     default  => 0,
 );
+
+has todo => (
+    is       => 'ro',
+    isa      => InstanceOf['Coro::PrioChannel'],
+    init_arg => undef,
+    default  => sub { Coro::PrioChannel->new() },
+);
+
+has complete => (
+    is       => 'ro',
+    isa      => HashRef,
+    init_arg => undef,
+    default  => sub {{}},
+);
+
+has watcher => (
+    is       => 'lazy',
+    isa      => InstanceOf['Coro'],
+    init_arg => undef,
+);
+
+sub _build_watcher {
+    my $self = shift;
+
+    return async {
+        while (1) {
+            # Acquire capacity slot
+            $self->sem_capacity->down;
+
+            # Release capacity slot once complete
+            scope_guard { $self->sem_capacity->up };
+
+            # Get the next available worker
+            my $cmp = sub { $self->get_tracking($_[0])->est_proc_time };
+            my @workers =
+                sort { $cmp->($a) <=> $cmp->($b) }
+                grep { $self->get_tracking($_)->capacity > 0 }
+                $self->all_workers;
+
+            my $worker = $workers[0];
+
+            # Get the next message
+            my $msg = $self->todo->get;
+
+            # Execute with tracking
+            $self->get_tracking($worker)->start_request($msg->id);
+
+            scope_guard {
+                # If the worker connection was lost while the request was
+                # outstanding, the tracker may be missing, so completing
+                # the request must account for this appropriately.
+                $self->get_tracking($worker)->end_request($msg->id)
+                    if $self->has_worker($worker);
+            };
+
+            # Assign the task
+            $msg->{key} = $worker;
+
+            # TODO this is hanging sometimes and causing delays in responses
+            my $reply = eval { $self->get_worker($worker)->send($msg) };
+
+            if ($@) {
+                WARN 'Worker error (%s) - disconnecting: %s', $worker, $@;
+                $self->deregister($worker);
+                $reply = $msg->reply(cmd => $CMD_ERROR, payload => "An error occurred routing the request: $@");
+            }
+
+            $self->complete->{$msg->id}->put($reply);
+        }
+    };
+}
+
+before start => sub {
+    my $self = shift;
+    $self->watcher;
+};
 
 sub inc_capacity {
     my ($self, $amount) = @_;
@@ -155,45 +232,13 @@ sub cmd_queue {
     return $msg->reply(cmd => $CMD_ERROR, payload => 'No workers registered.')
         if $self->capacity == 0;
 
-    # Acquire capacity slot
-    $self->sem_capacity->down;
+    $self->complete->{$msg->id} = Coro::Channel->new();
+    $self->todo->put($msg);
 
-    # Release capacity slot once complete
-    scope_guard { $self->sem_capacity->up };
+    my $reply = $self->complete->{$msg->id}->get;
+    delete $self->complete->{$msg->id};
 
-    # Get the next available worker
-    my $cmp = sub { $self->get_tracking($_[0])->est_proc_time };
-    my @workers =
-        sort { $cmp->($a) <=> $cmp->($b) }
-        grep { $self->get_tracking($_)->capacity > 0 }
-        $self->all_workers;
-
-    my $worker = $workers[0];
-
-    # Execute with tracking
-    $self->get_tracking($worker)->start_request($msg->id);
-
-    scope_guard {
-        # If the worker connection was lost while the request was
-        # outstanding, the tracker may be missing, so completing
-        # the request must account for this appropriately.
-        $self->get_tracking($worker)->end_request($msg->id)
-            if $self->has_worker($worker);
-    };
-
-    # Assign the task
-    $msg->{key} = $worker;
-
-    # TODO this is hanging sometimes and causing delays in responses
-    my $reply = eval { $self->get_worker($worker)->send($msg) };
-
-    if ($@) {
-        WARN 'Worker error (%s) - disconnecting: %s', $worker, $@;
-        $self->deregister($worker);
-        return $msg->reply(cmd => $CMD_ERROR, payload => "An error occurred routing the request: $@");
-    } else {
-        return $reply;
-    }
+    return $reply;
 }
 
 1;
