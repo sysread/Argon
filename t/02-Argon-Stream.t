@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use AnyEvent::Impl::Perl; # Ensure the pure perl loop is loaded for testing
+use AnyEvent::Loop; # Ensure the pure perl loop is loaded for testing
 use Test::More;
 use AnyEvent::Util;
 use Coro::Handle;
