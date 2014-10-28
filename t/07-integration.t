@@ -7,9 +7,12 @@ use AnyEvent;
 use Coro;
 use Coro::AnyEvent;
 
+use Argon;
 use Argon::Client;
 use Argon::Manager;
 use Argon::Worker;
+
+$Argon::LOG_LEVEL = 0;
 
 my $manager_cv     = AnyEvent->condvar;;
 my $manager        = Argon::Manager->new();
