@@ -1,5 +1,6 @@
 0.12    ????-??-??
     * Added priority queueing to Managers
+    * Added retry strategy to Clients when system at max capacity
     * Switched from Test::TinyMocker to Sub::Override
 
 0.11    2014-10-27

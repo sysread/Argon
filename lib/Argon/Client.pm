@@ -140,7 +140,7 @@ sub queue {
         payload => [$f, $args],
     );
 
-    my $next_try  = 0.1;
+    my $next_try = 0.1;
     my $reply;
 
     for (my $tries = 1; $tries <= $max_tries; ++$tries) {
@@ -151,17 +151,34 @@ sub queue {
             Coro::AnyEvent::sleep $next_try;
             next;
         }
+        elsif ($reply->cmd == $CMD_ACK) {
+            return $reply->id;
+        }
+        else {
+            croak sprintf('Unknown response type: %s', $reply->cmd);
+        }
     }
+
+    croak sprintf('Request failed after %d attempts. %s', $max_tries, $reply->payload);
+}
+
+sub collect {
+    my ($self, $id) = @_;
+    my $msg   = Argon::Message->new(id => $id, cmd => $CMD_COLLECT, payload => $id);
+    my $reply = $self->send($msg);
 
     if ($reply->cmd == $CMD_COMPLETE) {
         return $reply->payload;
-    }
-    elsif ($reply->cmd == $CMD_REJECTED) {
-        croak sprintf('Request failed after %d attempts. %s', $max_tries, $reply->payload);
-    }
-    else {
+    } else {
         croak $reply->payload;
     }
+}
+
+sub process {
+    my ($self, $f, $args, $pri, $max_tries) = @_;
+    my $id     = $self->queue($f, $args, $pri, $max_tries);
+    my $result = $self->collect($id);
+    return $result;
 }
 
 sub defer {
@@ -170,11 +187,11 @@ sub defer {
 
     my $thread = async_pool {
         if ($arr) {
-            my @result = eval { queue(@_) };
+            my @result = eval { process(@_) };
             $cv->croak($@) if $@;
             $cv->send(@result);
         } else {
-            my $result = eval { queue(@_) };
+            my $result = eval { process(@_) };
             $cv->croak($@) if $@;
             $cv->send($result);
         }

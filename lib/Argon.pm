@@ -1,8 +1,7 @@
 #-------------------------------------------------------------------------------
 # TODO
-#   - max time on job
-#   - ensure recursive jobs don't kill the queue
-#   - reject after queue filled
+#   * Delete uncollected results after configurable time period
+#   * Verify that all processes terminated after SIGTERM/SIGINT
 #-------------------------------------------------------------------------------
 package Argon;
 
@@ -26,7 +25,7 @@ our %EXPORT_TAGS = (
 
     # Command verbs and responses
     commands => [qw(
-        $CMD_PING $CMD_QUEUE $CMD_REGISTER
+        $CMD_PING $CMD_QUEUE $CMD_COLLECT $CMD_REGISTER
         $CMD_ACK $CMD_COMPLETE $CMD_ERROR $CMD_REJECTED
     )],
 
@@ -95,14 +94,15 @@ const our $PRI_LOW    => Coro::PRIO_MIN;
 #-------------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------------
-const our $CMD_PING     => 0;  # Add a node to a cluster
-const our $CMD_QUEUE    => 1;  # Queue a message
-const our $CMD_REGISTER => 2;  # Add a node to a cluster
+const our $CMD_PING     => 0; # Add a node to a cluster
+const our $CMD_QUEUE    => 1; # Queue a message
+const our $CMD_COLLECT  => 2; # Collect results
+const our $CMD_REGISTER => 3; # Add a node to a cluster
 
-const our $CMD_ACK      => 3;  # Acknowledgement (respond OK)
-const our $CMD_COMPLETE => 4;  # Response - message is complete
-const our $CMD_ERROR    => 5;  # Response - error processing message or invalid message format
-const our $CMD_REJECTED => 6;  # Response - no available capacity for handling tasks
+const our $CMD_ACK      => 4; # Acknowledgement (respond OK)
+const our $CMD_COMPLETE => 5; # Response - message is complete
+const our $CMD_ERROR    => 6; # Response - error processing message or invalid message format
+const our $CMD_REJECTED => 7; # Response - no available capacity for handling tasks
 
 #-------------------------------------------------------------------------------
 # Strips an error message of line number and file information.

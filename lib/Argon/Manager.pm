@@ -14,6 +14,7 @@ use Argon qw(K :logging :commands);
 
 const our $ERR_NO_CAPACITY => 'Unable to process request. System is at max capacity.';
 const our $ERR_PROC_FAIL   => 'An error occurred routing the request.';
+const our $ERR_NOT_FOUND   => 'The message ID was not found.';
 
 extends 'Argon::Dispatcher';
 
@@ -183,6 +184,7 @@ sub init {
     my $self = shift;
     $self->respond_to($CMD_REGISTER, K('cmd_register', $self));
     $self->respond_to($CMD_QUEUE,    K('cmd_queue',    $self));
+    $self->respond_to($CMD_COLLECT,  K('cmd_collect',  $self));
     $self->is_running(1);
     $self->watcher;
 }
@@ -273,14 +275,24 @@ sub cmd_queue {
     return $msg->reply(cmd => $CMD_REJECTED, payload => $ERR_NO_CAPACITY)
         unless $self->has_capacity;
 
-    $self->complete->{$msg->id} = Coro::Channel->new();
     $self->complete_set($msg->id => Coro::Channel->new());
     $self->todo_put($msg);
 
-    my $reply = $self->complete_get($msg->id)->get;;
-    $self->complete_del($msg->id);
+    return $msg->reply(cmd => $CMD_ACK);
+}
 
-    return $reply;
+sub cmd_collect {
+    my ($self, $msg, $addr) = @_;
+
+    my $id = $msg->payload;
+
+    return $msg->reply(cmd => $CMD_ERROR, payload => $ERR_NOT_FOUND)
+        unless $self->is_pending($id);
+
+    my $result = $self->complete_get($id)->get;;
+    $self->complete_del($id);
+
+    return $result->reply(id => $id);
 }
 
 1;

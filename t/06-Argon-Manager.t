@@ -63,8 +63,10 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
         Sub::Override->new('Argon::Client::send', sub { return $_[1]->reply(cmd => $CMD_COMPLETE, payload => 42) }),
     );
 
-    my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_QUEUE));
-    is($reply->cmd, $CMD_COMPLETE, 'queue succeeds with registered worker');
+    my $ack = $m->dispatch(Argon::Message->new(cmd => $CMD_QUEUE));
+    is($ack->cmd, $CMD_ACK, 'queue succeeds with registered worker');
+
+    my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_COLLECT, payload => $ack->id));
     is($reply->payload, 42, 'queue returns expected result from worker client');
 }
 

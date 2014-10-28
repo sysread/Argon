@@ -13,6 +13,12 @@ use Argon::Manager;
 use Argon::Worker;
 
 $Argon::LOG_LEVEL = 0;
+#$Argon::LOG_LEVEL = $Argon::LOG_LEVEL|$Argon::LOG_DEBUG;
+
+sub test {
+    my $n = shift || 0;
+    return $n * $n;
+}
 
 my $manager_cv     = AnyEvent->condvar;;
 my $manager        = Argon::Manager->new();
@@ -35,12 +41,19 @@ Coro::AnyEvent::sleep(3);
 my $client = Argon::Client->new(host => $manager->host, port => $manager->port);
 $client->connect;
 
-my @range    = 1 .. 20;
+my @range = 1 .. 20;
+
+# Test process
+foreach my $i (@range) {
+    my $result = $client->process(\&test, [$i]);
+    is($result, ($i * $i), "process result $i");
+}
+
+# Test defer
 my %deferred = map { $_ => $client->defer(sub { $_[0] * $_[0] }, [$_]) } @range;
 my %results  = map { $_ => $deferred{$_}->() } keys %deferred;
-
 foreach my $i (shuffle @range) {
-    is($results{$i}, $i * $i, "expected results for $i");
+    is($results{$i}, $i * $i, "defer result $i");
 }
 
 $client->shutdown;
