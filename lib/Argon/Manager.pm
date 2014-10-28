@@ -3,6 +3,7 @@ package Argon::Manager;
 use Moo;
 use MooX::HandlesVia;
 use Types::Standard qw(-types);
+use Const::Fast;
 use Coro;
 use Coro::PrioChannel;
 use Coro::Semaphore;
@@ -11,7 +12,15 @@ use Argon::Client;
 use Argon::Tracker;
 use Argon qw(K :logging :commands);
 
+const our $ERR_NO_CAPACITY => 'Unable to process request. System is at max capacity.';
+const our $ERR_PROC_FAIL   => 'An error occurred routing the request.';
+
 extends 'Argon::Dispatcher';
+
+has queue_size => (
+    is  => 'ro',
+    isa => Maybe[Int],
+);
 
 has workers => (
     is          => 'ro',
@@ -59,15 +68,20 @@ has capacity => (
 );
 
 has todo => (
-    is       => 'ro',
+    is       => 'lazy',
     isa      => InstanceOf['Coro::PrioChannel'],
     init_arg => undef,
-    default  => sub { Coro::PrioChannel->new() },
     handles  => {
       todo_put => 'put',
       todo_get => 'get',
+      todo_len => 'size',
     }
 );
+
+sub _build_todo {
+    my $self = shift;
+    return Coro::PrioChannel->new($self->queue_size);
+}
 
 has complete => (
     is          => 'ro',
@@ -137,7 +151,7 @@ sub _build_watcher {
             if ($@) {
                 WARN 'Worker error (%s) - disconnecting: %s', $worker, $@;
                 $self->deregister($worker);
-                $reply = $msg->reply(cmd => $CMD_ERROR, payload => "An error occurred routing the request: $@");
+                $reply = $msg->reply(cmd => $CMD_ERROR, payload => "$ERR_PROC_FAIL. Error message: $@");
             }
 
             DEBUG 'Result is posted';
@@ -162,6 +176,13 @@ sub dec_capacity {
     my ($self, $amount) = @_;
     $amount //= 1;
     $self->{capacity} -= $amount;
+}
+
+sub has_capacity {
+    my $self = shift;
+    return if $self->capacity == 0;
+    return if $self->queue_size && $self->todo_len >= $self->queue_size;
+    return 1;
 }
 
 sub init {
@@ -254,9 +275,9 @@ sub cmd_register {
 sub cmd_queue {
     my ($self, $msg, $addr) = @_;
 
-    # Return an error if there are no workers registered
-    return $msg->reply(cmd => $CMD_ERROR, payload => 'No workers registered.')
-        if $self->capacity == 0;
+    # Reject tasks when there is no available capacity
+    return $msg->reply(cmd => $CMD_REJECTED, payload => $ERR_NO_CAPACITY)
+        unless $self->has_capacity;
 
     $self->complete->{$msg->id} = Coro::Channel->new();
     $self->complete_set($msg->id => Coro::Channel->new());

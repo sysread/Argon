@@ -1,3 +1,9 @@
+#-------------------------------------------------------------------------------
+# TODO
+#   - max time on job
+#   - ensure recursive jobs don't kill the queue
+#   - reject after queue filled
+#-------------------------------------------------------------------------------
 package Argon;
 
 our $VERSION = '0.12';

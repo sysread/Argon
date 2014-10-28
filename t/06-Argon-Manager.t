@@ -14,16 +14,16 @@ $Argon::LOG_LEVEL = 0;
 use_ok('Argon::Manager') or BAIL_OUT;
 
 # Create a new manager
-my $m = new_ok('Argon::Manager', [port => '4321', host => 'test']) or BAIL_OUT;
+my $m = new_ok('Argon::Manager', [port => '4321', host => 'test', queue_size => 10]) or BAIL_OUT;
 $m->init;
 
 ok($m->responds_to($CMD_QUEUE), 'manager responds to CMD_QUEUE');
 ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
 
+# Queue fails with no capacity
 {
-    # Queue fails with no capacity
     my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_QUEUE));
-    is($reply->cmd, $CMD_ERROR, 'queue fails with no capacity');
+    is($reply->cmd, $CMD_REJECTED, 'queue fails with no capacity');
 }
 
 # Registration succeeds
@@ -57,27 +57,39 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
     ok($monitor_called, 'register starts monitoring worker connection');
 }
 
+# Queue succeeds with registered worker
 {
     my @overrides = (
         Sub::Override->new('Argon::Client::send', sub { return $_[1]->reply(cmd => $CMD_COMPLETE, payload => 42) }),
     );
 
-    # Queue succeeds with registered worker
     my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_QUEUE));
     is($reply->cmd, $CMD_COMPLETE, 'queue succeeds with registered worker');
     is($reply->payload, 42, 'queue returns expected result from worker client');
 }
 
-# Deregistration results in capacity reduction
-$m->deregister('test');
-is($m->capacity, 0, 'worker disconnect removes capacity');
-is($m->current_capacity, 0, 'worker disconnect adjusts sem');
-ok(!$m->has_worker('test'), 'worker deregistered');
-
+# Queue fails when max capacity reached
 {
-    # Queue fails with degraded capacity
+    my @overrides = (
+        Sub::Override->new('Argon::Manager::todo_len', sub { 11 }),
+    );
+
     my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_QUEUE));
-    is($reply->cmd, $CMD_ERROR, 'queue fails with no capacity after dereg');
+    is($reply->cmd, $CMD_REJECTED, 'queue fails with no capacity when queue full');
+}
+
+# Deregistration results in capacity reduction
+{
+    $m->deregister('test');
+    is($m->capacity, 0, 'worker disconnect removes capacity');
+    is($m->current_capacity, 0, 'worker disconnect adjusts sem');
+    ok(!$m->has_worker('test'), 'worker deregistered');
+}
+
+# Queue fails with degraded capacity
+{
+    my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_QUEUE));
+    is($reply->cmd, $CMD_REJECTED, 'queue fails with no capacity after dereg');
 }
 
 done_testing;
