@@ -116,6 +116,29 @@ given identical tasks on a network with two worker nodes, each running the same
 number of processes, adding another worker would increase throughput by 50%.
 Doubling the number of workers would increase throughput by 100%.
 
+=head1 HYPERCONGESTION AND PREDICTABLE PERFORMANCE DEGREDATION
+
+Argon managers started with the C<queue-size> switch are protected by a
+size-limited queue, preventing large backlogs when the system is under high
+load. When the queue limit is reached, tasks are rejected. The client
+(L<Argon::Client>) transparently retries rejected tasks with an increasing
+delay until the system is able to accomodate them (up to a configurable default
+maximum of 10 retries).
+
+When hit with a spike in traffic, a service can acquire a growing backlog of
+requests that are beyond its capacity to handle (hypercongestion). The system
+cannot return to responsiveness until the backlog has been cleared to within
+the limits of the system's capacity.
+
+Setting a queue limit enforces a defined, maximum load for the system, ensuring
+that the system remains responsive even when under high load, and protecting
+other back end services from being flooded with large spikes in requests (e.g.
+a database server).
+
+The benefit of this strategy is that administrators can predict the degradation
+to performance in the event of higher than normal traffic and account for it
+correctly when deciding how to allocate resources.
+
 =head1 AUTHOR
 
 Jeff Ober <jeffober@gmail.com>

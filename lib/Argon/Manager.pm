@@ -109,11 +109,9 @@ sub _build_watcher {
     return async {
         while ($self->is_running) {
             # Get the next message
-            DEBUG 'Waiting for message';
             my $msg = $self->todo_get;
 
             # Acquire capacity slot
-            DEBUG 'Waiting for worker';
             $self->sem_capacity->down;
 
             # Release capacity slot once complete
@@ -143,10 +141,7 @@ sub _build_watcher {
             $msg->{key} = $worker;
 
             # TODO this is hanging sometimes and causing delays in responses
-            DEBUG 'Waiting for result';
             my $reply = eval { $self->get_worker($worker)->send($msg) };
-
-            DEBUG 'RESULT IS: %s', $reply->payload;
 
             if ($@) {
                 WARN 'Worker error (%s) - disconnecting: %s', $worker, $@;
@@ -154,7 +149,6 @@ sub _build_watcher {
                 $reply = $msg->reply(cmd => $CMD_ERROR, payload => "$ERR_PROC_FAIL. Error message: $@");
             }
 
-            DEBUG 'Result is posted';
             $self->complete_get($msg->id)->put($reply);
         }
     };

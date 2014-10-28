@@ -9,6 +9,7 @@ use AnyEvent::Socket;
 use Coro;
 use Coro::AnyEvent;
 use Coro::Handle;
+use List::Util qw(max);
 use Guard qw(scope_guard);
 use Argon qw(:commands :priorities :logging);
 use Argon::Message;
@@ -124,21 +125,41 @@ sub send {
 }
 
 sub queue {
-    my ($self, $f, $args, $pri) = @_;
+    my ($self, $f, $args, $pri, $max_tries) = @_;
     $f && ref $f eq 'CODE' || croak 'expected CODE ref';
+
     $args ||= [];
     ref $args eq 'ARRAY' || croak 'expected ARRAY ref of args';
-    $pri ||= $PRI_NORMAL;
 
-    my $reply = $self->send(Argon::Message->new(
+    $pri       ||= $PRI_NORMAL;
+    $max_tries ||= 10;
+
+    my $msg = Argon::Message->new(
         cmd     => $CMD_QUEUE,
         pri     => $pri,
         payload => [$f, $args],
-    ));
+    );
+
+    my $next_try  = 0.1;
+    my $reply;
+
+    for (my $tries = 1; $tries <= $max_tries; ++$tries) {
+        $reply = $self->send($msg);
+
+        if ($reply->cmd == $CMD_REJECTED) {
+            $next_try = log(max($tries, 1.1)) / log(10);
+            Coro::AnyEvent::sleep $next_try;
+            next;
+        }
+    }
 
     if ($reply->cmd == $CMD_COMPLETE) {
         return $reply->payload;
-    } elsif ($reply->cmd == $CMD_ERROR) {
+    }
+    elsif ($reply->cmd == $CMD_REJECTED) {
+        croak sprintf('Request failed after %d attempts. %s', $max_tries, $reply->payload);
+    }
+    else {
         croak $reply->payload;
     }
 }
@@ -210,12 +231,16 @@ calling L</connect>.
 
 Connects to the remote host.
 
-=head2 queue($f, $args)
+=head2 queue($f, $args, $pri, $max_tries)
 
 Sends a task to the Argon network to evaluate C<$f->(@$args)> and returns the
 result. Since Argon uses L<Coro>, this method does not actually block until the
 result is received. Instead, it yields execution priority to other threads
-until the result is available.
+until the result is available. If specified, $pri (an $Argon::PRI_* constant)
+is the priority of the task, affecting the priority queueing of the task with
+the manager. $max_tries specifies the maximum number of attempts that will be
+made to queue the task in the event that the server is at maximum capacity and
+rejects the request.
 
 If an error occurs in the execution of C<$f>, an error is thrown.
 
@@ -261,10 +286,15 @@ The right way is to import the module inside the task:
 
     my $data = [1,2,3];
     my $string = $client->queue(sub {
-        use Data::Dumper;
+        require Data::Dumper;
         my $data = shift;
-        return Dumper($data);
+        return Data::Dumper::Dumper($data);
     }, [$data]);
+
+Note the use of C<require> instead of C<use>. This is because C<use> is
+performed at compilation time, causing it to be triggered when the calling code
+is compiled, rather than from within the worker process. C<require>, on the
+other hand, is triggered at runtime and will behave as expected.
 
 =head1 AUTHOR
 

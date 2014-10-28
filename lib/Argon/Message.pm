@@ -2,12 +2,14 @@ package Argon::Message;
 
 use strict;
 use warnings;
+
+require Data::UUID;
+require Storable;
+
 use Carp;
-use Data::UUID;
-use Storable qw(nfreeze thaw);
-use MIME::Base64 qw(encode_base64 decode_base64);
-use List::Util qw(first);
-use Argon qw(:priorities);
+use Coro::Storable qw(nfreeze thaw);
+use MIME::Base64   qw(encode_base64 decode_base64);
+use Argon          qw(:priorities);
 
 use fields qw(
     id
@@ -39,10 +41,14 @@ sub payload { $_[0]->{payload} }
 sub encode {
     my $self = shift;
 
-    local $Storable::Deparse = 1;
-    my $data = defined $self->{payload}
-        ? encode_base64(nfreeze([$self->{payload}]), '')
-        : '-';
+    my $data = do {
+        no warnings 'once';
+        local $Storable::Deparse = 1;
+
+        defined $self->{payload}
+            ? encode_base64(nfreeze([$self->{payload}]), '')
+            : '-';
+    };
 
     my $line = join(
         $Argon::MSG_SEPARATOR,
@@ -69,16 +75,17 @@ sub decode {
     if ($payload eq '-') {
         undef $payload;
     } else {
+        no warnings 'once';
         local $Storable::Eval = 1;
         $payload = thaw(decode_base64($payload))->[0];
     }
 
     return $class->new(
-        id         => $id,
-        cmd        => $cmd,
-        pri        => $pri,
-        key        => $key,
-        payload    => $payload,
+        id      => $id,
+        cmd     => $cmd,
+        pri     => $pri,
+        key     => $key,
+        payload => $payload,
     );
 }
 
