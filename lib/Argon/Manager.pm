@@ -63,13 +63,24 @@ has todo => (
     isa      => InstanceOf['Coro::PrioChannel'],
     init_arg => undef,
     default  => sub { Coro::PrioChannel->new() },
+    handles  => {
+      todo_put => 'put',
+      todo_get => 'get',
+    }
 );
 
 has complete => (
-    is       => 'ro',
-    isa      => HashRef,
-    init_arg => undef,
-    default  => sub {{}},
+    is          => 'ro',
+    isa         => HashRef,
+    init_arg    => undef,
+    default     => sub {{}},
+    handles_via => 'Hash',
+    handles     => {
+      complete_set => 'set',
+      complete_get => 'get',
+      complete_del => 'delete',
+      is_pending   => 'exists',
+    }
 );
 
 has watcher => (
@@ -82,7 +93,7 @@ sub _build_watcher {
     my $self = shift;
 
     return async {
-        while (1) {
+        while ($self->is_running) {
             # Acquire capacity slot
             $self->sem_capacity->down;
 
@@ -99,7 +110,7 @@ sub _build_watcher {
             my $worker = $workers[0];
 
             # Get the next message
-            my $msg = $self->todo->get;
+            my $msg = $self->todo_get;
 
             # Execute with tracking
             $self->get_tracking($worker)->start_request($msg->id);
@@ -124,10 +135,16 @@ sub _build_watcher {
                 $reply = $msg->reply(cmd => $CMD_ERROR, payload => "An error occurred routing the request: $@");
             }
 
-            $self->complete->{$msg->id}->put($reply);
+            $self->get_complete($msg->id)->put($reply);
         }
     };
 }
+
+has is_running => (
+    is      => 'rw',
+    isa     => Bool,
+    default => 0,
+);
 
 before start => sub {
     my $self = shift;
@@ -150,6 +167,12 @@ sub init {
     my $self = shift;
     $self->respond_to($CMD_REGISTER, K('cmd_register', $self));
     $self->respond_to($CMD_QUEUE,    K('cmd_queue',    $self));
+    $self->is_running(1);
+}
+
+sub shutdown {
+    my $self = shift;
+    $self->is_running(0);
 }
 
 sub deregister {
@@ -233,10 +256,11 @@ sub cmd_queue {
         if $self->capacity == 0;
 
     $self->complete->{$msg->id} = Coro::Channel->new();
-    $self->todo->put($msg);
+    $self->complete_set($msg->id => Coro::Channel->new());
+    $self->todo_put($msg);
 
-    my $reply = $self->complete->{$msg->id}->get;
-    delete $self->complete->{$msg->id};
+    my $reply = $self->complete_get($msg->id)->get;;
+    $self->complete_del($msg->id);
 
     return $reply;
 }

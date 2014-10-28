@@ -64,6 +64,7 @@ sub start {
     );
 
     rouse_wait($self->stop_cb);
+    $self->shutdown;
     INFO 'Service stopped';
 }
 
@@ -104,5 +105,6 @@ sub process_requests {
 sub init                { }
 sub client_connected    { }
 sub client_disconnected { }
+sub shutdown            { }
 
 1;
