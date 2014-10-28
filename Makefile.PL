@@ -32,5 +32,6 @@ WriteMakefile(
         'List::Util'       => 0,
         'Test::More'       => 0,
         'Test::TinyMocker' => 0,
+        'Sub::Override'    => 0,
     },
 );

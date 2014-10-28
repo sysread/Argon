@@ -94,7 +94,12 @@ sub _build_watcher {
 
     return async {
         while ($self->is_running) {
+            # Get the next message
+            DEBUG 'Waiting for message';
+            my $msg = $self->todo_get;
+
             # Acquire capacity slot
+            DEBUG 'Waiting for worker';
             $self->sem_capacity->down;
 
             # Release capacity slot once complete
@@ -108,9 +113,6 @@ sub _build_watcher {
                 $self->all_workers;
 
             my $worker = $workers[0];
-
-            # Get the next message
-            my $msg = $self->todo_get;
 
             # Execute with tracking
             $self->get_tracking($worker)->start_request($msg->id);
@@ -127,7 +129,10 @@ sub _build_watcher {
             $msg->{key} = $worker;
 
             # TODO this is hanging sometimes and causing delays in responses
+            DEBUG 'Waiting for result';
             my $reply = eval { $self->get_worker($worker)->send($msg) };
+
+            DEBUG 'RESULT IS: %s', $reply->payload;
 
             if ($@) {
                 WARN 'Worker error (%s) - disconnecting: %s', $worker, $@;
@@ -135,7 +140,8 @@ sub _build_watcher {
                 $reply = $msg->reply(cmd => $CMD_ERROR, payload => "An error occurred routing the request: $@");
             }
 
-            $self->get_complete($msg->id)->put($reply);
+            DEBUG 'Result is posted';
+            $self->complete_get($msg->id)->put($reply);
         }
     };
 }
@@ -145,11 +151,6 @@ has is_running => (
     isa     => Bool,
     default => 0,
 );
-
-before start => sub {
-    my $self = shift;
-    $self->watcher;
-};
 
 sub inc_capacity {
     my ($self, $amount) = @_;
@@ -168,6 +169,7 @@ sub init {
     $self->respond_to($CMD_REGISTER, K('cmd_register', $self));
     $self->respond_to($CMD_QUEUE,    K('cmd_queue',    $self));
     $self->is_running(1);
+    $self->watcher;
 }
 
 sub shutdown {
@@ -196,6 +198,7 @@ sub start_monitor {
         scope_guard { $self->deregister($worker) };
 
         while (1) {
+            DEBUG 'Sending ping';
             my $msg = Argon::Message->new(cmd => $CMD_PING);
             my $reply = $client->send($msg) or last;
 

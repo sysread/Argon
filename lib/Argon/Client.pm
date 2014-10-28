@@ -10,7 +10,7 @@ use Coro;
 use Coro::AnyEvent;
 use Coro::Handle;
 use Guard qw(scope_guard);
-use Argon qw(:commands :priorities);
+use Argon qw(:commands :priorities :logging);
 use Argon::Message;
 use Argon::Stream;
 
@@ -30,7 +30,9 @@ has stream => (
     is       => 'lazy',
     isa      => InstanceOf['Argon::Stream'],
     init_arg => undef,
-    handles  => [qw(addr)],
+    handles  => {
+        addr => 'addr',
+    },
 );
 
 sub _build_stream {
@@ -73,6 +75,7 @@ has read_loop => (
 
 sub _build_read_loop {
     my $self = shift;
+
     return async {
         scope_guard { $self->shutdown };
 

@@ -7,8 +7,6 @@ use Coro::Handle;
 use Argon qw(:commands);
 use Argon::Message;
 
-BEGIN { use AnyEvent::Impl::Perl }
-
 use_ok('Argon::Stream');
 
 {

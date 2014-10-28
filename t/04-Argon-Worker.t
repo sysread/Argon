@@ -2,21 +2,21 @@ use strict;
 use warnings;
 use AnyEvent::Loop; # Ensure the pure perl loop is loaded for testing
 use Test::More;
-use Test::TinyMocker;
 use List::Util qw(sum);
 use Coro;
-use Argon::Message;
+use Sub::Override;
 use Argon qw(:commands);
+require Argon::Message;
 require Coro::ProcessPool;
-
-BEGIN { require AnyEvent::Impl::Perl }
 
 local $Argon::LOG_LEVEL = 0;
 
-mock 'Coro::ProcessPool', 'process', sub {
-    my ($pool, $f, $args) = @_;
-    return $f->(@$args);
-};
+my @overrides = (
+    Sub::Override->new('Coro::ProcessPool::process', sub {
+        my ($pool, $f, $args) = @_;
+        return $f->(@$args);
+    }),
+);
 
 use_ok('Argon::Worker');
 
@@ -54,14 +54,16 @@ subtest '(managed) positive path' => sub {
 
     my $reg_msg;
 
-    mock 'Argon::Stream', 'connect', sub { return bless {}, 'Argon::Stream' };
-    mock 'Argon::Stream', 'write', sub { shift; $reg_msg = shift; };
-    mock 'Argon::Stream', 'read', sub {
-        Argon::Message->new(
-            cmd => $CMD_ACK,
-            payload => { client_addr => 'foo:9997' },
-        );
-    };
+    my @overrides = (
+        Sub::Override->new('Argon::Stream::connect', sub { return bless {}, 'Argon::Stream' }),
+        Sub::Override->new('Argon::Stream::write', sub { shift; $reg_msg = shift }),
+        Sub::Override->new('Argon::Stream::read', sub {
+            Argon::Message->new(
+                cmd => $CMD_ACK,
+                payload => { client_addr => 'foo:9997' },
+            );
+        }),
+    );
 
     $w->_set_port(9998);
     $w->_set_host('bar');
@@ -76,10 +78,6 @@ subtest '(managed) positive path' => sub {
 
     my $reply = $w->cmd_queue(Argon::Message->new(cmd => $CMD_QUEUE), 'asdf:1234');
     is($reply->cmd, $CMD_ERROR, 'cmd_queue fails in managed mode when msg source is not manager');
-
-    unmock 'Argon::Stream', 'connect';
-    unmock 'Argon::Stream', 'write';
-    unmock 'Argon::Stream', 'read';
 };
 
 subtest '(managed) negative path' => sub {
@@ -90,22 +88,25 @@ subtest '(managed) negative path' => sub {
     $w->_set_port(9999);
     $w->_set_host('bar');
 
-    mock 'Argon::Stream', 'connect', sub { die 'test msg' };
-    ok(!$w->register, 'registration fails on connection failure');
-    ok(!$w->is_registered, 'is_registered false after unsuccessful call to register');
+    {
+        my @overrides = (
+            Sub::Override->new('Argon::Stream::connect', sub { die 'test msg' }),
+        );
 
-    mock 'Argon::Stream', 'connect', sub { return bless {}, 'Argon::Stream' };
-    mock 'Argon::Stream', 'write',   sub { };
-    mock 'Argon::Stream', 'read',    sub { Argon::Message->new(cmd => $CMD_ERROR, payload => 'test msg') };
+        ok(!$w->register, 'registration fails on connection failure');
+        ok(!$w->is_registered, 'is_registered false after unsuccessful call to register');
+    }
+
+    my @overrides = (
+        Sub::Override->new('Argon::Stream::connect', sub { return bless {}, 'Argon::Stream' }),
+        Sub::Override->new('Argon::Stream::write', sub {}),
+        Sub::Override->new('Argon::Stream::read', sub { Argon::Message->new(cmd => $CMD_ERROR, payload => 'test msg') }),
+    );
 
     eval { $w->register };
     ok($@, 'registration failure from manager triggers an error');
     ok($@ =~ 'test msg', 'registration failure from manager propagates error message');
     ok(!$w->is_registered, 'is_registered false after unsuccessful call to register');
-
-    unmock 'Argon::Stream', 'connect';
-    unmock 'Argon::Stream', 'write';
-    unmock 'Argon::Stream', 'read';
 };
 
 subtest '(managed) registration loop' => sub {
@@ -120,21 +121,23 @@ subtest '(managed) registration loop' => sub {
     my $tries = 3;
     my $cb    = rouse_cb;
 
-    mock 'Argon::Stream', 'write', sub { };
-    mock 'Argon::Stream', 'read', sub {
-        Argon::Message->new(
-            cmd => $CMD_ACK,
-            payload => { client_addr => $mgr_client_addr },
-        );
-    };
-    mock 'Argon::Stream', 'connect', sub {
-        if (++$calls >= $tries) {
-            $cb->();
-            return bless {}, 'Argon::Stream';
-        } else {
-            die 'test msg';
-        }
-    };
+    my @overrides = (
+        Sub::Override->new('Argon::Stream::write', sub {}),
+        Sub::Override->new('Argon::Stream::read', sub {
+            Argon::Message->new(
+                cmd => $CMD_ACK,
+                payload => { client_addr => $mgr_client_addr },
+            );
+        }),
+        Sub::Override->new('Argon::Stream::connect', sub {
+            if (++$calls >= $tries) {
+                $cb->();
+                return bless {}, 'Argon::Stream';
+            } else {
+                die 'test msg';
+            }
+        }),
+    );
 
     my $loop = async { $w->register_loop };
     rouse_wait $cb;
@@ -147,11 +150,6 @@ subtest '(managed) registration loop' => sub {
     rouse_wait $cb;
 
     is($calls, $tries + 1, 'registration triggered after client_disconnected called');
-
-    unmock 'Argon::Stream', 'connect';
-    unmock 'Argon::Stream', 'write';
-    unmock 'Argon::Stream', 'read';
 };
 
-unmock 'Coro::ProcessPool', 'process';
 done_testing;

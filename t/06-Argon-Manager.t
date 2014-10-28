@@ -2,14 +2,12 @@ use strict;
 use warnings;
 use AnyEvent::Loop; # Ensure the pure perl loop is loaded for testing
 use Test::More;
-use Test::TinyMocker;
-use Guard;
+use Coro;
+use Sub::Override;
 use Argon::Message;
 use Argon qw(:commands);
 use Argon::Client;
 use Argon::Stream;
-
-BEGIN { require AnyEvent::Impl::Perl }
 
 $Argon::LOG_LEVEL = 0;
 
@@ -32,22 +30,19 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
 {
     my $monitor_called;
 
-    mock 'Argon::Manager', 'start_monitor', sub { $monitor_called = 1 };
-    mock 'Argon::Stream', 'connect', sub { bless {}, 'Argon::Stream' };
-    mock 'Argon::Stream', 'addr', sub { 'blah:4321' };
-
-    scope_guard {
-        unmock 'Argon::Manager', 'start_monitor';
-        unmock 'Argon::Stream', 'connect';
-        unmock 'Argon::Stream', 'addr';
-    };
+    my @overrides = (
+        Sub::Override->new('Argon::Manager::start_monitor', sub { $monitor_called = 1 }),
+        Sub::Override->new('Argon::Stream::connect', sub { bless {}, 'Argon::Stream' }),
+        Sub::Override->new('Argon::Stream::addr', sub { 'blah:4321' }),
+        Sub::Override->new('Argon::Client::_build_read_loop', sub {async {}}),
+    );
 
     my $msg = Argon::Message->new(
-        cmd => $CMD_REGISTER,
-        key => 'test',
+        cmd     => $CMD_REGISTER,
+        key     => 'test',
         payload => {
-            host => 'foo',
-            port => '1234',
+            host     => 'foo',
+            port     => '1234',
             capacity => 4,
         }
     );
@@ -63,8 +58,9 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
 }
 
 {
-    mock 'Argon::Client', 'send', sub { return $_[1]->reply(cmd => $CMD_COMPLETE, payload => 42) };
-    scope_guard { unmock 'Argon::Client', 'send' };
+    my @overrides = (
+        Sub::Override->new('Argon::Client::send', sub { return $_[1]->reply(cmd => $CMD_COMPLETE, payload => 42) }),
+    );
 
     # Queue succeeds with registered worker
     my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_QUEUE));

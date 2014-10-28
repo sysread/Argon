@@ -32,7 +32,7 @@ Coro::AnyEvent::sleep(3);
 my $client = Argon::Client->new(host => $manager->host, port => $manager->port);
 $client->connect;
 
-my @range    = 1 .. 1000;
+my @range    = 1 .. 100;
 my %deferred = map { $_ => $client->defer(sub { $_[0] * $_[0] }, [$_]) } @range;
 my %results  = map { $_ => $deferred{$_}->() } keys %deferred;
 

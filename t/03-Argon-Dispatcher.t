@@ -4,8 +4,6 @@ use Test::More;
 use Argon::Message;
 use Argon qw(:commands);
 
-BEGIN { require AnyEvent::Impl::Perl }
-
 use_ok('Argon::Dispatcher');
 my $d = new_ok('Argon::Dispatcher');
 
