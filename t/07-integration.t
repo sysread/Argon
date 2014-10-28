@@ -15,7 +15,7 @@ use Argon::Worker;
 $Argon::LOG_LEVEL = 0;
 
 my $manager_cv     = AnyEvent->condvar;;
-my $manager        = Argon::Manager->new(queue_size => 20);
+my $manager        = Argon::Manager->new();
 my $manager_thread = async { $manager->start(sub { $manager_cv->send(shift) }) };
 my $manager_addr   = $manager_cv->recv;
 
@@ -35,7 +35,7 @@ Coro::AnyEvent::sleep(3);
 my $client = Argon::Client->new(host => $manager->host, port => $manager->port);
 $client->connect;
 
-my @range    = 1 .. 100;
+my @range    = 1 .. 20;
 my %deferred = map { $_ => $client->defer(sub { $_[0] * $_[0] }, [$_]) } @range;
 my %results  = map { $_ => $deferred{$_}->() } keys %deferred;
 
