@@ -70,6 +70,24 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
     is($reply->payload, 42, 'queue returns expected result from worker client');
 }
 
+# Status
+{
+    my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_STATUS));
+    is($reply->cmd, $CMD_COMPLETE, 'correct reply status');
+
+    my $expected = {
+        workers          => 1,
+        total_capacity   => 4,
+        current_capacity => 4,
+        queue_length     => 0,
+        pending          => {
+            test => []
+        },
+    };
+
+    is_deeply($reply->payload, $expected, 'expected status');
+}
+
 # Queue fails when max capacity reached
 {
     my @overrides = (
@@ -78,6 +96,30 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
 
     my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_QUEUE));
     is($reply->cmd, $CMD_REJECTED, 'queue fails with no capacity when queue full');
+}
+
+# Status
+{
+    my @overrides = (
+        Sub::Override->new('Argon::Manager::todo_len',         sub { 11 }),
+        Sub::Override->new('Argon::Manager::current_capacity', sub { 0 }),
+        Sub::Override->new('Argon::Tracker::all_pending',      sub {qw(foo bar baz bat)}),
+    );
+
+    my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_STATUS));
+    is($reply->cmd, $CMD_COMPLETE, 'correct reply status');
+
+    my $expected = {
+        workers          => 1,
+        total_capacity   => 4,
+        current_capacity => 0,
+        queue_length     => 11,
+        pending          => {
+            test => ['foo', 'bar', 'baz', 'bat']
+        },
+    };
+
+    is_deeply($reply->payload, $expected, 'expected status');
 }
 
 # Deregistration results in capacity reduction

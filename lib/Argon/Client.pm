@@ -200,6 +200,21 @@ sub defer {
     return sub { $cv->recv };
 }
 
+sub server_status {
+    my $self  = shift;
+    my $msg   = Argon::Message->new(cmd => $CMD_STATUS);
+    my $reply = $self->send($msg);
+
+    if ($reply->cmd == $CMD_COMPLETE) {
+        return $reply->payload;
+    } elsif ($reply->cmd == $CMD_ERROR) {
+        croak $reply->payload;
+    } else {
+        DEBUG 'Invalid server response [%d]: %s', $reply->cmd, $reply->payload;
+        croak 'Invalid server response';
+    }
+}
+
 1;
 __DATA__
 

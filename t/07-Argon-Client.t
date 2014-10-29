@@ -41,6 +41,18 @@ Coro::AnyEvent::sleep(3);
 my $client = Argon::Client->new(host => $manager->host, port => $manager->port);
 $client->connect;
 
+# Server status
+my $status   = $client->server_status;
+my $expected = {
+    workers          => 1,
+    total_capacity   => $worker->workers,
+    current_capacity => $worker->workers,
+    queue_length     => 0,
+    pending          => {$worker->key => []},
+};
+
+is_deeply($status, $expected, 'expected server status');
+
 my @range = 1 .. 20;
 
 # Test process

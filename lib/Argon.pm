@@ -25,7 +25,7 @@ our %EXPORT_TAGS = (
 
     # Command verbs and responses
     commands => [qw(
-        $CMD_PING $CMD_QUEUE $CMD_COLLECT $CMD_REGISTER
+        $CMD_PING $CMD_QUEUE $CMD_COLLECT $CMD_REGISTER $CMD_STATUS
         $CMD_ACK $CMD_COMPLETE $CMD_ERROR $CMD_REJECTED
     )],
 
@@ -94,15 +94,16 @@ const our $PRI_LOW    => Coro::PRIO_MIN;
 #-------------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------------
-const our $CMD_PING     => 0; # Add a node to a cluster
+const our $CMD_PING     => 0; # Verify that a worker is responding
 const our $CMD_QUEUE    => 1; # Queue a message
 const our $CMD_COLLECT  => 2; # Collect results
 const our $CMD_REGISTER => 3; # Add a node to a cluster
+const our $CMD_STATUS   => 4; # Get process and system status from a manager
 
-const our $CMD_ACK      => 4; # Acknowledgement (respond OK)
-const our $CMD_COMPLETE => 5; # Response - message is complete
-const our $CMD_ERROR    => 6; # Response - error processing message or invalid message format
-const our $CMD_REJECTED => 7; # Response - no available capacity for handling tasks
+const our $CMD_ACK      => 5; # Acknowledgement (respond OK)
+const our $CMD_COMPLETE => 6; # Response - message is complete
+const our $CMD_ERROR    => 7; # Response - error processing message or invalid message format
+const our $CMD_REJECTED => 8; # Response - no available capacity for handling tasks
 
 #-------------------------------------------------------------------------------
 # Strips an error message of line number and file information.

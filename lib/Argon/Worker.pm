@@ -24,7 +24,7 @@ has manager => (
 );
 
 has workers => (
-    is  => 'ro',
+    is  => 'rwp',
     isa => Maybe[Int],
 );
 
@@ -51,10 +51,14 @@ has manager_address => (
 
 sub _build_pool {
     my $self = shift;
-    return Coro::ProcessPool->new(
+    my $pool = Coro::ProcessPool->new(
         ($self->workers      ? (max_procs => $self->workers)      : ()),
         ($self->max_requests ? (max_reqs  => $self->max_requests) : ()),
     );
+
+    $self->_set_workers($pool->{max_procs}) unless $self->workers;
+
+    return $pool;
 }
 
 has capacity => (

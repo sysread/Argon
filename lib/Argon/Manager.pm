@@ -35,6 +35,7 @@ has workers => (
         del_worker  => 'delete',
         has_worker  => 'exists',
         all_workers => 'keys',
+        num_workers => 'count',
     }
 );
 
@@ -185,6 +186,7 @@ sub init {
     $self->respond_to($CMD_REGISTER, K('cmd_register', $self));
     $self->respond_to($CMD_QUEUE,    K('cmd_queue',    $self));
     $self->respond_to($CMD_COLLECT,  K('cmd_collect',  $self));
+    $self->respond_to($CMD_STATUS,   K('cmd_status',   $self));
     $self->is_running(1);
     $self->watcher;
 }
@@ -293,6 +295,26 @@ sub cmd_collect {
     $self->complete_del($id);
 
     return $result->reply(id => $id);
+}
+
+sub cmd_status {
+    my ($self, $msg, $addr) = @_;
+
+    my $pending;
+    foreach my $worker ($self->all_workers) {
+        $pending->{$worker} = [$self->get_tracking($worker)->all_pending];
+    }
+
+    return $msg->reply(
+        cmd     => $CMD_COMPLETE,
+        payload => {
+            workers          => $self->num_workers,
+            total_capacity   => $self->capacity,
+            current_capacity => $self->current_capacity,
+            queue_length     => $self->todo_len,
+            pending          => $pending,
+        }
+    );
 }
 
 1;

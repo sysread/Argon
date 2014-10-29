@@ -78,6 +78,7 @@ has 'pending' => (
         get_pending => 'get',
         del_pending => 'delete',
         num_pending => 'count',
+        all_pending => 'keys',
     }
 );
 
