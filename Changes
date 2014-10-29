@@ -1,4 +1,4 @@
-0.12    ????-??-??
+0.12    2014-10-29
     * Added priority queueing to Managers
     * Added retry to Client when system at max capacity
     * Manager now deletes uncollected results after $Argon::DEL_COMPLETE_AFTER seconds
