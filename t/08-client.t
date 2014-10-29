@@ -7,13 +7,12 @@ use AnyEvent;
 use Coro;
 use Coro::AnyEvent;
 
-use Argon;
+use Argon qw(:logging);
 use Argon::Client;
 use Argon::Manager;
 use Argon::Worker;
 
-$Argon::LOG_LEVEL = 0;
-#$Argon::LOG_LEVEL = $Argon::LOG_LEVEL|$Argon::LOG_DEBUG;
+SET_LOG_LEVEL($FATAL);
 
 sub test {
     my $n = shift || 0;

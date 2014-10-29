@@ -4,8 +4,10 @@ use AnyEvent::Loop; # Ensure the pure perl loop is loaded for testing
 use Test::More;
 use AnyEvent::Util;
 use Coro::Handle;
-use Argon qw(:commands);
+use Argon qw(:commands :logging);
 use Argon::Message;
+
+SET_LOG_LEVEL($FATAL);
 
 use_ok('Argon::Stream');
 

@@ -4,6 +4,7 @@
     * Manager now deletes uncollected results after $Argon::DEL_COMPLETE_AFTER seconds
     * Added Manager status report (CMD_STATUS)
     * Switched from Test::TinyMocker to Sub::Override
+    * Logging now handled with Log::Log4perl
 
 0.11    2014-10-27
     * Tests now force use of AnyEvent::Loop (pure perl loop) for consistency

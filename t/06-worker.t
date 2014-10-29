@@ -5,11 +5,11 @@ use Test::More;
 use List::Util qw(sum);
 use Coro;
 use Sub::Override;
-use Argon qw(:commands);
-require Argon::Message;
-require Coro::ProcessPool;
+use Argon qw(:commands :logging);
+use Argon::Message;
+use Coro::ProcessPool;
 
-local $Argon::LOG_LEVEL = 0;
+SET_LOG_LEVEL($FATAL);
 
 my @overrides = (
     Sub::Override->new('Coro::ProcessPool::process', sub {

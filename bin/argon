@@ -5,7 +5,7 @@ use warnings;
 use Pod::Usage;
 use Getopt::Long;
 use UNIVERSAL::require;
-use Argon;
+use Argon qw(:logging);
 use Argon::Manager;
 use Argon::Worker;
 
@@ -44,8 +44,9 @@ GetOptions(
 
 $help && pod2usage(0);
 
-$Argon::LOG_LEVEL = $Argon::LOG_LEVEL | $Argon::LOG_DEBUG
-    if $verbose;
+if ($verbose) {
+    SET_LOG_LEVEL($INFO);
+}
 
 # Clean up host
 $opt{host} = '127.0.0.1' if !defined $opt{host} || $opt{host} eq 'localhost';

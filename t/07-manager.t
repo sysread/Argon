@@ -5,11 +5,11 @@ use Test::More;
 use Coro;
 use Sub::Override;
 use Argon::Message;
-use Argon qw(:commands);
+use Argon qw(:commands :logging);
 use Argon::Client;
 use Argon::Stream;
 
-$Argon::LOG_LEVEL = 0;
+SET_LOG_LEVEL($FATAL);
 
 use_ok('Argon::Manager') or BAIL_OUT;
 

@@ -23,6 +23,7 @@ WriteMakefile(
         'Coro::PrioChannel'  => '0.005',
         'Guard'              => 0,
         'Data::UUID'         => 0,
+        'Log::Log4perl'      => 0,
         'UNIVERSAL::require' => 0,
         'Moo'                => 0,
         'MooX::HandlesVia'   => 0,
