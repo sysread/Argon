@@ -1,8 +1,3 @@
-#-------------------------------------------------------------------------------
-# TODO
-#   * Delete uncollected results after configurable time period
-#   * Verify that all processes terminated after SIGTERM/SIGINT
-#-------------------------------------------------------------------------------
 package Argon;
 
 our $VERSION = '0.12';
@@ -78,11 +73,12 @@ sub K {
 #-------------------------------------------------------------------------------
 # Defaults
 #-------------------------------------------------------------------------------
-our $EOL             = "\n"; # end of line/message character(s)
-our $MSG_SEPARATOR   = ' ';  # separator between parts of a message (command, priority, payload, etc)
-our $TRACK_MESSAGES  = 10;   # number of message times to track for computing avg processing time at a host
-our $POLL_INTERVAL   = 5;    # number of seconds between polls for connectivity between cluster/node
-our $CONNECT_TIMEOUT = 5;    # number of seconds after which a stream times out attempting to connect
+our $EOL                = "\n";    # end of line/message character(s)
+our $MSG_SEPARATOR      = ' ';     # separator between parts of a message (command, priority, payload, etc)
+our $TRACK_MESSAGES     = 10;      # number of message times to track for computing avg processing time at a host
+our $POLL_INTERVAL      = 5;       # number of seconds between polls for connectivity between cluster/node
+our $CONNECT_TIMEOUT    = 5;       # number of seconds after which a stream times out attempting to connect
+our $DEL_COMPLETE_AFTER = 30 * 60; # number of seconds after which a completed task's result is delete if not collected
 
 #-------------------------------------------------------------------------------
 # Priorities

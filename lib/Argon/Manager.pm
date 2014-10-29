@@ -5,6 +5,7 @@ use MooX::HandlesVia;
 use Types::Standard qw(-types);
 use Const::Fast;
 use Coro;
+use Coro::AnyEvent;
 use Coro::PrioChannel;
 use Coro::Semaphore;
 use Guard qw(scope_guard);
@@ -95,7 +96,21 @@ has complete => (
       complete_set => 'set',
       complete_get => 'get',
       complete_del => 'delete',
-      is_pending   => 'exists',
+      is_complete  => 'exists',
+      all_complete => 'keys',
+    }
+);
+
+has completed_time => (
+    is          => 'ro',
+    isa         => Map[Str,Num],
+    init_arg    => undef,
+    default     => sub {{}},
+    handles_via => 'Hash',
+    handles     => {
+      completed_time_set => 'set',
+      completed_time_get => 'get',
+      completed_time_del => 'delete',
     }
 );
 
@@ -107,52 +122,22 @@ has watcher => (
 
 sub _build_watcher {
     my $self = shift;
+    return async { $self->process_pending while $self->is_running };
+}
 
+has cleaner => (
+    is       => 'lazy',
+    isa      => InstanceOf['Coro'],
+    init_arg => undef,
+);
+
+sub _build_cleaner {
+    my $self = shift;
     return async {
-        while ($self->is_running) {
-            # Get the next message
-            my $msg = $self->todo_get;
-
-            # Acquire capacity slot
-            $self->sem_capacity->down;
-
-            # Release capacity slot once complete
-            scope_guard { $self->sem_capacity->up };
-
-            # Get the next available worker
-            my $cmp = sub { $self->get_tracking($_[0])->est_proc_time };
-            my @workers =
-                sort { $cmp->($a) <=> $cmp->($b) }
-                grep { $self->get_tracking($_)->capacity > 0 }
-                $self->all_workers;
-
-            my $worker = $workers[0];
-
-            # Execute with tracking
-            $self->get_tracking($worker)->start_request($msg->id);
-
-            scope_guard {
-                # If the worker connection was lost while the request was
-                # outstanding, the tracker may be missing, so completing
-                # the request must account for this appropriately.
-                $self->get_tracking($worker)->end_request($msg->id)
-                    if $self->has_worker($worker);
-            };
-
-            # Assign the task
-            $msg->{key} = $worker;
-
-            # TODO this is hanging sometimes and causing delays in responses
-            my $reply = eval { $self->get_worker($worker)->send($msg) };
-
-            if ($@) {
-                WARN 'Worker error (%s) - disconnecting: %s', $worker, $@;
-                $self->deregister($worker);
-                $reply = $msg->reply(cmd => $CMD_ERROR, payload => "$ERR_PROC_FAIL. Error message: $@");
-            }
-
-            $self->complete_get($msg->id)->put($reply);
-        }
+        do {
+            $self->delete_unclaimed;
+            Coro::AnyEvent::sleep 60;
+        } while $self->is_running;
     };
 }
 
@@ -183,18 +168,23 @@ sub has_capacity {
 
 sub init {
     my $self = shift;
+    $self->is_running(1);
+
+    # Register handlers
     $self->respond_to($CMD_REGISTER, K('cmd_register', $self));
     $self->respond_to($CMD_QUEUE,    K('cmd_queue',    $self));
     $self->respond_to($CMD_COLLECT,  K('cmd_collect',  $self));
     $self->respond_to($CMD_STATUS,   K('cmd_status',   $self));
-    $self->is_running(1);
+
+    # Start services
     $self->watcher;
+    $self->cleaner;
 }
 
-sub shutdown {
+before shutdown => sub {
     my $self = shift;
     $self->is_running(0);
-}
+};
 
 sub deregister {
     my ($self, $worker) = @_;
@@ -229,6 +219,65 @@ sub start_monitor {
             }
         }
     };
+}
+
+sub process_pending {
+    my $self = shift;
+
+    # Get the next message
+    my $msg = $self->todo_get;
+
+    # Acquire capacity slot
+    $self->sem_capacity->down;
+
+    # Release capacity slot once complete
+    scope_guard { $self->sem_capacity->up };
+
+    # Get the next available worker
+    my $cmp = sub { $self->get_tracking($_[0])->est_proc_time };
+    my @workers =
+        sort { $cmp->($a) <=> $cmp->($b) }
+        grep { $self->get_tracking($_)->capacity > 0 }
+        $self->all_workers;
+
+    my $worker = $workers[0];
+
+    # Execute with tracking
+    $self->get_tracking($worker)->start_request($msg->id);
+
+    scope_guard {
+        # If the worker connection was lost while the request was
+        # outstanding, the tracker may be missing, so completing
+        # the request must account for this appropriately.
+        $self->get_tracking($worker)->end_request($msg->id)
+            if $self->has_worker($worker);
+    };
+
+    # Assign the task
+    $msg->{key} = $worker;
+
+    # TODO this is hanging sometimes and causing delays in responses
+    my $reply = eval { $self->get_worker($worker)->send($msg) };
+
+    if ($@) {
+        WARN 'Worker error (%s) - disconnecting: %s', $worker, $@;
+        $self->deregister($worker);
+        $reply = $msg->reply(cmd => $CMD_ERROR, payload => "$ERR_PROC_FAIL. Error message: $@");
+    }
+
+    $self->complete_get($msg->id)->put($reply);
+}
+
+sub delete_unclaimed {
+    my $self = shift;
+    my $now  = time;
+    foreach my $msgid ($self->all_complete) {
+        my $ts = $self->completed_time_get($msgid);
+        if ($now - $ts > $Argon::DEL_COMPLETE_AFTER) {
+            $self->complete_del($msgid);
+            $self->completed_time_del($msgid);
+        }
+    }
 }
 
 sub cmd_register {
@@ -278,6 +327,7 @@ sub cmd_queue {
         unless $self->has_capacity;
 
     $self->complete_set($msg->id => Coro::Channel->new());
+    $self->completed_time_set($msg->id, time);
     $self->todo_put($msg);
 
     return $msg->reply(cmd => $CMD_ACK);
@@ -289,10 +339,11 @@ sub cmd_collect {
     my $id = $msg->payload;
 
     return $msg->reply(cmd => $CMD_ERROR, payload => $ERR_NOT_FOUND)
-        unless $self->is_pending($id);
+        unless $self->is_complete($id);
 
-    my $result = $self->complete_get($id)->get;;
+    my $result = $self->complete_get($id)->get;
     $self->complete_del($id);
+    $self->completed_time_del($id);
 
     return $result->reply(id => $id);
 }
