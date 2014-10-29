@@ -11,6 +11,7 @@ use Coro::Semaphore;
 use Guard qw(scope_guard);
 use Argon::Client;
 use Argon::Tracker;
+use Argon::MessageTracker;
 use Argon qw(K :logging :commands);
 
 const our $ERR_NO_CAPACITY => 'Unable to process request. System is at max capacity.';
@@ -22,6 +23,29 @@ extends 'Argon::Dispatcher';
 has queue_size => (
     is  => 'ro',
     isa => Maybe[Int],
+);
+
+has queue => (
+    is       => 'lazy',
+    isa      => InstanceOf['Coro::PrioChannel'],
+    init_arg => undef,
+    handles  => {
+      queue_put => 'put',
+      queue_get => 'get',
+      queue_len => 'size',
+    }
+);
+
+sub _build_queue {
+    my $self = shift;
+    return Coro::PrioChannel->new($self->queue_size);
+}
+
+has msg_tracker => (
+    is       => 'ro',
+    isa      => InstanceOf['Argon::MessageTracker'],
+    init_arg => undef,
+    default  => sub { Argon::MessageTracker->new() },
 );
 
 has workers => (
@@ -70,50 +94,6 @@ has capacity => (
     default  => 0,
 );
 
-has todo => (
-    is       => 'lazy',
-    isa      => InstanceOf['Coro::PrioChannel'],
-    init_arg => undef,
-    handles  => {
-      todo_put => 'put',
-      todo_get => 'get',
-      todo_len => 'size',
-    }
-);
-
-sub _build_todo {
-    my $self = shift;
-    return Coro::PrioChannel->new($self->queue_size);
-}
-
-has complete => (
-    is          => 'ro',
-    isa         => HashRef,
-    init_arg    => undef,
-    default     => sub {{}},
-    handles_via => 'Hash',
-    handles     => {
-      complete_set => 'set',
-      complete_get => 'get',
-      complete_del => 'delete',
-      is_complete  => 'exists',
-      all_complete => 'keys',
-    }
-);
-
-has completed_time => (
-    is          => 'ro',
-    isa         => Map[Str,Num],
-    init_arg    => undef,
-    default     => sub {{}},
-    handles_via => 'Hash',
-    handles     => {
-      completed_time_set => 'set',
-      completed_time_get => 'get',
-      completed_time_del => 'delete',
-    }
-);
-
 has watcher => (
     is       => 'lazy',
     isa      => InstanceOf['Coro'],
@@ -123,22 +103,6 @@ has watcher => (
 sub _build_watcher {
     my $self = shift;
     return async { $self->process_pending while $self->is_running };
-}
-
-has cleaner => (
-    is       => 'lazy',
-    isa      => InstanceOf['Coro'],
-    init_arg => undef,
-);
-
-sub _build_cleaner {
-    my $self = shift;
-    return async {
-        do {
-            $self->delete_unclaimed;
-            Coro::AnyEvent::sleep 60;
-        } while $self->is_running;
-    };
 }
 
 has is_running => (
@@ -162,7 +126,7 @@ sub dec_capacity {
 sub has_capacity {
     my $self = shift;
     return if $self->capacity == 0;
-    return if $self->queue_size && $self->todo_len >= $self->queue_size;
+    return if $self->queue_size && $self->queue_len >= $self->queue_size;
     return 1;
 }
 
@@ -178,7 +142,6 @@ sub init {
 
     # Start services
     $self->watcher;
-    $self->cleaner;
 }
 
 before shutdown => sub {
@@ -225,7 +188,7 @@ sub process_pending {
     my $self = shift;
 
     # Get the next message
-    my $msg = $self->todo_get;
+    my $msg = $self->queue_get;
 
     # Acquire capacity slot
     $self->sem_capacity->down;
@@ -256,7 +219,7 @@ sub process_pending {
     # Assign the task
     $msg->{key} = $worker;
 
-    # TODO this is hanging sometimes and causing delays in responses
+    # queue this is hanging sometimes and causing delays in responses
     my $reply = eval { $self->get_worker($worker)->send($msg) };
 
     if ($@) {
@@ -265,19 +228,7 @@ sub process_pending {
         $reply = $msg->reply(cmd => $CMD_ERROR, payload => "$ERR_PROC_FAIL. Error message: $@");
     }
 
-    $self->complete_get($msg->id)->put($reply);
-}
-
-sub delete_unclaimed {
-    my $self = shift;
-    my $now  = time;
-    foreach my $msgid ($self->all_complete) {
-        my $ts = $self->completed_time_get($msgid);
-        if ($now - $ts > $Argon::DEL_COMPLETE_AFTER) {
-            $self->complete_del($msgid);
-            $self->completed_time_del($msgid);
-        }
-    }
+    $self->msg_tracker->complete_message($reply);
 }
 
 sub cmd_register {
@@ -326,9 +277,8 @@ sub cmd_queue {
     return $msg->reply(cmd => $CMD_REJECTED, payload => $ERR_NO_CAPACITY)
         unless $self->has_capacity;
 
-    $self->complete_set($msg->id => Coro::Channel->new());
-    $self->completed_time_set($msg->id, time);
-    $self->todo_put($msg);
+    $self->msg_tracker->track_message($msg->id);
+    $self->queue_put($msg);
 
     return $msg->reply(cmd => $CMD_ACK);
 }
@@ -336,16 +286,13 @@ sub cmd_queue {
 sub cmd_collect {
     my ($self, $msg, $addr) = @_;
 
-    my $id = $msg->payload;
+    my $msgid = $msg->payload;
 
     return $msg->reply(cmd => $CMD_ERROR, payload => $ERR_NOT_FOUND)
-        unless $self->is_complete($id);
+        unless $self->msg_tracker->is_tracked($msgid);
 
-    my $result = $self->complete_get($id)->get;
-    $self->complete_del($id);
-    $self->completed_time_del($id);
-
-    return $result->reply(id => $id);
+    my $result = $self->msg_tracker->collect_message($msgid);
+    return $result->reply(id => $msgid);
 }
 
 sub cmd_status {
@@ -362,7 +309,7 @@ sub cmd_status {
             workers          => $self->num_workers,
             total_capacity   => $self->capacity,
             current_capacity => $self->current_capacity,
-            queue_length     => $self->todo_len,
+            queue_length     => $self->queue_len,
             pending          => $pending,
         }
     );

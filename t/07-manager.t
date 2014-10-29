@@ -91,7 +91,7 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
 # Queue fails when max capacity reached
 {
     my @overrides = (
-        Sub::Override->new('Argon::Manager::todo_len', sub { 11 }),
+        Sub::Override->new('Argon::Manager::queue_len', sub { 11 }),
     );
 
     my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_QUEUE));
@@ -101,7 +101,7 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
 # Status
 {
     my @overrides = (
-        Sub::Override->new('Argon::Manager::todo_len',         sub { 11 }),
+        Sub::Override->new('Argon::Manager::queue_len',         sub { 11 }),
         Sub::Override->new('Argon::Manager::current_capacity', sub { 0 }),
         Sub::Override->new('Argon::Tracker::all_pending',      sub {qw(foo bar baz bat)}),
     );

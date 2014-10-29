@@ -1,6 +1,8 @@
 0.12    ????-??-??
     * Added priority queueing to Managers
-    * Added retry strategy to Clients when system at max capacity
+    * Added retry to Client when system at max capacity
+    * Manager now deletes uncollected results after $Argon::DEL_COMPLETE_AFTER seconds
+    * Added Manager status report (CMD_STATUS)
     * Switched from Test::TinyMocker to Sub::Override
 
 0.11    2014-10-27
