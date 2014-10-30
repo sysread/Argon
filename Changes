@@ -1,3 +1,7 @@
+0.13    2014-10-30
+    * Added task age to status results from manager
+    * Added Argon::Simple
+
 0.12    2014-10-29
     * Added priority queueing to Managers
     * Added retry to Client when system at max capacity

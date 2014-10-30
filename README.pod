@@ -105,6 +105,37 @@ result is synchronized.
 
 See L<Argon::Client>.
 
+=head1 THE EASY WAY
+
+In most cases there will be only a single manager to which a client will
+wish to connect. L<Argon::Simple> is available for this case:
+
+    use Argon::Simple;
+
+    connect 'mgrhost:8000';
+
+    # Send of some numbers to crunch
+    my $result = process { shift * shift } 4, 7;
+
+    # Use the results
+    printf "4 * 7 = %d\n", $result->();
+
+The return value of C<process> will synchronize the thread, returning once
+the task has been completed by the system.
+
+When called in list context, C<process> returns two values: the deferred
+value as well as a test function that returns true once the task is finished
+running:
+
+    # Send of some numbers to crunch
+    my ($result, $is_finished) = process { shift * shift } 4, 7;
+
+    # Do other things until the work is complete
+    do { ... } until $is_finished->();
+
+    # Use the results
+    printf "4 * 7 = %d\n", $result->();
+
 =head1 SCALABILITY
 
 Argon is designed to make scalability simple and easy. Simply add more workers

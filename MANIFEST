@@ -12,6 +12,7 @@ lib/Argon/Manager.pm
 lib/Argon/Message.pm
 lib/Argon/MessageTracker.pm
 lib/Argon/Service.pm
+lib/Argon/Simple.pm
 lib/Argon/Stream.pm
 lib/Argon/Tracker.pm
 lib/Argon/Worker.pm
@@ -25,3 +26,4 @@ t/05-stream.t
 t/06-worker.t
 t/07-manager.t
 t/08-client.t
+t/09-simple.t

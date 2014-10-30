@@ -182,22 +182,9 @@ sub process {
 }
 
 sub defer {
-    my $arr = wantarray;
-    my $cv  = AnyEvent->condvar;
-
-    my $thread = async_pool {
-        if ($arr) {
-            my @result = eval { process(@_) };
-            $cv->croak($@) if $@;
-            $cv->send(@result);
-        } else {
-            my $result = eval { process(@_) };
-            $cv->croak($@) if $@;
-            $cv->send($result);
-        }
-    } @_;
-
-    return sub { $cv->recv };
+    my $self  = shift;
+    my $msgid = $self->queue(@_);
+    return sub { $self->collect($msgid) };
 }
 
 sub server_status {
