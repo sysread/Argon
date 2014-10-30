@@ -297,10 +297,12 @@ sub cmd_collect {
 
 sub cmd_status {
     my ($self, $msg, $addr) = @_;
+    my $msgid = $msg->payload;
 
     my $pending;
     foreach my $worker ($self->all_workers) {
-        $pending->{$worker} = [$self->get_tracking($worker)->all_pending];
+        my $tracker = $self->get_tracking($worker);
+        $pending->{$worker} = { map { $_ => $tracker->age($_) } $tracker->all_pending };
     }
 
     return $msg->reply(

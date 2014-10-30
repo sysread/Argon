@@ -3,6 +3,7 @@ use warnings;
 use AnyEvent::Loop; # Ensure the pure perl loop is loaded for testing
 use Test::More;
 use List::Util qw(shuffle);
+use Sub::Override;
 use AnyEvent;
 use Coro;
 use Coro::AnyEvent;
@@ -47,12 +48,33 @@ my $expected = {
     total_capacity   => $worker->workers,
     current_capacity => $worker->workers,
     queue_length     => 0,
-    pending          => {$worker->key => []},
+    pending          => {$worker->key => {}},
 };
 
 is_deeply($status, $expected, 'expected server status');
 
 my @range = 1 .. 20;
+
+# Test queue, collect, and server_status
+foreach my $i (@range) {
+    my $overrid = Sub::Override->new('Argon::Tracker::age', sub { 42 });
+
+    ok(my $msgid = $client->queue(\&test, [$i]), "queue $i");
+
+    my $status = $client->server_status;
+    my $result = $client->collect($msgid);
+
+    my $expected = {
+        workers          => 1,
+        total_capacity   => $worker->workers,
+        current_capacity => $worker->workers - 1,
+        queue_length     => 0,
+        pending          => { $worker->key => { $msgid => 42 } },
+    };
+
+    is($result, ($i * $i), "queue => collect result $i");
+    is_deeply($status, $expected, "server_status $i");
+}
 
 # Test process
 foreach my $i (@range) {

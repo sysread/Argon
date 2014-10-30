@@ -80,9 +80,7 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
         total_capacity   => 4,
         current_capacity => 4,
         queue_length     => 0,
-        pending          => {
-            test => []
-        },
+        pending          => {test => {}},
     };
 
     is_deeply($reply->payload, $expected, 'expected status');
@@ -101,9 +99,10 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
 # Status
 {
     my @overrides = (
-        Sub::Override->new('Argon::Manager::queue_len',         sub { 11 }),
-        Sub::Override->new('Argon::Manager::current_capacity', sub { 0 }),
-        Sub::Override->new('Argon::Tracker::all_pending',      sub {qw(foo bar baz bat)}),
+        Sub::Override->new('Argon::Manager::queue_len',        sub { 11 }),
+        Sub::Override->new('Argon::Manager::current_capacity', sub {  0 }),
+        Sub::Override->new('Argon::Tracker::all_pending',      sub { qw(foo bar baz bat) }),
+        Sub::Override->new('Argon::Tracker::age',              sub { 42 }),
     );
 
     my $reply = $m->dispatch(Argon::Message->new(cmd => $CMD_STATUS));
@@ -115,7 +114,12 @@ ok($m->responds_to($CMD_REGISTER), 'manager responds to CMD_REGISTER');
         current_capacity => 0,
         queue_length     => 11,
         pending          => {
-            test => ['foo', 'bar', 'baz', 'bat']
+            test => {
+                foo => 42,
+                bar => 42,
+                baz => 42,
+                bat => 42,
+            },
         },
     };
 

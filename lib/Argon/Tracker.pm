@@ -16,7 +16,7 @@ use Time::HiRes qw/time/;
 #-------------------------------------------------------------------------------
 # The length of tracking history to keep.
 #-------------------------------------------------------------------------------
-has 'tracking' => (
+has tracking => (
     is       => 'ro',
     isa      => Int,
     required => 1,
@@ -25,7 +25,7 @@ has 'tracking' => (
 #-------------------------------------------------------------------------------
 # The number of workers a node has.
 #-------------------------------------------------------------------------------
-has 'workers' => (
+has workers => (
     is       => 'ro',
     isa      => Int,
     required => 1,
@@ -34,7 +34,7 @@ has 'workers' => (
 #-------------------------------------------------------------------------------
 # The total number of requests this node has served.
 #-------------------------------------------------------------------------------
-has 'requests' => (
+has requests => (
     is       => 'ro',
     isa      => Int,
     init_arg => undef,
@@ -50,7 +50,7 @@ sub inc_requests {
 #-------------------------------------------------------------------------------
 # Stores the last <tracking> request timings.
 #-------------------------------------------------------------------------------
-has 'history' => (
+has history => (
     is          => 'ro',
     isa         => ArrayRef[Num],
     init_arg    => undef,
@@ -67,7 +67,7 @@ has 'history' => (
 #-------------------------------------------------------------------------------
 # Hash of pending requests (msgid => tracking start time).
 #-------------------------------------------------------------------------------
-has 'pending' => (
+has pending => (
     is          => 'ro',
     isa         => Map[Str,Num],
     init_arg    => undef,
@@ -79,13 +79,14 @@ has 'pending' => (
         del_pending => 'delete',
         num_pending => 'count',
         all_pending => 'keys',
+        is_pending  => 'exists',
     }
 );
 
 #-------------------------------------------------------------------------------
 # Avg processing time, calculated after each request completes.
 #-------------------------------------------------------------------------------
-has 'avg_proc_time' => (
+has avg_proc_time => (
     is       => 'rw',
     isa      => Num,
     init_arg => undef,
@@ -135,6 +136,18 @@ sub capacity {
 sub est_proc_time {
     my $self = shift;
     return $self->avg_proc_time * ($self->num_pending + 1);
+}
+
+#-------------------------------------------------------------------------------
+# Calculates the age of a tracked job.
+#-------------------------------------------------------------------------------
+sub age {
+    my ($self, $msg_id) = @_;
+    if ($self->is_pending($msg_id)) {
+        return time - $self->get_pending($msg_id);
+    } else {
+        return;
+    }
 }
 
 1;

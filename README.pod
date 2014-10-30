@@ -65,7 +65,7 @@ of execution yields until the result is ready, at which point it is awoken.
     use Argon::Client;
 
     my $client = Argon::Client->new(host => "mgrhost", port => 8000);
-    my $result = $client->queue(
+    my $result = $client->process(
         # Code to execute
         sub {
             my ($x, $y) = @_;
