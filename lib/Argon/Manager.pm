@@ -193,42 +193,46 @@ sub process_pending {
     # Acquire capacity slot
     $self->sem_capacity->down;
 
-    # Release capacity slot once complete
-    scope_guard { $self->sem_capacity->up };
+    async_pool {
+        my $msg = shift;
 
-    # Get the next available worker
-    my $cmp = sub { $self->get_tracking($_[0])->est_proc_time };
-    my @workers =
-        sort { $cmp->($a) <=> $cmp->($b) }
-        grep { $self->get_tracking($_)->capacity > 0 }
-        $self->all_workers;
+        # Release capacity slot once complete
+        scope_guard { $self->sem_capacity->up };
 
-    my $worker = $workers[0];
+        # Get the next available worker
+        my $cmp = sub { $self->get_tracking($_[0])->est_proc_time };
+        my @workers =
+            sort { $cmp->($a) <=> $cmp->($b) }
+            grep { $self->get_tracking($_)->capacity > 0 }
+            $self->all_workers;
 
-    # Execute with tracking
-    $self->get_tracking($worker)->start_request($msg->id);
+        my $worker = $workers[0];
 
-    scope_guard {
-        # If the worker connection was lost while the request was
-        # outstanding, the tracker may be missing, so completing
-        # the request must account for this appropriately.
-        $self->get_tracking($worker)->end_request($msg->id)
-            if $self->has_worker($worker);
-    };
+        # Execute with tracking
+        $self->get_tracking($worker)->start_request($msg->id);
 
-    # Assign the task
-    $msg->{key} = $worker;
+        scope_guard {
+            # If the worker connection was lost while the request was
+            # outstanding, the tracker may be missing, so completing
+            # the request must account for this appropriately.
+            $self->get_tracking($worker)->end_request($msg->id)
+                if $self->has_worker($worker);
+        };
 
-    # queue this is hanging sometimes and causing delays in responses
-    my $reply = eval { $self->get_worker($worker)->send($msg) };
+        # Assign the task
+        $msg->{key} = $worker;
 
-    if ($@) {
-        WARN 'Worker error (%s) - disconnecting: %s', $worker, $@;
-        $self->deregister($worker);
-        $reply = $msg->reply(cmd => $CMD_ERROR, payload => "$ERR_PROC_FAIL. Error message: $@");
-    }
+        # queue this is hanging sometimes and causing delays in responses
+        my $reply = eval { $self->get_worker($worker)->send($msg) };
 
-    $self->msg_tracker->complete_message($reply);
+        if ($@) {
+            WARN 'Worker error (%s) - disconnecting: %s', $worker, $@;
+            $self->deregister($worker);
+            $reply = $msg->reply(cmd => $CMD_ERROR, payload => "$ERR_PROC_FAIL. Error message: $@");
+        }
+
+        $self->msg_tracker->complete_message($reply);
+    } $msg;
 }
 
 sub cmd_register {

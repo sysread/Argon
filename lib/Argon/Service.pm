@@ -84,9 +84,7 @@ sub process_requests {
         $self->client_disconnected($addr);
     };
 
-    while (1) {
-        my $msg = $stream->read or last;
-
+    while (my $msg = $stream->read) {
         async_pool {
             my $reply = eval { $self->dispatch($msg, $addr) };
 

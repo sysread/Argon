@@ -28,10 +28,10 @@ sub connect {
 }
 
 sub process (&@) {
-    my ($f, $args) = @_;
+    my ($f, @args) = @_;
     croak 'not connected' unless $CLIENT;
 
-    my $msgid    = $CLIENT->queue($f, $args);
+    my $msgid    = $CLIENT->queue($f, \@args);
     my $deferred = sub { $CLIENT->collect($msgid) };
 
     return $deferred unless wantarray;

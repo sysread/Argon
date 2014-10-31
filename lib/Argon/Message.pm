@@ -3,11 +3,9 @@ package Argon::Message;
 use strict;
 use warnings;
 
-require Data::UUID;
-require Storable;
-
 use Carp;
 use Coro::Storable qw(nfreeze thaw);
+use Data::UUID;
 use MIME::Base64   qw(encode_base64 decode_base64);
 use Argon          qw(:priorities);
 

@@ -38,6 +38,21 @@ has pool => (
     isa => InstanceOf['Coro::ProcessPool'],
 );
 
+sub _build_pool {
+    my $self = shift;
+
+    INFO 'Starting worker with %s pool processes', ($self->workers // 'default');
+
+    my $pool = Coro::ProcessPool->new(
+        ($self->workers      ? (max_procs => $self->workers)      : ()),
+        ($self->max_requests ? (max_reqs  => $self->max_requests) : ()),
+    );
+
+    $self->_set_workers($pool->{max_procs}) unless $self->workers;
+
+    return $pool;
+}
+
 has key => (
     is      => 'lazy',
     isa     => Str,
@@ -48,18 +63,6 @@ has manager_address => (
     is  => 'rwp',
     isa => Str,
 );
-
-sub _build_pool {
-    my $self = shift;
-    my $pool = Coro::ProcessPool->new(
-        ($self->workers      ? (max_procs => $self->workers)      : ()),
-        ($self->max_requests ? (max_reqs  => $self->max_requests) : ()),
-    );
-
-    $self->_set_workers($pool->{max_procs}) unless $self->workers;
-
-    return $pool;
-}
 
 has capacity => (
     is  => 'lazy',

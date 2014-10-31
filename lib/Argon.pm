@@ -1,14 +1,14 @@
 package Argon;
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 use strict;
 use warnings;
 use Carp;
 use Const::Fast;
 use Coro;
-use Scalar::Util qw(weaken);
-use POSIX qw(strftime);
+use Scalar::Util  qw(weaken refaddr);
+use POSIX         qw(strftime);
 use Log::Log4perl qw();
 
 require Exporter;
@@ -136,8 +136,9 @@ sub error {
 }
 
 sub LOG {
-    my $lvl = lc shift;
-    my $msg = sprintf('[%s] => %s', $$, error(sprintf(shift, @_)));
+    my $lvl  = lc shift;
+    my $coro = $Coro::current + 0;
+    my $msg  = sprintf('[%s] [%s] => %s', $$, $coro, error(sprintf(shift, @_)));
     $LOGGER->$lvl($msg);
 }
 

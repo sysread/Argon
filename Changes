@@ -1,3 +1,6 @@
+0.14    2014-10-31
+    * Bug fixes
+
 0.13    2014-10-30
     * Added task age to status results from manager
     * Added Argon::Simple

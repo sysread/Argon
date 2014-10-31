@@ -69,8 +69,8 @@ sub complete_message {
     my ($self, $msg) = @_;
     croak 'message is not tracked' unless $self->is_tracked($msg->id);
     $self->cleanup_thread; # make sure this is running
-    $self->get_tracked($msg->id)->put($msg);
     $self->set_complete($msg->id => time);
+    $self->get_tracked($msg->id)->put($msg);
 }
 
 sub collect_message {
@@ -92,7 +92,7 @@ sub delete_unclaimed {
     my $now  = time;
 
     foreach my $msgid ($self->all_complete) {
-        my $ts = $self->get_completed($msgid);
+        my $ts = $self->get_complete($msgid);
 
         if ($now - $ts >= $Argon::DEL_COMPLETE_AFTER) {
             $self->cleanup_message($msgid);
