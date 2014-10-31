@@ -14,17 +14,26 @@ use Argon::Tracker;
 use Argon::MessageTracker;
 use Argon qw(K :logging :commands);
 
+#-------------------------------------------------------------------------------
+# Error constants
+#-------------------------------------------------------------------------------
 const our $ERR_NO_CAPACITY => 'Unable to process request. System is at max capacity.';
 const our $ERR_PROC_FAIL   => 'An error occurred routing the request.';
 const our $ERR_NOT_FOUND   => 'The message ID was not found.';
 
 extends 'Argon::Dispatcher';
 
+#-------------------------------------------------------------------------------
+# Max number of unassigned tasks. Once this number is hit, tasks are rejected.
+#-------------------------------------------------------------------------------
 has queue_size => (
     is  => 'ro',
     isa => Maybe[Int],
 );
 
+#-------------------------------------------------------------------------------
+# Priority queue for unassigned messages.
+#-------------------------------------------------------------------------------
 has queue => (
     is       => 'lazy',
     isa      => InstanceOf['Coro::PrioChannel'],
@@ -41,6 +50,9 @@ sub _build_queue {
     return Coro::PrioChannel->new($self->queue_size);
 }
 
+#-------------------------------------------------------------------------------
+# Keeps track of message state and results.
+#-------------------------------------------------------------------------------
 has msg_tracker => (
     is       => 'ro',
     isa      => InstanceOf['Argon::MessageTracker'],
@@ -48,6 +60,9 @@ has msg_tracker => (
     default  => sub { Argon::MessageTracker->new() },
 );
 
+#-------------------------------------------------------------------------------
+# Stores Argon::Clients for each worker. Maps them to the worker's unique key.
+#-------------------------------------------------------------------------------
 has workers => (
     is          => 'ro',
     isa         => Map[Str,InstanceOf['Argon::Client']],
@@ -64,6 +79,9 @@ has workers => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Stores statistics about each worker for better routing of tasks.
+#-------------------------------------------------------------------------------
 has tracking => (
     is          => 'ro',
     isa         => Map[Str,InstanceOf['Argon::Tracker']],
@@ -77,6 +95,9 @@ has tracking => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Tracks the current capacity of the system.
+#-------------------------------------------------------------------------------
 has sem_capacity => (
     is       => 'ro',
     isa      => InstanceOf['Coro::Semaphore'],
@@ -87,28 +108,15 @@ has sem_capacity => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Total capacity of the system. Subroutines inc_capacity and dec_capacity allow
+# adjustment of this value.
+#-------------------------------------------------------------------------------
 has capacity => (
     is       => 'ro',
     isa      => Int,
     init_arg => undef,
     default  => 0,
-);
-
-has watcher => (
-    is       => 'lazy',
-    isa      => InstanceOf['Coro'],
-    init_arg => undef,
-);
-
-sub _build_watcher {
-    my $self = shift;
-    return async { $self->process_pending while $self->is_running };
-}
-
-has is_running => (
-    is      => 'rw',
-    isa     => Bool,
-    default => 0,
 );
 
 sub inc_capacity {
@@ -123,14 +131,45 @@ sub dec_capacity {
     $self->{capacity} -= $amount;
 }
 
+#-------------------------------------------------------------------------------
+# Timer loop that routes tasks to workers as messages become available from the
+# queue and as workers have capacity to handle tasks.
+#-------------------------------------------------------------------------------
+has watcher => (
+    is       => 'lazy',
+    isa      => InstanceOf['Coro'],
+    init_arg => undef,
+);
+
+sub _build_watcher {
+    my $self = shift;
+    return async { $self->process_pending while $self->is_running };
+}
+
+#-------------------------------------------------------------------------------
+# Set to true when running
+#-------------------------------------------------------------------------------
+has is_running => (
+    is      => 'rw',
+    isa     => Bool,
+    default => 0,
+);
+
+#-------------------------------------------------------------------------------
+# True if there is available capacity for handling tasks or if the queue is not
+# at its maximum value.
+#-------------------------------------------------------------------------------
 sub has_capacity {
     my $self = shift;
-    return if $self->capacity == 0;
+    return if $self->current_capacity == 0;
     return if $self->queue_size && $self->queue_len >= $self->queue_size;
     return 1;
 }
 
-sub init {
+#-------------------------------------------------------------------------------
+# Configures dispatcher and watcher thread when Argon::Service is started.
+#-------------------------------------------------------------------------------
+after init => sub {
     my $self = shift;
     $self->is_running(1);
 
@@ -142,13 +181,20 @@ sub init {
 
     # Start services
     $self->watcher;
-}
+};
 
+#-------------------------------------------------------------------------------
+# Turns of is_running when shutting down so that service threads know to stop.
+#-------------------------------------------------------------------------------
 before shutdown => sub {
     my $self = shift;
     $self->is_running(0);
 };
 
+#-------------------------------------------------------------------------------
+# Deregisters a worker by key name and removes its capacity from the pool. Also
+# destroys its tracking data.
+#-------------------------------------------------------------------------------
 sub deregister {
     my ($self, $worker) = @_;
     if ($self->has_worker($worker)) {
@@ -162,6 +208,10 @@ sub deregister {
     }
 }
 
+#-------------------------------------------------------------------------------
+# Starts a monitor thread which continuously sends CMD_PING messages to
+# $worker. Started when a worker is registered.
+#-------------------------------------------------------------------------------
 sub start_monitor {
     my ($self, $worker) = @_;
     my $client = $self->get_worker($worker);
@@ -169,7 +219,7 @@ sub start_monitor {
     async_pool {
         scope_guard { $self->deregister($worker) };
 
-        while (1) {
+        while ($self->has_worker($worker)) {
             DEBUG 'Sending ping';
             my $msg = Argon::Message->new(cmd => $CMD_PING);
             my $reply = $client->send($msg) or last;
@@ -184,6 +234,10 @@ sub start_monitor {
     };
 }
 
+#-------------------------------------------------------------------------------
+# Blocks until both a worker and message are available. Once both are acquired,
+# sends the task to the worker and posts the results.
+#-------------------------------------------------------------------------------
 sub process_pending {
     my $self = shift;
 
@@ -235,6 +289,9 @@ sub process_pending {
     } $msg;
 }
 
+#-------------------------------------------------------------------------------
+# CMD_REGISTER handler. Registers a new worker.
+#-------------------------------------------------------------------------------
 sub cmd_register {
     my ($self, $msg) = @_;
     my $key      = $msg->key;
@@ -274,6 +331,9 @@ sub cmd_register {
     );
 }
 
+#-------------------------------------------------------------------------------
+# CMD_QUEUE handler. Queues a message and returns a CMD_ACK.
+#-------------------------------------------------------------------------------
 sub cmd_queue {
     my ($self, $msg, $addr) = @_;
 
@@ -287,6 +347,10 @@ sub cmd_queue {
     return $msg->reply(cmd => $CMD_ACK);
 }
 
+#-------------------------------------------------------------------------------
+# CMD_COLLECT handler. Waits for the result of a previously CMD_QUEUE'd message
+# to be posted and returns as a reply to the client.
+#-------------------------------------------------------------------------------
 sub cmd_collect {
     my ($self, $msg, $addr) = @_;
 
@@ -299,6 +363,9 @@ sub cmd_collect {
     return $result->reply(id => $msgid);
 }
 
+#-------------------------------------------------------------------------------
+# CMD_STATUS handler. Returns a hash of tracking and capacity data.
+#-------------------------------------------------------------------------------
 sub cmd_status {
     my ($self, $msg, $addr) = @_;
     my $msgid = $msg->payload;

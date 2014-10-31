@@ -13,6 +13,9 @@ use Argon qw(K :commands :logging);
 
 extends 'Argon::Dispatcher';
 
+#-------------------------------------------------------------------------------
+# Manager's address in the format "host:port"
+#-------------------------------------------------------------------------------
 has manager => (
     is        => 'rwp',
     isa       => sub {
@@ -23,16 +26,25 @@ has manager => (
     predicate => 'is_managed',
 );
 
+#-------------------------------------------------------------------------------
+# Number of worker processes
+#-------------------------------------------------------------------------------
 has workers => (
     is  => 'rwp',
     isa => Maybe[Int],
 );
 
+#-------------------------------------------------------------------------------
+# Number of requests each worker process may handle before being restarted
+#-------------------------------------------------------------------------------
 has max_requests => (
     is  => 'ro',
     isa => Maybe[Int],
 );
 
+#-------------------------------------------------------------------------------
+# Coro::ProcessPool object which manages the worker processes
+#-------------------------------------------------------------------------------
 has pool => (
     is  => 'lazy',
     isa => InstanceOf['Coro::ProcessPool'],
@@ -53,17 +65,19 @@ sub _build_pool {
     return $pool;
 }
 
+#-------------------------------------------------------------------------------
+# Unique key to identify the worker with the manager
+#-------------------------------------------------------------------------------
 has key => (
     is      => 'lazy',
     isa     => Str,
     default => sub { Data::UUID->new->create_str },
 );
 
-has manager_address => (
-    is  => 'rwp',
-    isa => Str,
-);
-
+#-------------------------------------------------------------------------------
+# Total capacity of the worker, equating to the number of worker processes
+# available.
+#-------------------------------------------------------------------------------
 has capacity => (
     is  => 'lazy',
     isa => Int,
@@ -71,6 +85,10 @@ has capacity => (
 
 sub _build_capacity { $_[0]->pool->{max_procs} }
 
+#-------------------------------------------------------------------------------
+# Set to true once the worker has registered with the manager. Set to false if
+# the connection is lost or the worker is not managed.
+#-------------------------------------------------------------------------------
 has is_registered => (
     is       => 'rwp',
     isa      => Bool,
@@ -78,6 +96,10 @@ has is_registered => (
     init_arg => undef,
 );
 
+#-------------------------------------------------------------------------------
+# When the worker has registered with the manager, this stores the address of
+# the Argon::Client being used by the manager to send tasks to this worker.
+#-------------------------------------------------------------------------------
 has manager_client_addr => (
     is        => 'rwp',
     isa       => Str,
@@ -85,7 +107,9 @@ has manager_client_addr => (
     clearer   => 'clear_manager_client_addr',
 );
 
+#-------------------------------------------------------------------------------
 # Shut down the process pool when the server stops
+#-------------------------------------------------------------------------------
 around stop => sub {
     my $orig = shift;
     my $self = shift;
@@ -93,7 +117,11 @@ around stop => sub {
     $self->$orig(@_);
 };
 
-sub init {
+#-------------------------------------------------------------------------------
+# Initialize the worker, configure responders. Start registration loop if this
+# is a managed worker.
+#-------------------------------------------------------------------------------
+after init => sub {
     my $self = shift;
     $self->respond_to($CMD_QUEUE, K('cmd_queue', $self));
     $self->respond_to($CMD_PING,  K('cmd_ping',  $self));
@@ -104,8 +132,13 @@ sub init {
     } else {
         INFO 'Starting worker node in standalone mode with %d processes', $self->capacity;
     }
-}
+};
 
+#-------------------------------------------------------------------------------
+# Called by Argon::Service when a client is disconnected. If this is a managed
+# worker and the client being disconnected is the manager, reset manager
+# tracking attributes so the registration monitor will attempt to reconnect.
+#-------------------------------------------------------------------------------
 sub client_disconnected {
     my ($self, $addr) = @_;
     DEBUG 'Worker: client %s disconnected', $addr;
@@ -120,11 +153,17 @@ sub client_disconnected {
     }
 }
 
+#-------------------------------------------------------------------------------
+# Called by Argon::Service when new client is connected
+#-------------------------------------------------------------------------------
 sub client_connected {
     my ($self, $addr) = @_;
     DEBUG 'Worker: client %s connected', $addr;
 }
 
+#-------------------------------------------------------------------------------
+# Perform single registration attempt with the manager.
+#-------------------------------------------------------------------------------
 sub register {
     my $self = shift;
     croak 'Cannot register in standalone mode' unless $self->is_managed;
@@ -171,6 +210,11 @@ sub register {
     }
 }
 
+#-------------------------------------------------------------------------------
+# Timer that checks whether a managed worker is connected and reconnects as
+# needed. The time between attempts increases logarithmically until a
+# connection is made, at which point it is reset.
+#-------------------------------------------------------------------------------
 sub register_loop {
     my $self  = shift;
     my $sleep = $Argon::POLL_INTERVAL;
@@ -197,11 +241,18 @@ sub register_loop {
     }
 }
 
+#-------------------------------------------------------------------------------
+# Handler for CMD_PING
+#-------------------------------------------------------------------------------
 sub cmd_ping {
     my ($self, $msg, $addr) = @_;
     return $msg->reply(cmd => $CMD_ACK);
 }
 
+#-------------------------------------------------------------------------------
+# Handler for CMD_QUEUE. Shunts msgs to the process pool and returns the
+# results.
+#-------------------------------------------------------------------------------
 sub cmd_queue {
     my ($self, $msg, $addr) = @_;
 

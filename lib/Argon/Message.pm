@@ -17,6 +17,9 @@ use fields qw(
     key
 );
 
+#-------------------------------------------------------------------------------
+# Creates a new message.
+#-------------------------------------------------------------------------------
 sub new {
     my ($class, %param) = @_;
     defined $param{cmd} || croak 'expected parameter "cmd"';
@@ -29,6 +32,9 @@ sub new {
     return $self;
 }
 
+#-------------------------------------------------------------------------------
+# Accessors and comparison method
+#-------------------------------------------------------------------------------
 sub cmp     { $_[0]->{pri} <=> $_[1]->{pri} }
 sub id      { $_[0]->{id}      }
 sub cmd     { $_[0]->{cmd}     }
@@ -36,6 +42,10 @@ sub pri     { $_[0]->{pri}     }
 sub key     { $_[0]->{key}     }
 sub payload { $_[0]->{payload} }
 
+#-------------------------------------------------------------------------------
+# Encodes a message into a line of ASCII (base64-encoded) which can be
+# transmitted on the line.
+#-------------------------------------------------------------------------------
 sub encode {
     my $self = shift;
 
@@ -60,6 +70,9 @@ sub encode {
     return $line;
 }
 
+#-------------------------------------------------------------------------------
+# Decodes a line of data and returns a new Argon::Message object.
+#-------------------------------------------------------------------------------
 sub decode {
     my ($class, $line) = @_;
     my ($id, $cmd, $pri, $key, $payload) = split $Argon::MSG_SEPARATOR, $line;
@@ -87,6 +100,11 @@ sub decode {
     );
 }
 
+#-------------------------------------------------------------------------------
+# Creates a new Argon::Message object replying to this instance. Named
+# parameters passed in are forwarded to the constructor to override those
+# values in this instance.
+#-------------------------------------------------------------------------------
 sub reply {
     my ($self, %param) = @_;
     return $self->new(%$self, %param)

@@ -13,21 +13,35 @@ use Argon::Message;
 use Argon::Stream;
 use Argon qw(:commands :logging);
 
+#-------------------------------------------------------------------------------
+# Listening port number. Assigned by OS and set if not provided by the caller.
+#-------------------------------------------------------------------------------
 has port => (
     is  => 'rwp',
     isa => Int,
 );
 
+#-------------------------------------------------------------------------------
+# Listening host address. Assigned by OS and set if not provided by the caller.
+#-------------------------------------------------------------------------------
 has host => (
     is  => 'rwp',
     isa => Str,
 );
 
+#-------------------------------------------------------------------------------
+# Address in the format of host:port. Set on initialization from the listening
+# socket.
+#-------------------------------------------------------------------------------
 has address => (
-    is  => 'rwp',
-    isa => Str,
+    is       => 'rwp',
+    isa      => Str,
+    init_arg => undef,
 );
 
+#-------------------------------------------------------------------------------
+# Stores the rouse callback used to shut down the service.
+#-------------------------------------------------------------------------------
 has stop_cb => (
     is          => 'rwp',
     isa         => CodeRef,
@@ -36,6 +50,11 @@ has stop_cb => (
     handles     => { stop => 'execute' }
 );
 
+#-------------------------------------------------------------------------------
+# Starts the service. Once the socket is built, the host, port, and address are
+# all set to the actual values according to the socket. If provided, $cb is
+# called once the service is started.
+#-------------------------------------------------------------------------------
 sub start {
     my ($self, $cb) = @_;
 
@@ -68,6 +87,9 @@ sub start {
     INFO 'Service stopped';
 }
 
+#-------------------------------------------------------------------------------
+# Process requests for a single client.
+#-------------------------------------------------------------------------------
 sub process_requests {
     my ($self, $handle, $addr) = @_;
     my $stream = Argon::Stream->new(handle => $handle);
@@ -99,7 +121,10 @@ sub process_requests {
     }
 }
 
-# Methods triggered by the Argon::Service
+#-------------------------------------------------------------------------------
+# Methods triggered by the Argon::Service. These are used by derived classes to
+# hook into different events in the service's life cycle.
+#-------------------------------------------------------------------------------
 sub init                { }
 sub client_connected    { }
 sub client_disconnected { }

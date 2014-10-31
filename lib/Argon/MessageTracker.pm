@@ -11,6 +11,11 @@ use Coro::Channel;
 use Argon;
 use Argon::Message;
 
+#-------------------------------------------------------------------------------
+# As messages are added to the tracker, a Coro::Channel is created (and mapped
+# to the message id). It is used to allow callers to block until the result is
+# posted to the channel.
+#-------------------------------------------------------------------------------
 has tracked => (
     is          => 'ro',
     isa         => Map[Str, InstanceOf['Coro::Channel']],
@@ -27,6 +32,9 @@ has tracked => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Tracks the completion time stamp for messages.
+#-------------------------------------------------------------------------------
 has complete => (
     is          => 'ro',
     isa         => Map[Str, Num],
@@ -43,6 +51,10 @@ has complete => (
     }
 );
 
+#-------------------------------------------------------------------------------
+# Uses the completion time stamp to delete any messages which were completed
+# more than $Argon::DEL_COMPLETE_AFTER seconds ago and remain unclaimed.
+#-------------------------------------------------------------------------------
 has cleanup_thread => (
     is       => 'lazy',
     isa      => InstanceOf['Coro'],
@@ -59,12 +71,18 @@ sub _build_cleanup_thread {
     };
 }
 
+#-------------------------------------------------------------------------------
+# Starts tracking on a message.
+#-------------------------------------------------------------------------------
 sub track_message {
     my ($self, $msgid) = @_;
     croak 'message is already tracked' if $self->is_tracked($msgid);
     $self->set_tracked($msgid => Coro::Channel->new());
 }
 
+#-------------------------------------------------------------------------------
+# Completes tracking on a message and posts results.
+#-------------------------------------------------------------------------------
 sub complete_message {
     my ($self, $msg) = @_;
     croak 'message is not tracked' unless $self->is_tracked($msg->id);
@@ -73,6 +91,10 @@ sub complete_message {
     $self->get_tracked($msg->id)->put($msg);
 }
 
+#-------------------------------------------------------------------------------
+# Waits until a tracked message's results are available and returns them, then
+# cleans up after the message.
+#-------------------------------------------------------------------------------
 sub collect_message {
     my ($self, $msgid) = @_;
     croak 'message is not tracked' unless $self->is_tracked($msgid);
@@ -81,12 +103,20 @@ sub collect_message {
     return $msg;
 }
 
+#-------------------------------------------------------------------------------
+# Removes tracking information for a tracked message.
+#-------------------------------------------------------------------------------
 sub cleanup_message {
     my ($self, $msgid) = @_;
     $self->del_tracked($msgid);
     $self->del_complete($msgid);
 }
 
+#-------------------------------------------------------------------------------
+# Deletes unclaimed messages which were completed more than
+# $Argon::DEL_COMPLETE_AFTER seconds ago. Run in a loop stored in
+# cleanup_thread.
+#-------------------------------------------------------------------------------
 sub delete_unclaimed {
     my $self = shift;
     my $now  = time;

@@ -11,6 +11,9 @@ use Socket qw(unpack_sockaddr_in inet_ntoa);
 use Argon::Message;
 use Argon qw(:logging);
 
+#-------------------------------------------------------------------------------
+# Non-blocking Coro::Handle for this connection.
+#-------------------------------------------------------------------------------
 has handle => (
     is        => 'rwp',
     isa       => InstanceOf['Coro::Handle'],
@@ -20,9 +23,13 @@ has handle => (
     handles   => {fh => 'fh'}
 );
 
+#-------------------------------------------------------------------------------
+# The host:port for this connection.
+#-------------------------------------------------------------------------------
 has addr => (
-    is  => 'lazy',
-    isa => Str,
+    is       => 'lazy',
+    isa      => Str,
+    init_arg => undef,
 );
 
 sub _build_addr {
@@ -32,6 +39,9 @@ sub _build_addr {
     sprintf('%s:%d', $host, $port);
 }
 
+#-------------------------------------------------------------------------------
+# Connects to $host:$port. Returns once the connection is made.
+#-------------------------------------------------------------------------------
 sub connect {
     my ($class, $host, $port) = @_;
     my $rouse = rouse_cb;
@@ -57,18 +67,27 @@ sub connect {
     return $stream;
 }
 
+#-------------------------------------------------------------------------------
+# Closes the connection.
+#-------------------------------------------------------------------------------
 sub close {
     my $self = shift;
     $self->handle->close;
     $self->_clear_handle;
 }
 
+#-------------------------------------------------------------------------------
+# Writes $msg to the line.
+#-------------------------------------------------------------------------------
 sub write {
     my ($self, $msg) = @_;
     croak 'not connected' unless $self->is_connected;
     $self->handle->print($msg->encode . $Argon::EOL);
 }
 
+#-------------------------------------------------------------------------------
+# Reads an Argon::Message from the line. Throws an error on junk input.
+#-------------------------------------------------------------------------------
 sub read {
     my $self = shift;
     croak 'not connected' unless $self->is_connected;
