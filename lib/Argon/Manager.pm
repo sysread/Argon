@@ -121,13 +121,13 @@ has capacity => (
 
 sub inc_capacity {
     my ($self, $amount) = @_;
-    $amount //= 1;
+    $amount ||= 1;
     $self->{capacity} += $amount;
 }
 
 sub dec_capacity {
     my ($self, $amount) = @_;
-    $amount //= 1;
+    $amount ||= 1;
     $self->{capacity} -= $amount;
 }
 

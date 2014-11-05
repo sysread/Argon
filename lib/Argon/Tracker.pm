@@ -43,7 +43,7 @@ has requests => (
 
 sub inc_requests {
     my ($self, $amount) = @_;
-    $amount //= 0;
+    $amount ||= 0;
     $self->{requests} += $amount;
 }
 

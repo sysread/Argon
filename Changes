@@ -1,5 +1,6 @@
 0.15    ????-??-??
     * Added comments to internally used classes
+    * Replaced // usaged with || for perl 5.8-ophiles
 
 0.14    2014-10-31
     * Bug fixes
