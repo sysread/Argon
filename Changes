@@ -3,6 +3,7 @@
     * Replaced // usaged with || for perl 5.8-ophiles
     * Bumped required version of Coro::ProcessPool to 0.14 for better 5.8 support
     * SKIP tests on MSWin32 systems (not supported)
+    * Fixed ugly sleep causing race condition in tests
 
 0.14    2014-10-31
     * Bug fixes

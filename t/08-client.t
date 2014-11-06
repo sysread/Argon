@@ -23,23 +23,22 @@ sub test {
 SKIP: {
     skip 'does not run under MSWin32' if $^O eq 'MSWin32';
 
-    my $manager_cv     = AnyEvent->condvar;;
-    my $manager        = Argon::Manager->new();
-    my $manager_thread = async { $manager->start(sub { $manager_cv->send(shift) }) };
-    my $manager_addr   = $manager_cv->recv;
+    my $ready = rouse_cb;
+
+    my $manager_cb     = rouse_cb;
+    my $manager        = Argon::Manager->new(on_ready => $ready);
+    my $manager_thread = async { $manager->start($manager_cb) };
+    my $manager_addr   = rouse_wait $manager_cb;
 
     like($manager_addr, qr/^[\w\.]+:\d+$/, 'manager address is set');
 
-    my $worker_cv      = AnyEvent->condvar;
+    my $worker_cb      = rouse_cb;
     my $worker         = Argon::Worker->new(manager => $manager_addr);
-    my $worker_thread  = async { $worker->start(sub { $worker_cv->send }) };
-    $worker_cv->recv;
+    my $worker_thread  = async { $worker->start($worker_cb) };
+    rouse_wait $worker_cb;
 
-    # Wait for worker to connect to manager.
-    # TODO There's got to be a better way to do this. But if the worker thread blocks
-    # while waiting for a manager connection, the manager cannot connect because the
-    # worker startup doesn't cede.
-    Coro::AnyEvent::sleep(3);
+    # Wait for the worker to register with the manager
+    rouse_wait $ready;
 
     my $client = Argon::Client->new(host => $manager->host, port => $manager->port);
     $client->connect;

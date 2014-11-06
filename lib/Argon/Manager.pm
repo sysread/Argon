@@ -156,6 +156,17 @@ has is_running => (
 );
 
 #-------------------------------------------------------------------------------
+# If set, this code ref is called when the Manager is started and has at least
+# one registered worker. This is mostly useful when writing something that must
+# return after the manager has started and is ready to accept tasks (like a
+# test - see t/08-client.t).
+#-------------------------------------------------------------------------------
+has on_ready => (
+    is      => 'ro',
+    isa     => CodeRef,
+);
+
+#-------------------------------------------------------------------------------
 # True if there is available capacity for handling tasks or if the queue is not
 # at its maximum value.
 #-------------------------------------------------------------------------------
@@ -324,6 +335,11 @@ sub cmd_register {
     $self->start_monitor($key);
 
     DEBUG 'Capacity at %d', $self->capacity;
+
+    # Signal that we're ready to receive requests to anyone that may be waiting
+    if ($self->on_ready) {
+        $self->on_ready->();
+    }
 
     return $msg->reply(
         cmd     => $CMD_ACK,
