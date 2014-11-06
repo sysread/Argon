@@ -20,80 +20,84 @@ sub test {
     return $n * $n;
 }
 
-my $manager_cv     = AnyEvent->condvar;;
-my $manager        = Argon::Manager->new();
-my $manager_thread = async { $manager->start(sub { $manager_cv->send(shift) }) };
-my $manager_addr   = $manager_cv->recv;
+SKIP: {
+    skip 'does not run under MSWin32' if $^O eq 'MSWin32';
 
-like($manager_addr, qr/^[\w\.]+:\d+$/, 'manager address is set');
+    my $manager_cv     = AnyEvent->condvar;;
+    my $manager        = Argon::Manager->new();
+    my $manager_thread = async { $manager->start(sub { $manager_cv->send(shift) }) };
+    my $manager_addr   = $manager_cv->recv;
 
-my $worker_cv      = AnyEvent->condvar;
-my $worker         = Argon::Worker->new(manager => $manager_addr);
-my $worker_thread  = async { $worker->start(sub { $worker_cv->send }) };
-$worker_cv->recv;
+    like($manager_addr, qr/^[\w\.]+:\d+$/, 'manager address is set');
 
-# Wait for worker to connect to manager.
-# TODO There's got to be a better way to do this. But if the worker thread blocks
-# while waiting for a manager connection, the manager cannot connect because the
-# worker startup doesn't cede.
-Coro::AnyEvent::sleep(3);
+    my $worker_cv      = AnyEvent->condvar;
+    my $worker         = Argon::Worker->new(manager => $manager_addr);
+    my $worker_thread  = async { $worker->start(sub { $worker_cv->send }) };
+    $worker_cv->recv;
 
-my $client = Argon::Client->new(host => $manager->host, port => $manager->port);
-$client->connect;
+    # Wait for worker to connect to manager.
+    # TODO There's got to be a better way to do this. But if the worker thread blocks
+    # while waiting for a manager connection, the manager cannot connect because the
+    # worker startup doesn't cede.
+    Coro::AnyEvent::sleep(3);
 
-# Server status
-my $status   = $client->server_status;
-my $expected = {
-    workers          => 1,
-    total_capacity   => $worker->workers,
-    current_capacity => $worker->workers,
-    queue_length     => 0,
-    pending          => {$worker->key => {}},
-};
+    my $client = Argon::Client->new(host => $manager->host, port => $manager->port);
+    $client->connect;
 
-is_deeply($status, $expected, 'expected server status');
-
-my @range = 1 .. 20;
-
-# Test queue, collect, and server_status
-foreach my $i (@range) {
-    my $overrid = Sub::Override->new('Argon::Tracker::age', sub { 42 });
-
-    ok(my $msgid = $client->queue(\&test, [$i]), "queue $i");
-
-    my $status = $client->server_status;
-    my $result = $client->collect($msgid);
-
+    # Server status
+    my $status   = $client->server_status;
     my $expected = {
         workers          => 1,
         total_capacity   => $worker->workers,
-        current_capacity => $worker->workers - 1,
+        current_capacity => $worker->workers,
         queue_length     => 0,
-        pending          => { $worker->key => { $msgid => 42 } },
+        pending          => {$worker->key => {}},
     };
 
-    is($result, ($i * $i), "queue => collect result $i");
-    is_deeply($status, $expected, "server_status $i");
-}
+    is_deeply($status, $expected, 'expected server status');
 
-# Test process
-foreach my $i (@range) {
-    my $result = $client->process(\&test, [$i]);
-    is($result, ($i * $i), "process result $i");
-}
+    my @range = 1 .. 20;
 
-# Test defer
-my %deferred = map { $_ => $client->defer(sub { $_[0] * $_[0] }, [$_]) } @range;
-my %results  = map { $_ => $deferred{$_}->() } keys %deferred;
-foreach my $i (shuffle @range) {
-    is($results{$i}, $i * $i, "defer result $i");
-}
+    # Test queue, collect, and server_status
+    foreach my $i (@range) {
+        my $overrid = Sub::Override->new('Argon::Tracker::age', sub { 42 });
 
-$client->shutdown;
-$worker->stop;
-$manager->stop;
+        ok(my $msgid = $client->queue(\&test, [$i]), "queue $i");
 
-$manager_thread->join;
-$worker_thread->join;
+        my $status = $client->server_status;
+        my $result = $client->collect($msgid);
+
+        my $expected = {
+            workers          => 1,
+            total_capacity   => $worker->workers,
+            current_capacity => $worker->workers - 1,
+            queue_length     => 0,
+            pending          => { $worker->key => { $msgid => 42 } },
+        };
+
+        is($result, ($i * $i), "queue => collect result $i");
+        is_deeply($status, $expected, "server_status $i");
+    }
+
+    # Test process
+    foreach my $i (@range) {
+        my $result = $client->process(\&test, [$i]);
+        is($result, ($i * $i), "process result $i");
+    }
+
+    # Test defer
+    my %deferred = map { $_ => $client->defer(sub { $_[0] * $_[0] }, [$_]) } @range;
+    my %results  = map { $_ => $deferred{$_}->() } keys %deferred;
+    foreach my $i (shuffle @range) {
+        is($results{$i}, $i * $i, "defer result $i");
+    }
+
+    $client->shutdown;
+    $worker->stop;
+    $manager->stop;
+
+    $manager_thread->join;
+    $worker_thread->join;
+};
 
 done_testing;

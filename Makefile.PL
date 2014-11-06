@@ -19,7 +19,7 @@ WriteMakefile(
         'AnyEvent'           => 0,
         'Const::Fast'        => 0,
         'Coro'               => 0,
-        'Coro::ProcessPool'  => '0.11',
+        'Coro::ProcessPool'  => '0.14',
         'Coro::PrioChannel'  => '0.005',
         'Guard'              => 0,
         'Data::UUID'         => 0,

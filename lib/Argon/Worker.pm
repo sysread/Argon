@@ -19,7 +19,7 @@ extends 'Argon::Dispatcher';
 has manager => (
     is        => 'rwp',
     isa       => sub {
-        croak sprintf("'%s' does not match host:port", ($_[0] // 'undef'))
+        croak sprintf("'%s' does not match host:port", ($_[0] || 'undef'))
             if !defined $_[0]
             || $_[0] !~ /^[\w\.]+:\d+$/;
     },
@@ -53,7 +53,7 @@ has pool => (
 sub _build_pool {
     my $self = shift;
 
-    INFO 'Starting worker with %s pool processes', ($self->workers // 'default');
+    INFO 'Starting worker with %s pool processes', ($self->workers || 'default');
 
     my $pool = Coro::ProcessPool->new(
         ($self->workers      ? (max_procs => $self->workers)      : ()),

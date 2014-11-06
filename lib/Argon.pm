@@ -1,6 +1,6 @@
 package Argon;
 
-our $VERSION = '0.14_01';
+our $VERSION = '0.14_02';
 
 use strict;
 use warnings;
@@ -10,6 +10,10 @@ use Coro;
 use Scalar::Util  qw(weaken refaddr);
 use POSIX         qw(strftime);
 use Log::Log4perl qw();
+
+if ($^O eq 'MSWin32') {
+    die 'MSWin32 is not supported';
+}
 
 require Exporter;
 use base qw/Exporter/;
