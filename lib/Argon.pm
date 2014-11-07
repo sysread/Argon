@@ -1,6 +1,6 @@
 package Argon;
 
-our $VERSION = '0.14_03';
+our $VERSION = '0.15';
 
 use strict;
 use warnings;
