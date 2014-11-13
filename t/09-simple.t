@@ -39,6 +39,12 @@ SKIP: {
         is($is_finished->(), 1, 'finished');
         is($deferred->(), 42, 'process + deferred');
     }
+
+    # Task class
+    {
+        my $deferred = task 't::TestTask', 1, 2, 3;
+        is($deferred->(), 42, 'task + deferred');
+    }
 };
 
 done_testing;

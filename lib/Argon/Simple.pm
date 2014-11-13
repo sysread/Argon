@@ -6,7 +6,7 @@ use Carp;
 use Argon::Client;
 
 use parent qw(Exporter);
-our @EXPORT = qw(connect process);
+our @EXPORT = qw(connect process task);
 
 my $CLIENT;
 
@@ -28,10 +28,14 @@ sub connect {
 }
 
 sub process (&@) {
-    my ($f, @args) = @_;
+    goto \&task;
+}
+
+sub task ($@) {
+    my ($task_class, @args) = @_;
     croak 'not connected' unless $CLIENT;
 
-    my $msgid    = $CLIENT->queue($f, \@args);
+    my $msgid    = $CLIENT->queue($task_class, \@args);
     my $deferred = sub { $CLIENT->collect($msgid) };
 
     return $deferred unless wantarray;

@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Carp;
+use Storable       qw();
 use Coro::Storable qw(nfreeze thaw);
 use Data::UUID;
 use MIME::Base64   qw(encode_base64 decode_base64);
@@ -51,7 +52,8 @@ sub encode {
 
     my $data = do {
         no warnings 'once';
-        local $Storable::Deparse = 1;
+        local $Storable::Deparse    = 1;
+        local $Storable::forgive_me = 1;
 
         defined $self->{payload}
             ? encode_base64(nfreeze([$self->{payload}]), '')

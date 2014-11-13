@@ -1,3 +1,7 @@
+0.16    ????-??-??
+    * Added Argon::Simple::task - supports "task class"
+    * Switched from UNIVERSAL::require to Module::Load
+
 0.15    2014-11-06
     * Added comments to internally used classes
     * Replaced // usaged with || for perl 5.8-ophiles

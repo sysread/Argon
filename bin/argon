@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Pod::Usage;
 use Getopt::Long;
-use UNIVERSAL::require;
+use Module::Load qw(load);
 use Argon qw(:logging);
 use Argon::Manager;
 use Argon::Worker;
@@ -59,7 +59,7 @@ pod2usage('invalid options for manager')
     if $kind eq 'manager' && @opt{'workers', 'max_reqs', 'manager'};
 
 my $class = $kind eq 'manager' ? 'Argon::Manager' : 'Argon::Worker';
-$class->require;
+load $class;
 
 my $service = $class->new(%opt);
 $service->start;
