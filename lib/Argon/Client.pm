@@ -362,6 +362,10 @@ performed at compilation time, causing it to be triggered when the calling code
 is compiled, rather than from within the worker process. C<require>, on the
 other hand, is triggered at runtime and will behave as expected.
 
+Using a task class avoids this issue entirely; the task is loaded within the
+Argon worker process at run time, including any C<use> or C<require>
+statements.
+
 =head1 AUTHOR
 
 Jeff Ober <jeffober@gmail.com>

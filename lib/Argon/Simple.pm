@@ -98,7 +98,7 @@ system and is available.
 When called in list context, additionally returns a CODE reference which
 evaluates to true when the task has been completed by the Argon system.
 
-See also L<Coro::ProcessPool::A NOTE ABOUT IMPORTS AND CLOSURES>, which has
+See also L<Coro::ProcessPool/A NOTE ABOUT IMPORTS AND CLOSURES>, which has
 some important information about C<use> and C<require>.
 
 =head2 task 'Task::Class', @args
