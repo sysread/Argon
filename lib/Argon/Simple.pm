@@ -98,6 +98,15 @@ system and is available.
 When called in list context, additionally returns a CODE reference which
 evaluates to true when the task has been completed by the Argon system.
 
+See also L<Coro::ProcessPool::A NOTE ABOUT IMPORTS AND CLOSURES>, which has
+some important information about C<use> and C<require>.
+
+=head2 task 'Task::Class', @args
+
+Similar to process, but passes in the name of a class implementing the methods
+C<new(@args)> and C<run>. The result of C<run> is returned. Note that the class
+must be found on the workers' include paths.
+
 =head1 AUTHOR
 
 Jeff Ober <jeffober@gmail.com>
