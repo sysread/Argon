@@ -66,12 +66,12 @@ Argon::Simple
 
     connect 'somehost:9999';
 
-    my $deferred = process { shift * 2 } 21;
+    my $deferred = process { $_[0] * 2 } 21;
     if ($deferred->() == 42) {
         print "So long, and thanks for all the fish!\n";
     }
 
-    my ($deferred, $is_finished) = process { shift * 2 } 21;
+    my ($deferred, $is_finished) = process { $_[0] * 2 } 21;
     do { print "." } until $is_finished->();
     print "So long, and thanks for all the fish!\n";
 
