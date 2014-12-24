@@ -27,3 +27,4 @@ t/06-worker.t
 t/07-manager.t
 t/08-client.t
 t/09-simple.t
+t/TestTask.pm
