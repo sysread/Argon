@@ -17,6 +17,7 @@ use Argon qw(K :logging :commands);
 #-------------------------------------------------------------------------------
 # Error constants
 #-------------------------------------------------------------------------------
+const our $ERR_NO_WORKERS  => 'There are no registered workers.';
 const our $ERR_NO_CAPACITY => 'Unable to process request. System is at max capacity.';
 const our $ERR_PROC_FAIL   => 'An error occurred routing the request.';
 const our $ERR_NOT_FOUND   => 'The message ID was not found.';
@@ -352,6 +353,10 @@ sub cmd_register {
 #-------------------------------------------------------------------------------
 sub cmd_queue {
     my ($self, $msg, $addr) = @_;
+
+    # Reject tasks when there are no workers
+    return $msg->reply(cmd => $CMD_REJECTED, payload => $ERR_NO_WORKERS)
+        if $self->num_workers == 0;
 
     # Reject tasks when there is no available capacity
     return $msg->reply(cmd => $CMD_REJECTED, payload => $ERR_NO_CAPACITY)
