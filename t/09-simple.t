@@ -4,14 +4,16 @@ use AnyEvent::Loop; # Ensure the pure perl loop is loaded for testing
 use Test::More;
 use Sub::Override;
 use Argon::Simple;
+use Argon::Message;
+use Argon qw(:commands);
 
 SKIP: {
     skip 'does not run under MSWin32' if $^O eq 'MSWin32';
 
     our @overrides = (
         Sub::Override->new('Argon::Client::connect', sub {}),
-        Sub::Override->new('Argon::Client::queue',   sub { 'abcdefg' }),
         Sub::Override->new('Argon::Client::collect', sub { 42 }),
+        Sub::Override->new('Argon::Client::send',    sub { Argon::Message->new(cmd => $CMD_ACK, id => 'abcdefg') }),
     );
 
     ok(my $client1 = connect('somehost:1234'),  'connect (1 arg)');

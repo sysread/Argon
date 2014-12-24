@@ -84,6 +84,12 @@ SKIP: {
         is($result, ($i * $i), "process result $i");
     }
 
+    # Test task class
+    {
+        my $result = $client->process('t::TestTask', [1, 2, 3]);
+        is($result, 6, 'process + task class');
+    }
+
     # Test defer
     my %deferred = map { $_ => $client->defer(sub { $_[0] * $_[0] }, [$_]) } @range;
     my %results  = map { $_ => $deferred{$_}->() } keys %deferred;

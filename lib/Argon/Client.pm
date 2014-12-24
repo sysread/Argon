@@ -126,7 +126,7 @@ sub send {
 
 sub queue {
     my ($self, $f, $args, $pri, $max_tries) = @_;
-    $f && ref $f eq 'CODE' || croak 'expected CODE ref';
+    defined $f && (!ref $f || ref $f eq 'CODE') || croak 'expected CODE ref or class name';
 
     $args ||= [];
     ref $args eq 'ARRAY' || croak 'expected ARRAY ref of args';

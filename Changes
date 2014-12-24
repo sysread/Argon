@@ -1,5 +1,6 @@
-0.16    ????-??-??
-    * Added Argon::Simple::task - supports "task class"
+0.16    2014-12-24
+    * Argon::Client->queue now supports task classes
+    * Added Argon::Simple::task - supports task class
     * Switched from UNIVERSAL::require to Module::Load
     * Bumped required Coro::ProcessPool to 0.15 for better error messages, task classes
 
