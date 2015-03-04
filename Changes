@@ -1,3 +1,7 @@
+0.17    2015-??-??
+    * Client unit test now shuts down more cleanly
+    * Added --debug option to bin/argon
+
 0.16    2014-12-24
     * Argon::Client->queue now supports task classes
     * Added Argon::Simple::task - supports task class
