@@ -22,6 +22,7 @@ unless (defined $kind && $kind =~ /manager|worker/) {
 # Get options
 my $help;
 my $verbose;
+my $debug;
 my %opt = (
     port       => undef,
     host       => undef,
@@ -34,6 +35,7 @@ my %opt = (
 GetOptions(
     'help'           => \$help,
     'verbose'        => \$verbose,
+    'debug'          => \$debug,
     'host=s'         => \$opt{host},
     'port=i'         => \$opt{port},
     'workers=i'      => \$opt{workers},
@@ -46,6 +48,10 @@ $help && pod2usage(0);
 
 if ($verbose) {
     SET_LOG_LEVEL($INFO);
+}
+
+if ($debug) {
+    SET_LOG_LEVEL($DEBUG);
 }
 
 # Clean up host

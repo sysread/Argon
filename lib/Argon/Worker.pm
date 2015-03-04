@@ -110,11 +110,9 @@ has manager_client_addr => (
 #-------------------------------------------------------------------------------
 # Shut down the process pool when the server stops
 #-------------------------------------------------------------------------------
-around stop => sub {
-    my $orig = shift;
+after stop => sub {
     my $self = shift;
     $self->pool->shutdown;
-    $self->$orig(@_);
 };
 
 #-------------------------------------------------------------------------------

@@ -97,12 +97,9 @@ SKIP: {
         is($results{$i}, $i * $i, "defer result $i");
     }
 
-    $client->shutdown;
     $worker->stop;
     $manager->stop;
-
-    $manager_thread->join;
-    $worker_thread->join;
+    $client->shutdown;
 };
 
 done_testing;
