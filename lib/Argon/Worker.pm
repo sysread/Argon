@@ -108,11 +108,21 @@ has manager_client_addr => (
 );
 
 #-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+has registration_loop => (
+    is        => 'rwp',
+    isa       => InstanceOf['Coro'],
+    init_arg  => undef,
+    clearer   => 'clear_registration_loop',
+);
+
+#-------------------------------------------------------------------------------
 # Shut down the process pool when the server stops
 #-------------------------------------------------------------------------------
 after stop => sub {
     my $self = shift;
     $self->pool->shutdown;
+    $self->registration_loop->safe_cancel;
 };
 
 #-------------------------------------------------------------------------------
@@ -126,7 +136,7 @@ after init => sub {
 
     if ($self->is_managed) {
         INFO 'Starting worker node in managed mode with %d processes', $self->capacity;
-        async_pool { $self->register_loop };
+        $self->_set_registration_loop(async { $_[0]->register_loop } $self);
     } else {
         INFO 'Starting worker node in standalone mode with %d processes', $self->capacity;
     }
