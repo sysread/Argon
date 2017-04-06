@@ -1,5 +1,5 @@
 {{NEXT}}
-- Complete rewrite to remove dependency on Coro
+- Complete rewrite to remove dependency on Coro (NOT backward compatible)
 
 0.16 2014-12-24
 - Argon::Client->queue now supports task classes

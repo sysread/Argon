@@ -9,6 +9,7 @@ requires 'MIME::Base64' => '';
 requires 'Scalar::Util' => '';
 requires 'Storable'     => '';
 requires 'Time::HiRes'  => '';
+requires 'Getopt::Long::Descriptive' => '';
 
 on test => sub {
   requires 'Test2::Bundle::Extended' => 0;

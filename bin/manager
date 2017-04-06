@@ -1,0 +1,52 @@
+#!perl
+
+# PODNAME: manager
+# ABSTRACT: Starts an Argon manager service
+#
+=head1 SYNOPSIS
+
+  manager --host localhost --port 4242
+
+=head1 DESCRIPTION
+
+Starts the Argon manager service. The service will not accept any tasks until
+at least one worker has registered with it.
+
+=head1 OPTIONS
+
+=head2 port
+
+Optionally specifies the port to listen on. Defaults to an OS-assigned port.
+
+=head2 host
+
+Optionally specifies the device address to listen on. Defaults to an
+OS-assigned address.
+
+=cut
+
+
+use strict;
+use warnings;
+use Argon::Manager;
+use Getopt::Long::Descriptive;
+
+my ($opt, $usage) = describe_options(
+  'manager %o',
+  ['host|h=s', '(optional) hostname on which to listen (defaults to localhost)'],
+  [
+    'port|p=i', '(optional) port on which to listen (defaults to OS-assigned port)',
+    {callbacks => {'port number' => sub { shift > 0 }}},
+  ],
+  [],
+  ['help|h',  'prints this help text and exits', {shortcircuit => 1}],
+  ['usage|u', 'prints this help text and exits', {shortcircuit => 1}],
+);
+
+if ($opt->help) {
+  print $usage->text;
+  exit;
+}
+
+my $manager = Argon::Manager->new(host => $opt->host, port => $opt->port);
+$manager->run;

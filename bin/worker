@@ -1,0 +1,90 @@
+#!perl
+
+# PODNAME: worker
+# ABSTRACT: Starts an Argon worker service
+
+=head1 SYNOPSIS
+
+  worker --mgr some.host.com:4242 --capacity 16
+
+=head1 DESCRIPTION
+
+Starts an Argon worker service. The worker will attempt to connect and register
+with the manager service at the address specified by C<--mgr>. Up to
+C<--capacity> forked processes will be used to execute tasks assigned by the
+manager.
+
+=head1 OPTIONS
+
+=head2 port
+
+Optionally specifies the port to listen on. Defaults to an OS-assigned port.
+
+=head2 capacity
+
+Specifies the maximum number of concurrent, forked processes to be made
+available for the execution of tasks assigned by the manager.
+
+=head2 mgr
+
+The address of the manager service to which this worker is to be assigned. The
+address must be specified as hostname:portnumber.
+
+=head2 allow-eval
+
+By default, tasks must be specified as a class name and instantiation arguments.
+If specified, C<--allow-eval> allows code refs to be serialized using C<Storable>
+and executed in the forked worker process.
+
+This is obviously a security risk and therefore should only be permitted when
+running in a secure environment.
+
+=cut
+
+use strict;
+use warnings;
+use Argon::Worker;
+use Getopt::Long::Descriptive;
+
+my ($opt, $usage) = describe_options(
+  'worker %o',
+  [
+    'port|p=i', '(optional) port on which to listen (defaults to OS-assigned port)',
+    {callbacks => {'port number' => sub { shift > 0 }}},
+  ],
+  [
+    'capacity|c=i', '(required) max number of worker processes permitted',
+    {required => 1, callbacks => {'positive int' => sub { shift > 0 }}},
+  ],
+  [
+    'mgr|m=s',  '(required) address of Argon manager service (e.g. some.host.com:4242)',
+    {required => 1, callbacks => {'host:port' => sub { shift =~ /^.+?:\d+$/ }}},
+  ],
+  ['allow-eval|a', '(optional) permit execution of serialized code (warning: this is a security risk if not running in a safe environment)'],
+  [],
+  ['help|h',  'prints this help text and exits', {shortcircuit => 1}],
+  ['usage|u', 'prints this help text and exits', {shortcircuit => 1}],
+);
+
+if ($opt->help) {
+  print $usage->text;
+  exit;
+}
+
+my ($mgr_host, $mgr_port) = split /:/, $opt->mgr;
+unless ($mgr_host && $mgr_port) {
+  warn "Expected format host:port for --mgr\n";
+  print $usage->text;
+  exit;
+}
+
+local $Argon::ALLOW_EVAL = 1;
+
+my $worker = Argon::Worker->new(
+  capacity => $opt->capacity,
+  port     => $opt->port,
+  mgr_host => $mgr_host,
+  mgr_port => $mgr_port,
+);
+
+$worker->run;
