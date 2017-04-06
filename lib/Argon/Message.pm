@@ -1,0 +1,61 @@
+package Argon::Message;
+
+use strict;
+use warnings;
+use Carp;
+use Data::UUID;
+use Argon::Constants qw(:priorities :commands);
+use Argon::Util qw(param);
+
+sub new {
+  my ($class, %param) = @_;
+  my $id   = param 'id',   %param, sub { Data::UUID->new->create_str };
+  my $pri  = param 'pri',  %param, $PRI_NO;
+  my $cmd  = param 'cmd',  %param;
+  my $info = param 'info', %param, undef;
+  bless {id => $id, pri => $pri, cmd => $cmd, info => $info}, $class;
+}
+
+sub id   { $_[0]->{id} }
+sub pri  { $_[0]->{pri} }
+sub cmd  { $_[0]->{cmd} }
+sub info { $_[0]->{info} }
+
+sub decode {
+  my ($class, $line) = @_;
+  my $data = Argon::Util::decode($line);
+  bless $data, $class;
+}
+
+sub encode {
+  my $self = shift;
+  my %data = %$self;
+  Argon::Util::encode(\%data)
+}
+
+sub reply {
+  my ($self, %param) = @_;
+  Argon::Message->new((ref($self) ? %$self : ()), %param);
+}
+
+sub error {
+  my ($self, $error, %param) = @_;
+  $self->reply(cmd => $ERROR, info => $error, %param);
+}
+
+sub result {
+  my $self = shift;
+  return $self->cmd eq $ERROR ? croak($self->info)
+       : $self->cmd eq $DONE  ? $self->info
+       : $self->cmd eq $ACK   ? 1
+       : $self->cmd;
+}
+
+sub explain {
+  my $self = shift;
+  use JSON::XS;
+  my $info = ref $self->info ? $self->info : [$self->info];
+  sprintf 'Message< %s %s: %s >', $self->id, $self->cmd, encode_json($info);
+}
+
+1;

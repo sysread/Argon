@@ -1,0 +1,29 @@
+=pod
+
+=encoding UTF-8
+
+=head1 NAME
+
+Argon - Simple, fast, and flexible distributed computing
+
+=head1 VERSION
+
+version 0.01
+
+=head1 DESCRIPTION
+
+Argon is a distributed processing platform built for Perl. It is designed to
+offer a simple, flexible, system for quickly building scalable software.
+
+=head1 AUTHOR
+
+Jeff Ober <sysread@fastmail.fm>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2017 by Jeff Ober.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
