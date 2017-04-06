@@ -1,3 +1,2 @@
--Reconection backoff timer
 -Worker only executes tasks from manager
 -Better test coverage
