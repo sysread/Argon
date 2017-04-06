@@ -5,6 +5,7 @@ use strict;
 use warnings;
 use Carp;
 use Class::Load qw(load_class);
+use AnyEvent;
 use AnyEvent::Util qw(fork_call);
 use Argon::Client;
 use Argon::Constants qw(:commands);
@@ -26,18 +27,61 @@ sub new {
   $self->{capacity} = $AnyEvent::Util::MAX_FORKS = $capacity;
   $self->{mgr_host} = $mgr_host;
   $self->{mgr_port} = $mgr_port;
+  $self->{timer}    = undef;
+  $self->{tries}    = 0;
 
-  $self->{mgr} = Argon::Client->new(
-    host   => $self->{mgr_host},
-    port   => $self->{mgr_port},
-    ping   => 2,
-    opened => K('register', $self),
-    closed => K('_mgr_disconnected', $self),
-  );
+  $self->connect;
 
   $self->handles($QUEUE, K('_queue', $self));
 
   return $self;
+}
+
+sub connect {
+  my $self = shift;
+  ++$self->{tries};
+  $self->{mgr} = Argon::Client->new(
+    host   => $self->{mgr_host},
+    port   => $self->{mgr_port},
+    opened => K('_connected', $self),
+    closed => K('_disconnected', $self),
+  );
+}
+
+sub _connected {
+  my $self = shift;
+  $self->{tries} = 0;
+  $self->register;
+}
+
+sub _disconnected {
+  my $self = shift;
+  $self->reconnect;
+}
+
+sub reconnect {
+  my $self = shift;
+  ++$self->{tries};
+  my $intvl = 3 + log($self->{tries}) / log(10);
+  log_debug 'Reconection attempt in %0.2fs', $intvl;
+  $self->{timer} = AnyEvent->timer(after => $intvl, cb => K('connect', $self));
+}
+
+sub monitor {
+  my $self = shift;
+  my $ping = K('ping', $self->{mgr}, K('_check', $self));
+  $self->{timer} = AnyEvent->timer(after => 5, cb => $ping);
+}
+
+sub _check {
+  my ($self, $msg) = @_;
+
+  if ($msg->cmd eq $ERROR) {
+    $self->reconnect;
+  } else {
+    log_info '[%s] Pong!', $self->addr;
+    $self->monitor;
+  }
 }
 
 sub register {
@@ -47,10 +91,10 @@ sub register {
   log_trace 'Registering with manager';
 
   my $msg = Argon::Message->new(
-    cmd  => $HIRE,
+    cmd => $HIRE,
     info => {
-      host     => $self->{host},
-      port     => $self->{port},
+      host => $self->{host},
+      port => $self->{port},
       capacity => $self->{capacity},
     },
   );
@@ -65,11 +109,6 @@ sub _mgr_registered {
   } else {
     log_info 'Accepting tasks';
   }
-}
-
-sub _mgr_disconnected {
-  my $self = shift;
-  log_info 'Lost connection to manager';
 }
 
 sub _queue {

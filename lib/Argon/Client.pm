@@ -26,12 +26,10 @@ sub new {
   my $self = bless {
     host    => $host,
     port    => $port,
-    intvl   => $ping,
     opened  => $opened,
     closed  => $closed,
     notify  => $notify,
     channel => undef,
-    timer   => undef,
     conn    => AnyEvent->condvar,
     done    => AnyEvent->condvar,
     cb      => {},
@@ -89,14 +87,14 @@ sub process {
 
 sub connect {
   my $self = shift;
-  tcp_connect $self->{host}, $self->{port},
-    K('_connected',  $self);
+  tcp_connect $self->{host}, $self->{port}, K('_connected',  $self);
 }
 
 sub _connected {
   my ($self, $fh) = @_;
+
   if ($fh) {
-    log_debug 'Connected to %s:%d', $self->{host}, $self->{port};
+    log_debug '[%s] Connection established', $self->addr;
 
     $self->{channel} = Argon::Channel->new(
       fh       => $fh,
@@ -110,34 +108,8 @@ sub _connected {
     $self->{opened}->() if $self->{opened};
   }
   else {
-    log_debug 'Connection attempt failed with: %s', $!;
-    log_error 'Connection to manager failed';
-  }
-
-  if ($self->{intvl} && !$self->{timer}) {
-    $self->{timer} = AnyEvent->timer(
-      interval => $self->{intvl},
-      after => $self->{intvl},
-      cb => K('_monitor', $self),
-    );
-  }
-}
-
-sub _monitor {
-  my $self = shift;
-  if ($self->{channel}) {
-    $self->ping(K('_check', $self));
-  } else {
-    log_info 'Reconnecting to manager';
-    $self->connect;
-  }
-}
-
-sub _check {
-  my ($self, $msg) = @_;
-  if ($msg->cmd eq $ERROR) {
+    log_error '[%s] Connection attempt failed', $self->addr;
     $self->cleanup;
-    log_error 'Lost connection to manager';
   }
 }
 
@@ -145,9 +117,9 @@ sub cleanup {
   my $self = shift;
   $self->{closed}->() if $self->{closed};
   undef $self->{channel};
-  $self->{conn} = AnyEvent->condvar;
 
   $self->stop;
+  $self->{conn} = AnyEvent->condvar;
 
   my $msg = Argon::Message->new(
     cmd  => $ERROR,
@@ -161,13 +133,13 @@ sub cleanup {
 
 sub _error {
   my ($self, $error) = @_;
-  log_error $error;
+  log_error '[%s] %s', $self->addr, $error;
   $self->cleanup;
 }
 
 sub _close {
   my $self = shift;
-  log_debug 'Remote host disconnected';
+  log_debug '[%s] Remote host disconnected', $self->addr;
   $self->cleanup;
 }
 
