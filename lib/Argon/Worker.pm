@@ -1,4 +1,5 @@
 package Argon::Worker;
+# ABSTRACT: Argon worker node providing capacity to an Argon::Manager
 
 use strict;
 use warnings;

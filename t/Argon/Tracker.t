@@ -69,7 +69,7 @@ subtest 'tracking' => sub {
     my $msg = msg;
     $t->start($msg);
     $t->finish($msg);
-    ok length(@{$t->{history}}) <= 10, "history length is maintained ($_)";
+    ok scalar(@{$t->{history}}) <= 10, "history length is maintained ($_)";
   }
 };
 

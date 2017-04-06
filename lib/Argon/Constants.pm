@@ -1,4 +1,5 @@
 package Argon::Constants;
+# ABSTRACT: Constants used by Argon classes
 
 use strict;
 use warnings;

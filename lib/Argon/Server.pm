@@ -1,4 +1,5 @@
 package Argon::Server;
+# ABSTRACT: Base class for Argon server objects
 
 use strict;
 use warnings;

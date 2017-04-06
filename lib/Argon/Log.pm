@@ -1,4 +1,5 @@
 package Argon::Log;
+# ABSTRACT: Simple logging wrapper
 
 use strict;
 use warnings;

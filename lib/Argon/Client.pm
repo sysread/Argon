@@ -1,4 +1,5 @@
 package Argon::Client;
+# ABSTRACT: Client-side connection class for Argon systems
 
 use strict;
 use warnings;

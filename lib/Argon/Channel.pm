@@ -1,4 +1,5 @@
 package Argon::Channel;
+# ABSTRACT: Line protocol API for non-blocking sockets
 
 use strict;
 use warnings;

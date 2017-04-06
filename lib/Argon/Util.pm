@@ -1,4 +1,5 @@
 package Argon::Util;
+# ABSTRACT: Utilities used in Argon classes
 
 use strict;
 use warnings;

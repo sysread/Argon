@@ -1,9 +1,11 @@
 package Argon::Message;
+# ABSTRACT: Encodable message structure used for cross-system coordination
 
 use strict;
 use warnings;
 use Carp;
 use Data::UUID;
+use JSON::XS;
 use Argon::Constants qw(:priorities :commands);
 use Argon::Util qw(param);
 
@@ -53,7 +55,6 @@ sub result {
 
 sub explain {
   my $self = shift;
-  use JSON::XS;
   my $info = ref $self->info ? $self->info : [$self->info];
   sprintf 'Message< %s %s: %s >', $self->id, $self->cmd, encode_json($info);
 }

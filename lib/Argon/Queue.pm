@@ -1,4 +1,5 @@
 package Argon::Queue;
+# ABSTRACT: Bounded, prioritized queue class
 
 use strict;
 use warnings;

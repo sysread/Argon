@@ -1,4 +1,5 @@
 package Argon::Tracker;
+# ABSTRACT: Internal class used to track node capacity
 
 use strict;
 use warnings;

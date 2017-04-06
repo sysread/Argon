@@ -1,4 +1,5 @@
 package Argon::Manager;
+# ABSTRACT: Entry-point Argon service providing intelligent task routing
 
 use strict;
 use warnings;

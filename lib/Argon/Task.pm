@@ -1,4 +1,5 @@
 package Argon::Task;
+# ABSTRACT: Base interface for Argon-runnable tasks
 
 use strict;
 use warnings;
