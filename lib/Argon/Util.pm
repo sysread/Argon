@@ -5,7 +5,6 @@ use strict;
 use warnings;
 use Carp;
 use JSON::XS qw(encode_json decode_json);
-use MIME::Base64 qw(encode_base64 decode_base64);
 use Scalar::Util 'weaken';
 use Argon::Log;
 
@@ -21,8 +20,8 @@ our @EXPORT_OK = (
   map { @$_ } values %EXPORT_TAGS,
 );
 
-sub decode ($) { decode_json(decode_base64($_[0])) }
-sub encode ($) { encode_base64(encode_json($_[0]), '') }
+sub decode ($) { goto \&decode_json }
+sub encode ($) { goto \&encode_json }
 
 sub K {
   my ($fn, @args) = @_;

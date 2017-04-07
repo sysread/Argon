@@ -28,16 +28,17 @@ OS-assigned address.
 
 use strict;
 use warnings;
+use AnyEvent::Log;
 use Argon::Manager;
 use Getopt::Long::Descriptive;
+use Path::Tiny qw(path);
 
 my ($opt, $usage) = describe_options(
   'manager %o',
-  ['host|h=s', '(optional) hostname on which to listen (defaults to localhost)'],
-  [
-    'port|p=i', '(optional) port on which to listen (defaults to OS-assigned port)',
-    {callbacks => {'port number' => sub { shift > 0 }}},
-  ],
+  ['key|k=s',     '(required) path to file containing encryption key', {required => 1}],
+  ['host|h=s',    '(optional) hostname on which to listen (defaults to localhost)'],
+  ['port|p=i',    '(optional) port on which to listen (defaults to OS-assigned port)', {callbacks => {'port number' => sub { shift > 0 }}}],
+  ['verbose|v=i', '(optional) level of verbosity (1 - 9; defaults to 5 [warn])'],
   [],
   ['help|h',  'prints this help text and exits', {shortcircuit => 1}],
   ['usage|u', 'prints this help text and exits', {shortcircuit => 1}],
@@ -48,5 +49,12 @@ if ($opt->help) {
   exit;
 }
 
-my $manager = Argon::Manager->new(host => $opt->host, port => $opt->port);
+$AnyEvent::Log::FILTER->level($opt->verbose || 5);
+
+my $manager = Argon::Manager->new(
+  host => $opt->host,
+  port => $opt->port,
+  key => path($opt->key)->slurp_raw,
+);
+
 $manager->run;

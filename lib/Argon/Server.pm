@@ -14,10 +14,12 @@ use Argon::Util qw(K param);
 
 sub new {
   my ($class, %param) = @_;
+  my $key  = param 'key',  %param;
   my $host = param 'host', %param, undef;
   my $port = param 'port', %param, undef;
 
   my $self = bless {
+    key      => $key,
     host     => $host,
     port     => $port,
     handlers => {},
@@ -79,6 +81,7 @@ sub register_client {
   my ($self, $addr, $fh) = @_;
   $self->{client}{$addr} = Argon::Channel->new(
     fh       => $fh,
+    key      => $self->{key},
     on_msg   => K('_on_client_msg',   $self, $addr),
     on_err   => K('_on_client_err',   $self, $addr),
     on_close => K('_on_client_close', $self, $addr),

@@ -16,6 +16,7 @@ use Argon::Util qw(K param);
 
 sub new {
   my ($class, %param) = @_;
+  my $key    = param 'key',    %param;
   my $host   = param 'host',   %param;
   my $port   = param 'port',   %param;
   my $opened = param 'opened', %param, undef;
@@ -24,6 +25,7 @@ sub new {
   my $ping   = param 'ping',   %param, undef;
 
   my $self = bless {
+    key     => $key,
     host    => $host,
     port    => $port,
     opened  => $opened,
@@ -98,6 +100,7 @@ sub _connected {
 
     $self->{channel} = Argon::Channel->new(
       fh       => $fh,
+      key      => $self->{key},
       on_msg   => K('_notify', $self),
       on_err   => K('_error', $self),
       on_close => K('_close', $self),

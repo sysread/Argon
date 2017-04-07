@@ -86,6 +86,7 @@ sub _hire {
   my $addr = "$host:$port";
 
   my $worker = Argon::Client->new(
+    key    => $self->{key},
     host   => $host,
     port   => $port,
     notify => K('_collect', $self),

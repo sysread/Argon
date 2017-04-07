@@ -37,10 +37,16 @@ sub new {
   return $self;
 }
 
+sub register_client {
+  my ($self, $addr, $fh) = @_;
+  $self->SUPER::register_client($addr, $fh);
+}
+
 sub connect {
   my $self = shift;
   ++$self->{tries};
   $self->{mgr} = Argon::Client->new(
+    key    => $self->{key},
     host   => $self->{mgr_host},
     port   => $self->{mgr_port},
     opened => K('_connected', $self),

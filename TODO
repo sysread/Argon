@@ -1,2 +1,4 @@
 -Worker only executes tasks from manager
 -Better test coverage
+-Process management tooling
+-Simplified client API

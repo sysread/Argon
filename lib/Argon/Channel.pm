@@ -4,21 +4,30 @@ package Argon::Channel;
 use strict;
 use warnings;
 use Carp;
+use Crypt::CBC;
 use AnyEvent;
 use AnyEvent::Handle;
 use Argon::Constants ':defaults';
 use Argon::Log;
 use Argon::Message;
-use Argon::Util qw(K);
+use Argon::Util qw(K param);
 
 sub new {
   my ($class, %param) = @_;
-  my $fh       = $param{fh}       || croak 'expected parameter "fh"';
-  my $on_msg   = $param{on_msg}   || croak 'expected parameter "on_msg"';
-  my $on_close = $param{on_close} || sub {};
-  my $on_err   = $param{on_err}   || sub {};
+  my $fh       = param 'fh',       %param;
+  my $key      = param 'key',      %param;
+  my $on_msg   = param 'on_msg',   %param;
+  my $on_close = param 'on_close', %param, sub {};
+  my $on_err   = param 'on_err',   %param, sub {};
+
+  my $cipher = Crypt::CBC->new(
+    -key    => $key,
+    -cipher => 'Rijndael',
+    -salt   => 1,
+  );
 
   my $self = bless {
+    cipher   => $cipher,
     on_msg   => $on_msg,
     on_close => $on_close,
     on_err   => $on_err,
@@ -56,7 +65,7 @@ sub _read {
 
 sub _readline {
   my ($self, $handle, $line) = @_;
-  my $msg = Argon::Message->decode($line);
+  my $msg = $self->decode($line);
   $self->{on_msg}->($msg);
 }
 
@@ -67,9 +76,19 @@ sub disconnect {
 
 sub send {
   my ($self, $msg) = @_;
-  my $line = $msg->encode;
+  my $line = $self->encode($msg);
   $self->{handle}->push_write($line);
   $self->{handle}->push_write($EOL);
+}
+
+sub encode {
+  my ($self, $msg) = @_;
+  $self->{cipher}->encrypt_hex($msg->encode);
+}
+
+sub decode {
+  my ($self, $line) = @_;
+  Argon::Message->decode($self->{cipher}->decrypt_hex($line));
 }
 
 1;
