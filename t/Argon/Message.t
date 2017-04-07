@@ -4,7 +4,8 @@ use Argon::Message;
 
 subtest 'tokens' => sub {
   ok my $msg = Argon::Message->new(cmd => $PING, token => 'test-token');
-  isnt $msg->token, $msg->reply->token, 'reply drops existing token';
+  isnt $msg->error('foo')->token, $msg->token, 'error drops existing token';
+  isnt $msg->reply->token, $msg->token, 'reply drops existing token';
   is $msg->reply(token => 'different-token')->token, 'different-token', 'reply allows setting token';
 };
 

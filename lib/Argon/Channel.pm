@@ -6,6 +6,7 @@ use warnings;
 use Carp;
 use AnyEvent;
 use AnyEvent::Handle;
+use JSON::XS;
 use Argon::Constants ':defaults';
 use Argon::Log;
 use Argon::Message;
@@ -76,12 +77,14 @@ sub send {
 
 sub encode {
   my ($self, $msg) = @_;
-  $self->{cipher}->encrypt_hex($msg->encode);
+  my $line = Argon::Util::encode(%$msg);
+  $self->{cipher}->encrypt_hex($line);
 }
 
 sub decode {
   my ($self, $line) = @_;
-  Argon::Message->decode($self->{cipher}->decrypt_hex($line));
+  my $data = $self->{cipher}->decrypt_hex($line);
+  Argon::Util::decode($data);
 }
 
 1;

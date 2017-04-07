@@ -32,18 +32,6 @@ sub pri   { $_[0]->{pri} }
 sub cmd   { $_[0]->{cmd} }
 sub info  { $_[0]->{info} }
 
-sub decode {
-  my ($class, $line) = @_;
-  my $data = Argon::Util::decode($line);
-  bless $data, $class;
-}
-
-sub encode {
-  my $self = shift;
-  my %data = %$self;
-  Argon::Util::encode(\%data)
-}
-
 sub reply {
   my ($self, %param) = @_;
   Argon::Message->new(
