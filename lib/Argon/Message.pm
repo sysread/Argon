@@ -11,17 +11,26 @@ use Argon::Util qw(param);
 
 sub new {
   my ($class, %param) = @_;
-  my $id   = param 'id',   %param, sub { Data::UUID->new->create_str };
-  my $pri  = param 'pri',  %param, $PRI_NO;
-  my $cmd  = param 'cmd',  %param;
-  my $info = param 'info', %param, undef;
-  bless {id => $id, pri => $pri, cmd => $cmd, info => $info}, $class;
+  my $id    = param 'id',    %param, sub { Data::UUID->new->create_str };
+  my $token = param 'token', %param, undef;
+  my $pri   = param 'pri',   %param, $PRI_NO;
+  my $cmd   = param 'cmd',   %param;
+  my $info  = param 'info',  %param, undef;
+
+  bless {
+    id    => $id,
+    token => $token,
+    pri   => $pri,
+    cmd   => $cmd,
+    info  => $info,
+  }, $class;
 }
 
-sub id   { $_[0]->{id} }
-sub pri  { $_[0]->{pri} }
-sub cmd  { $_[0]->{cmd} }
-sub info { $_[0]->{info} }
+sub id    { $_[0]->{id} }
+sub token { $_[0]->{token} }
+sub pri   { $_[0]->{pri} }
+sub cmd   { $_[0]->{cmd} }
+sub info  { $_[0]->{info} }
 
 sub decode {
   my ($class, $line) = @_;
@@ -37,12 +46,16 @@ sub encode {
 
 sub reply {
   my ($self, %param) = @_;
-  Argon::Message->new((ref($self) ? %$self : ()), %param);
+  Argon::Message->new(
+    %$self,         # copy $self
+    token => undef, # remove token (unless in %param)
+    %param,         # add caller's parameters
+  );
 }
 
 sub error {
   my ($self, $error, %param) = @_;
-  $self->reply(cmd => $ERROR, info => $error, %param);
+  $self->reply(%param, cmd => $ERROR, info => $error);
 }
 
 sub result {
@@ -56,7 +69,10 @@ sub result {
 sub explain {
   my $self = shift;
   my $info = ref $self->info ? $self->info : [$self->info];
-  sprintf 'Message< %s %s: %s >', $self->id, $self->cmd, encode_json($info);
+  sprintf 'Message<%s %s: %s>',
+    $self->cmd,
+    $self->id,
+    encode_json($info);
 }
 
 1;

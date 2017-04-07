@@ -33,7 +33,7 @@ sub new {
 sub capacity { $_[0]->{tracker}{self}->capacity }
 sub has_capacity { $_[0]->{tracker}{self}->has_capacity }
 
-sub worker {
+sub next_worker {
   my $self = shift;
 
   my @workers =
@@ -47,12 +47,12 @@ sub worker {
 sub process_queue {
   my $self = shift;
   while ($self->has_capacity && !$self->{queue}->is_empty) {
-    my $msg = $self->{queue}->get;
-    my $addr = $self->worker;
-    $self->{worker}{$addr}->send($msg);
-    $self->{tracker}{$addr}->start($msg);
+    my $token = $self->next_worker;
+    my $msg = $self->{queue}->get->reply(token => $token);
+    $self->{worker}{$token}->send($msg);
+    $self->{tracker}{$token}->start($msg);
     $self->{tracker}{self}->start($msg);
-    $self->{assigned}{$msg->id} = $addr;
+    $self->{assigned}{$msg->id} = $token;
   }
 }
 
@@ -69,8 +69,8 @@ sub _queue {
 
 sub _collect {
   my ($self, $msg) = @_;
-  my $addr = delete $self->{assigned}{$msg->id};
-  $self->{tracker}{$addr}->finish($msg);
+  my $token = delete $self->{assigned}{$msg->id};
+  $self->{tracker}{$token}->finish($msg);
   $self->{tracker}{self}->finish($msg);
   $self->send($msg);
   $self->process_queue;
@@ -80,26 +80,26 @@ sub _hire {
   my ($self, $msg) = @_;
   $self->send($msg->reply(cmd => $ACK));
 
-  my $cap  = $msg->{info}{capacity};
-  my $host = $msg->{info}{host};
-  my $port = $msg->{info}{port};
-  my $addr = "$host:$port";
+  my $token = $msg->token || croak 'Missing token: ' . $msg->explain;
+  my $cap   = $msg->info->{capacity};
+  my $host  = $msg->info->{host};
+  my $port  = $msg->info->{port};
 
   my $worker = Argon::Client->new(
     key    => $self->{key},
     host   => $host,
     port   => $port,
     notify => K('_collect', $self),
-    closed => K('_fire', $self, $addr, $cap),
+    closed => K('_fire', $self, $token, $cap),
   );
 
-  $self->{worker}{$addr} = $worker;
-  $self->{tracker}{$addr} = Argon::Tracker->new(capacity => $cap);
+  $self->{worker}{$token} = $worker;
+  $self->{tracker}{$token} = Argon::Tracker->new(capacity => $cap);
   $self->{tracker}{self}->add_capacity($cap);
   $self->{queue}->max($self->capacity * 2);
 
-  log_info 'New worker %s added %d capacity (%d total)',
-    $addr, $cap, $self->capacity;
+  log_info 'New worker with identity %s (%s:%d) added %d capacity (%d total)',
+    $token, $host, $port, $cap, $self->capacity;
 }
 
 sub _fire {

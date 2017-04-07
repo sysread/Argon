@@ -37,6 +37,18 @@ sub new {
   return $self;
 }
 
+sub token {
+  my $self = shift;
+  return $self->{token};
+}
+
+sub update_token {
+  my $self = shift;
+  $self->{token} = unpack('H*', $self->cipher->random_bytes(32));
+  log_info 'Identity token is now %s', $self->{token};
+  return $self->{token};
+}
+
 sub register_client {
   my ($self, $addr, $fh) = @_;
   $self->SUPER::register_client($addr, $fh);
@@ -96,11 +108,14 @@ sub register {
 
   log_trace 'Registering with manager';
 
+  my $token = $self->update_token;
+
   my $msg = Argon::Message->new(
-    cmd => $HIRE,
-    info => {
-      host => $self->{host},
-      port => $self->{port},
+    token => $token,
+    cmd   => $HIRE,
+    info  => {
+      host     => $self->{host},
+      port     => $self->{port},
       capacity => $self->{capacity},
     },
   );
@@ -119,8 +134,17 @@ sub _mgr_registered {
 
 sub _queue {
   my ($self, $msg) = @_;
-  my ($class, @args) = @{$msg->info};
-  fork_call { _task($class, @args) } K('_result', $self, $msg);
+  if ($msg->token ne $self->{token}) {
+    log_note 'Token mismatch for message %s', $msg->explain;
+    log_note 'Received: %s', $msg->token;
+    log_note 'My token: %s', $self->{token};
+    $self->send($msg->error('token mismatch'));
+  }
+  else {
+    my $payload = $msg->info;
+    my ($class, @args) = @$payload;
+    fork_call { _task($class, @args) } K('_result', $self, $msg);
+  }
 }
 
 sub _task {

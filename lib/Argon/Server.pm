@@ -38,6 +38,11 @@ sub new {
   return $self;
 }
 
+sub cipher {
+  my $self = shift;
+  return Argon::Util::cipher($self->{key});
+}
+
 sub run {
   my $self = shift;
   $self->{done}->recv;

@@ -4,7 +4,6 @@ package Argon::Channel;
 use strict;
 use warnings;
 use Carp;
-use Crypt::CBC;
 use AnyEvent;
 use AnyEvent::Handle;
 use Argon::Constants ':defaults';
@@ -20,14 +19,8 @@ sub new {
   my $on_close = param 'on_close', %param, sub {};
   my $on_err   = param 'on_err',   %param, sub {};
 
-  my $cipher = Crypt::CBC->new(
-    -key    => $key,
-    -cipher => 'Rijndael',
-    -salt   => 1,
-  );
-
   my $self = bless {
-    cipher   => $cipher,
+    cipher   => Argon::Util::cipher($key),
     on_msg   => $on_msg,
     on_close => $on_close,
     on_err   => $on_err,

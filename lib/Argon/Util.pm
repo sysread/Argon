@@ -4,6 +4,7 @@ package Argon::Util;
 use strict;
 use warnings;
 use Carp;
+use Crypt::CBC;
 use JSON::XS qw(encode_json decode_json);
 use Scalar::Util 'weaken';
 use Argon::Log;
@@ -15,13 +16,9 @@ our %EXPORT_TAGS = (
 );
 
 our @EXPORT_OK = (
-  'K',
-  'param',
+  qw(K param cipher),
   map { @$_ } values %EXPORT_TAGS,
 );
-
-sub decode ($) { goto \&decode_json }
-sub encode ($) { goto \&encode_json }
 
 sub K {
   my ($fn, @args) = @_;
@@ -57,6 +54,23 @@ sub param ($\%;$) {
   else {
     return $param->{$key};
   }
+}
+
+sub decode ($) { goto \&decode_json }
+sub encode ($) { goto \&encode_json }
+
+my %ciphers;
+
+sub cipher {
+  my $key = shift;
+
+  $ciphers{$key} ||= Crypt::CBC->new(
+    -key    => $key,
+    -cipher => 'Rijndael',
+    -salt   => 1,
+  );
+
+  return $ciphers{$key};
 }
 
 1;
