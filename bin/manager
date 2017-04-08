@@ -31,7 +31,6 @@ use warnings;
 use AnyEvent::Log;
 use Argon::Manager;
 use Getopt::Long::Descriptive;
-use Path::Tiny qw(path);
 
 my ($opt, $usage) = describe_options(
   'manager %o',
@@ -52,9 +51,9 @@ if ($opt->help) {
 $AnyEvent::Log::FILTER->level($opt->verbose || 5);
 
 my $manager = Argon::Manager->new(
-  host => $opt->host,
-  port => $opt->port,
-  key => path($opt->key)->slurp_raw,
+  host    => $opt->host,
+  port    => $opt->port,
+  keyfile => $opt->key,
 );
 
 $manager->run;

@@ -32,6 +32,8 @@ sub pri   { $_[0]->{pri} }
 sub cmd   { $_[0]->{cmd} }
 sub info  { $_[0]->{info} }
 
+sub failed { $_[0]->cmd eq $ERROR }
+
 sub reply {
   my ($self, %param) = @_;
   Argon::Message->new(

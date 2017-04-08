@@ -6,6 +6,7 @@ use warnings;
 use Carp;
 use AnyEvent;
 use AnyEvent::Socket qw(tcp_server);
+use Path::Tiny 'path';
 use Argon::Channel;
 use Argon::Constants qw(:commands);
 use Argon::Log;
@@ -14,9 +15,13 @@ use Argon::Util qw(K param);
 
 sub new {
   my ($class, %param) = @_;
-  my $key  = param 'key',  %param;
-  my $host = param 'host', %param, undef;
-  my $port = param 'port', %param, undef;
+  my $host    = param 'host', %param, undef;
+  my $port    = param 'port', %param, undef;
+  my $keyfile = param 'keyfile', %param, undef;
+
+  my $key = defined $keyfile
+    ? path($keyfile)->slurp_raw
+    : param 'key', %param;
 
   my $self = bless {
     key      => $key,

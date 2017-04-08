@@ -7,6 +7,7 @@ use Carp;
 use Storable 'nfreeze';
 use AnyEvent;
 use AnyEvent::Socket qw(tcp_connect);
+use Path::Tiny 'path';
 use Argon;
 use Argon::Constants qw(:commands :priorities);
 use Argon::Channel;
@@ -16,13 +17,16 @@ use Argon::Util qw(K param);
 
 sub new {
   my ($class, %param) = @_;
-  my $key    = param 'key',    %param;
-  my $host   = param 'host',   %param;
-  my $port   = param 'port',   %param;
-  my $opened = param 'opened', %param, undef;
-  my $closed = param 'closed', %param, undef;
-  my $notify = param 'notify', %param, undef;
-  my $ping   = param 'ping',   %param, undef;
+  my $host    = param 'host',    %param;
+  my $port    = param 'port',    %param;
+  my $opened  = param 'opened',  %param, undef;
+  my $closed  = param 'closed',  %param, undef;
+  my $notify  = param 'notify',  %param, undef;
+  my $keyfile = param 'keyfile', %param, undef;
+
+  my $key = defined $keyfile
+    ? path($keyfile)->slurp_raw
+    : param 'key', %param;
 
   my $self = bless {
     key     => $key,

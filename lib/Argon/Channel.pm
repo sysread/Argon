@@ -77,14 +77,15 @@ sub send {
 
 sub encode {
   my ($self, $msg) = @_;
-  my $line = Argon::Util::encode(%$msg);
+  my %data = %$msg;
+  my $line = Argon::Util::encode(\%data);
   $self->{cipher}->encrypt_hex($line);
 }
 
 sub decode {
   my ($self, $line) = @_;
   my $data = $self->{cipher}->decrypt_hex($line);
-  Argon::Util::decode($data);
+  bless Argon::Util::decode($data), 'Argon::Message';
 }
 
 1;
