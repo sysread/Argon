@@ -24,6 +24,7 @@ use AnyEvent;
 use Try::Tiny;
 use Argon;
 use Argon::Client;
+use Argon::Constants qw(:commands);
 use Argon::Log;
 use Argon::Util qw(param);
 
@@ -34,6 +35,7 @@ our @EXPORT = qw(
   remote
   sync
   async
+  try_async
 );
 
 our $ARGON;
@@ -92,6 +94,32 @@ sub async (\$&;@) {
       $cv->croak($reply->info);
     } else {
       $cv->send($reply->info);
+    }
+  });
+}
+
+sub try_async (\$&;@) {
+  assert_client;
+  my ($var, $code, @args) = @_;
+  my $cv = AnyEvent->condvar;
+  $ARGON->{async}{$var} = $cv;
+  $ARGON->{client}->process($code, \@args, sub {
+    my $reply = shift;
+    my $result;
+    my $error;
+
+    if ($reply->cmd eq $DENY) {
+      try   { $result = $code->(@args) }
+      catch { $error  = $_ };
+    } else {
+      try   { $result = $reply->result }
+      catch { $error  = $_ };
+    }
+
+    if ($error) {
+      $cv->croak($error);
+    } else {
+      $cv->send($result);
     }
   });
 }

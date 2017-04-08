@@ -51,9 +51,8 @@ sub error {
 sub result {
   my $self = shift;
   return $self->cmd eq $ERROR ? croak($self->info)
-       : $self->cmd eq $DONE  ? $self->info
        : $self->cmd eq $ACK   ? 1
-       : $self->cmd;
+       : $self->info;
 }
 
 sub explain {

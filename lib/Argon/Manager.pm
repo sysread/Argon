@@ -59,7 +59,7 @@ sub process_queue {
 sub _queue {
   my ($self, $msg) = @_;
   if ($self->{queue}->is_full) {
-    $self->send($msg->error("No available capacity. Please try again later."));
+    $self->send($msg->reply(cmd => $DENY, info => "No available capacity. Please try again later."));
   }
   else {
     $self->{queue}->put($msg);
