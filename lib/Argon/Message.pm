@@ -33,6 +33,7 @@ sub cmd   { $_[0]->{cmd} }
 sub info  { $_[0]->{info} }
 
 sub failed { $_[0]->cmd eq $ERROR }
+sub denied { $_[0]->cmd eq $DENY }
 
 sub reply {
   my ($self, %param) = @_;
@@ -50,8 +51,9 @@ sub error {
 
 sub result {
   my $self = shift;
-  return $self->cmd eq $ERROR ? croak($self->info)
-       : $self->cmd eq $ACK   ? 1
+  return $self->failed ? croak($self->info)
+       : $self->denied ? croak($self->info)
+       : $self->cmd eq $ACK ? 1
        : $self->info;
 }
 

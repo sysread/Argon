@@ -43,7 +43,7 @@ running in a secure environment.
 
 use strict;
 use warnings;
-use AnyEvent::Log;
+use Argon::Log;
 use Argon::Worker;
 use Getopt::Long::Descriptive;
 use Path::Tiny;
@@ -73,7 +73,7 @@ unless ($mgr_host && $mgr_port) {
   exit;
 }
 
-$AnyEvent::Log::FILTER->level($opt->verbose || 5);
+log_level $opt->verbose || 5;
 $Argon::ALLOW_EVAL = $opt->allow_eval ? 1 : 0;
 
 my $worker = Argon::Worker->new(

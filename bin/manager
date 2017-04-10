@@ -28,7 +28,7 @@ OS-assigned address.
 
 use strict;
 use warnings;
-use AnyEvent::Log;
+use Argon::Log;
 use Argon::Manager;
 use Getopt::Long::Descriptive;
 
@@ -48,7 +48,7 @@ if ($opt->help) {
   exit;
 }
 
-$AnyEvent::Log::FILTER->level($opt->verbose || 5);
+log_level $opt->verbose || 5;
 
 my $manager = Argon::Manager->new(
   host    => $opt->host,

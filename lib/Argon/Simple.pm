@@ -108,7 +108,7 @@ sub try_async (\$&;@) {
     my $result;
     my $error;
 
-    if ($reply->cmd eq $DENY) {
+    if ($reply->denied) {
       try   { $result = $code->(@args) }
       catch { $error  = $_ };
     } else {

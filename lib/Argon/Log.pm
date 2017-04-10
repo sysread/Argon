@@ -10,6 +10,7 @@ use AnyEvent::Log;
 use parent 'Exporter';
 
 our @EXPORT = qw(
+  log_level
   log_trace
   log_debug
   log_info
@@ -48,5 +49,7 @@ sub log_note  ($;@) { @_ = ('note' , msg(@_)); goto &AE::log }
 sub log_warn  ($;@) { @_ = ('warn' , msg(@_)); goto &AE::log }
 sub log_error ($;@) { @_ = ('error', msg(@_)); goto &AE::log }
 sub log_fatal ($;@) { @_ = ('fatal', msg(@_)); goto &AE::log }
+
+sub log_level { $AnyEvent::Log::FILTER->level(@_) }
 
 1;
