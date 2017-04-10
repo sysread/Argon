@@ -80,7 +80,7 @@ sub sync (\[$@]) {
   return unless exists $ARGON->{async}{$var};
   $$var = $ARGON->{async}{$var}->recv;
   delete $ARGON->{async}{$var};
-  return 1;
+  return $$var;
 }
 
 sub async (\$&;@) {

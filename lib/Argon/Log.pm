@@ -23,14 +23,22 @@ $Carp::Internal{'Argon::Log'} = 1;
 
 sub msg {
   my $msg = shift or croak 'expected $msg';
+  my @args = @_;
 
-  foreach my $i (0 .. (@_ - 1)) {
-    if (!defined $_[$i]) {
+  foreach my $i (0 .. (@args - 1)) {
+    if (!defined $args[$i]) {
       croak sprintf('format parameter %d is uninitialized', $i + 1);
     }
   }
 
-  sprintf "[%d] $msg", $$, @_;
+  sub {
+    if (@args == 1 && (ref($args[0]) || '') eq 'CODE') {
+      my $val = $args[0]->();
+      @args = ($val);
+    }
+
+    sprintf "[%d] $msg", $$, @args;
+  };
 }
 
 sub log_trace ($;@) { @_ = ('trace', msg(@_)); goto &AE::log }

@@ -8,6 +8,7 @@ use Storable 'nfreeze';
 use AnyEvent;
 use AnyEvent::Socket qw(tcp_connect);
 use Path::Tiny 'path';
+use Try::Tiny;
 use Argon;
 use Argon::Constants qw(:commands :priorities);
 use Argon::Channel;
@@ -60,7 +61,13 @@ sub stop {
 
 sub send {
   my ($self, $msg, $cb) = @_;
-  $self->{conn}->recv;
+
+  try {
+    $self->{conn}->recv;
+  } catch {
+    Carp::confess($_);
+  };
+
   $self->{cb}{$msg->id} = $cb;
   $self->{channel}->send($msg);
   return $msg->id;
