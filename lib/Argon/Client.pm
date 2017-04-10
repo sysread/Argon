@@ -21,6 +21,7 @@ sub new {
   my $host    = param 'host',    %param;
   my $port    = param 'port',    %param;
   my $opened  = param 'opened',  %param, undef;
+  my $failed  = param 'failed',  %param, undef;
   my $closed  = param 'closed',  %param, undef;
   my $notify  = param 'notify',  %param, undef;
   my $keyfile = param 'keyfile', %param, undef;
@@ -34,6 +35,7 @@ sub new {
     host    => $host,
     port    => $port,
     opened  => $opened,
+    failed  => $failed,
     closed  => $closed,
     notify  => $notify,
     channel => undef,
@@ -124,6 +126,7 @@ sub _connected {
   else {
     log_error '[%s] Connection attempt failed', $self->addr;
     $self->cleanup;
+    $self->{failed}->($!) if $self->{failed};
   }
 }
 
