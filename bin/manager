@@ -28,6 +28,7 @@ OS-assigned address.
 
 use strict;
 use warnings;
+use AnyEvent;
 use Argon::Log;
 use Argon::Manager;
 use Getopt::Long::Descriptive;
@@ -56,4 +57,4 @@ my $manager = Argon::Manager->new(
   keyfile => $opt->key,
 );
 
-$manager->run;
+AnyEvent->condvar->recv;

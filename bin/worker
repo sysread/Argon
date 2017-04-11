@@ -43,10 +43,10 @@ running in a secure environment.
 
 use strict;
 use warnings;
+use AnyEvent;
 use Argon::Log;
 use Argon::Worker;
 use Getopt::Long::Descriptive;
-use Path::Tiny;
 
 my ($opt, $usage) = describe_options(
   'worker %o',
@@ -84,4 +84,4 @@ my $worker = Argon::Worker->new(
   mgr_port => $mgr_port,
 );
 
-$worker->run;
+AnyEvent->condvar->recv;

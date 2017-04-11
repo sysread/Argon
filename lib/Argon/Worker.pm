@@ -74,6 +74,7 @@ sub _connected {
 
 sub _disconnected {
   my $self = shift;
+  log_note 'Manager disconnected';
   $self->reconnect;
 }
 
@@ -85,33 +86,12 @@ sub reconnect {
   $self->{timer} = AnyEvent->timer(after => $intvl, cb => K('connect', $self));
 }
 
-sub monitor {
-  my $self = shift;
-  my $ping = K('ping', $self->{mgr}, K('_check', $self));
-  $self->{timer} = AnyEvent->timer(after => 5, cb => $ping);
-}
-
-sub _check {
-  my ($self, $msg) = @_;
-
-  if ($msg->cmd eq $ERROR) {
-    $self->reconnect;
-  } else {
-    log_info '[%s] Pong!', $self->addr;
-    $self->monitor;
-  }
-}
-
 sub register {
   my $self = shift;
-  $self->{conn}->recv;
-
   log_trace 'Registering with manager';
 
-  my $token = $self->update_token;
-
   my $msg = Argon::Message->new(
-    token => $token,
+    token => $self->update_token,
     cmd   => $HIRE,
     info  => {
       host     => $self->{host},

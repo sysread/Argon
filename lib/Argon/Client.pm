@@ -40,8 +40,6 @@ sub new {
     closed  => $closed,
     notify  => $notify,
     channel => undef,
-    conn    => AnyEvent->condvar,
-    done    => AnyEvent->condvar,
     cb      => {},
   }, $class;
 
@@ -71,8 +69,6 @@ sub _connected {
       on_close => K('_close', $self),
     );
 
-    $self->{done} = AnyEvent->condvar;
-    $self->{conn}->send;
     $self->{opened}->() if $self->{opened};
   }
   else {
@@ -82,25 +78,8 @@ sub _connected {
   }
 }
 
-sub run {
-  my $self = shift;
-  $self->{done}->recv;
-}
-
-sub stop {
-  my $self = shift;
-  $self->{done}->send;
-}
-
 sub send {
   my ($self, $msg, $cb) = @_;
-
-  try {
-    $self->{conn}->recv;
-  } catch {
-    Carp::confess($_);
-  };
-
   $self->{cb}{$msg->id} = $cb;
   $self->{channel}->send($msg);
   return $msg->id;
@@ -133,9 +112,6 @@ sub cleanup {
   my $self = shift;
   $self->{closed}->() if $self->{closed};
   undef $self->{channel};
-
-  $self->stop;
-  $self->{conn} = AnyEvent->condvar;
 
   my $msg = Argon::Message->new(
     cmd  => $ERROR,

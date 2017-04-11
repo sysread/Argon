@@ -31,8 +31,6 @@ sub new {
     handlers => {},
     client   => {},
     addr     => {},
-    conn     => AnyEvent->condvar,
-    done     => AnyEvent->condvar,
   }, $class;
 
   $self->handles($PING, K('_ping', $self));
@@ -47,16 +45,6 @@ sub new {
 sub cipher {
   my $self = shift;
   return Argon::Util::cipher($self->{key});
-}
-
-sub run {
-  my $self = shift;
-  $self->{done}->recv;
-}
-
-sub stop {
-  my $self = shift;
-  $self->{done}->send;
 }
 
 sub handles {
@@ -124,9 +112,8 @@ sub _prepare {
     $self->{host} = $host;
     $self->{port} = $port;
     $self->{fh}   = $fh;
-    $self->{conn}->send;
   } else {
-    $self->{conn}->croak("socket error: $!");
+    croak "socket error: $!";
   }
 
   return;
