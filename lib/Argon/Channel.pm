@@ -7,7 +7,6 @@ use Carp;
 use AnyEvent;
 use AnyEvent::Handle;
 use Data::Dumper;
-use JSON::XS;
 use Argon::Constants ':defaults';
 use Argon::Log;
 use Argon::Message;
@@ -42,14 +41,14 @@ sub fh { $_[0]->{handle}->fh }
 
 sub _eof {
   my ($self, $handle) = @_;
-  $self->{on_close}->();
+  $self->{on_close}->($self);
   undef $self->{handle};
 }
 
 sub _error {
   my ($self, $handle, $fatal, $msg) = @_;
   log_debug 'Network error: %s', $msg;
-  $self->{on_err}->($msg);
+  $self->{on_err}->($self, $msg);
   $self->disconnect;
 }
 
@@ -62,7 +61,7 @@ sub _readline {
   my ($self, $handle, $line) = @_;
   my $msg = $self->decode($line);
   log_trace 'received %s', sub { _dump($msg) };
-  $self->{on_msg}->($msg);
+  $self->{on_msg}->($self, $msg);
 }
 
 sub disconnect {

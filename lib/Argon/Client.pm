@@ -51,6 +51,36 @@ sub new {
 
 sub addr { sprintf '%s:%d', $_[0]->{host}, $_[0]->{port} }
 
+sub connect {
+  my $self = shift;
+  tcp_connect $self->{host}, $self->{port}, K('_connected',  $self);
+}
+
+sub _connected {
+  my ($self, $fh) = @_;
+
+  if ($fh) {
+    log_debug '[%s] Connection established', $self->addr;
+
+    $self->{channel} = Argon::Channel->new(
+      fh       => $fh,
+      key      => $self->{key},
+      on_msg   => K('_notify', $self),
+      on_err   => K('_error', $self),
+      on_close => K('_close', $self),
+    );
+
+    $self->{done} = AnyEvent->condvar;
+    $self->{conn}->send;
+    $self->{opened}->() if $self->{opened};
+  }
+  else {
+    log_error '[%s] Connection attempt failed', $self->addr;
+    $self->cleanup;
+    $self->{failed}->($!) if $self->{failed};
+  }
+}
+
 sub run {
   my $self = shift;
   $self->{done}->recv;
@@ -100,36 +130,6 @@ sub process {
   $self->queue('Argon::Task', [$code, $args], $cb);
 }
 
-sub connect {
-  my $self = shift;
-  tcp_connect $self->{host}, $self->{port}, K('_connected',  $self);
-}
-
-sub _connected {
-  my ($self, $fh) = @_;
-
-  if ($fh) {
-    log_debug '[%s] Connection established', $self->addr;
-
-    $self->{channel} = Argon::Channel->new(
-      fh       => $fh,
-      key      => $self->{key},
-      on_msg   => K('_notify', $self),
-      on_err   => K('_error', $self),
-      on_close => K('_close', $self),
-    );
-
-    $self->{done} = AnyEvent->condvar;
-    $self->{conn}->send;
-    $self->{opened}->() if $self->{opened};
-  }
-  else {
-    log_error '[%s] Connection attempt failed', $self->addr;
-    $self->cleanup;
-    $self->{failed}->($!) if $self->{failed};
-  }
-}
-
 sub cleanup {
   my $self = shift;
   $self->{closed}->() if $self->{closed};
@@ -149,19 +149,19 @@ sub cleanup {
 }
 
 sub _error {
-  my ($self, $error) = @_;
+  my ($self, $channel, $error) = @_;
   log_error '[%s] %s', $self->addr, $error;
   $self->cleanup;
 }
 
 sub _close {
-  my $self = shift;
+  my ($self, $channel) = @_;
   log_debug '[%s] Remote host disconnected', $self->addr;
   $self->cleanup;
 }
 
 sub _notify {
-  my ($self, $msg) = @_;
+  my ($self, $channel, $msg) = @_;
   my $cb = delete $self->{cb}{$msg->id};
   if ($cb) {
     $cb->($msg);

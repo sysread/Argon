@@ -133,19 +133,19 @@ sub _accept {
 }
 
 sub _on_client_msg {
-  my ($self, $addr, $msg) = @_;
+  my ($self, $addr, $channel, $msg) = @_;
   $self->{addr}{$msg->id} = $addr;
   $_->($msg) foreach @{$self->{handlers}{$msg->cmd}};
 }
 
 sub _on_client_err {
-  my ($self, $addr, $err) = @_;
+  my ($self, $addr, $channel, $err) = @_;
   log_info '[client %s] error: %s', $addr, $err;
   $self->unregister_client($addr);
 }
 
 sub _on_client_close {
-  my ($self, $addr) = @_;
+  my ($self, $channel, $addr) = @_;
   log_debug '[client %s] disconnected', $addr;
   $self->unregister_client($addr);
 }
