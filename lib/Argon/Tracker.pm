@@ -32,19 +32,25 @@ sub add_capacity { $_[0]->{capacity} += $_[1] }
 sub remove_capacity { $_[0]->{capacity} -= $_[1] }
 sub load { ($_[0]->assigned + 1) * $_[0]->avg_time }
 
-sub is_tracked { exists $_[0]->{started}{$_[1]->{id}} }
+sub is_tracked { exists $_[0]->{started}{$_[1]->id} }
+
+sub age {
+  my ($self, $msg) = @_;
+  return unless $self->is_tracked($msg);
+  time - $self->{started}{$msg->id};
+}
 
 sub start {
   my ($self, $msg) = @_;
   croak 'no capacity' unless $self->has_capacity;
-  croak "msg id $msg->{id} is already tracked" if $self->is_tracked($msg);
+  croak "msg id $msg->id is already tracked" if $self->is_tracked($msg);
   $self->{started}{$msg->id} = time;
   ++$self->{assigned};
 }
 
 sub finish {
   my ($self, $msg) = @_;
-  croak "msg id $msg->{id} is not tracked" unless $self->is_tracked($msg);
+  croak "msg id $msg->id is not tracked" unless $self->is_tracked($msg);
   --$self->{assigned};
   $self->_add_to_history(time - delete $self->{started}{$msg->id});
   $self->_update_avg_time;

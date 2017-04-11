@@ -14,9 +14,9 @@ const our $EOL => "\015\012";
 #-------------------------------------------------------------------------------
 # Priorities
 #-------------------------------------------------------------------------------
-const our $PRI_HI => '1';
-const our $PRI_NO => '2';
-const our $PRI_LO => '3';
+const our $HIGH   => 0;
+const our $NORMAL => 1;
+const our $LOW    => 2;
 
 #-------------------------------------------------------------------------------
 # Commands
@@ -34,7 +34,7 @@ const our $HIRE  => 'HIRE';
 #-------------------------------------------------------------------------------
 our %EXPORT_TAGS = (
   defaults   => [qw($EOL)],
-  priorities => [qw($PRI_HI $PRI_NO $PRI_LO)],
+  priorities => [qw($HIGH $NORMAL $LOW)],
   commands   => [qw($PING $ACK $ERROR $QUEUE $DENY $DONE $HIRE)],
 );
 

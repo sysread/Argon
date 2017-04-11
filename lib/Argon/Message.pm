@@ -13,7 +13,7 @@ sub new {
   my ($class, %param) = @_;
   my $id    = param 'id',    %param, sub { Data::UUID->new->create_str };
   my $token = param 'token', %param, undef;
-  my $pri   = param 'pri',   %param, $PRI_NO;
+  my $pri   = param 'pri',   %param, $NORMAL;
   my $cmd   = param 'cmd',   %param;
   my $info  = param 'info',  %param, undef;
 

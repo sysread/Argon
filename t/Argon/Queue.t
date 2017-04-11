@@ -4,12 +4,14 @@ use Argon::Message;
 use Argon::Constants qw(:priorities :commands);
 
 sub msg { Argon::Message->new(cmd => $ACK, pri => $_[0]) };
-my $msg1 = Argon::Message->new(cmd => $ACK, pri => ($PRI_NO));
-my $msg2 = Argon::Message->new(cmd => $ACK, pri => ($PRI_HI));
-my $msg3 = Argon::Message->new(cmd => $ACK, pri => ($PRI_LO));
-my $msg4 = Argon::Message->new(cmd => $ACK, pri => ($PRI_NO));
+my $msg1 = Argon::Message->new(cmd => $ACK, pri => $NORMAL);
+my $msg2 = Argon::Message->new(cmd => $ACK, pri => $HIGH);
+my $msg3 = Argon::Message->new(cmd => $ACK, pri => $LOW);
+my $msg4 = Argon::Message->new(cmd => $ACK, pri => $NORMAL);
 
 ok my $queue = Argon::Queue->new(4), 'new';
+$queue->{balanced} = time + 100; # force to future value prevent rebalancing during testing
+
 is $queue->count, 0, 'count';
 ok $queue->is_empty, 'is_empty';
 ok !$queue->is_full, '!is_full';
@@ -21,7 +23,7 @@ is $queue->put($msg4), 4, 'put';
 is $queue->count, 4, 'count';
 ok !$queue->is_empty, '!is_empty';
 ok $queue->is_full, 'is_full';
-ok dies { $queue->put(msg($PRI_NO)) }, 'put dies when is_full';
+ok dies { $queue->put(msg($NORMAL)) }, 'put dies when is_full';
 ok dies { $queue->put('foo') }, 'put dies on invalid parameter';
 
 is $queue->get, $msg2, 'get';
