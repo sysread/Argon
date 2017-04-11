@@ -3,7 +3,6 @@ package Argon::Task;
 
 use strict;
 use warnings;
-use Storable 'thaw';
 use Argon;
 use Argon::Log;
 
@@ -14,15 +13,10 @@ sub new {
 
 sub run {
   Argon::ASSERT_EVAL_ALLOWED;
-  my $self = shift;
-
-  my $code = do {
-    no warnings 'once';
-    local $Storable::Eval = 1;
-    thaw($self->[0]);
-  };
-
-  return $code->(@{$self->[1]});
+  my ($str_code, $args) = @{$_[0]};
+  log_trace 'Executing code: do { %s }', $str_code;
+  my $code = eval "do { $str_code };";
+  $code->(@$args);
 }
 
 1;

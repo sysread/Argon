@@ -4,6 +4,7 @@ package Argon::Server;
 use strict;
 use warnings;
 use Carp;
+use Try::Tiny;
 use AnyEvent;
 use AnyEvent::Socket qw(tcp_server);
 use Path::Tiny 'path';
@@ -83,7 +84,14 @@ sub send {
     return;
   }
 
-  $self->client($addr)->send($msg);
+  try {
+    $self->client($addr)->send($msg);
+  }
+  catch {
+    log_note 'unable to send message %s (%s) to %s: %s', $msg->id, $msg->cmd, $addr, $_;
+    $self->unregister_client($addr);
+  };
+
   delete $self->{addr}{$msg->id};
 }
 

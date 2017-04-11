@@ -7,6 +7,7 @@ use Carp;
 use Storable 'nfreeze';
 use AnyEvent;
 use AnyEvent::Socket qw(tcp_connect);
+use Data::Dump::Streamer;
 use Path::Tiny 'path';
 use Try::Tiny;
 use Argon;
@@ -120,12 +121,10 @@ sub process {
   my ($self, $code_ref, $args, $cb) = @_;
   $args ||= [];
 
-  my $code = do {
-    no warnings 'once';
-    local $Storable::Deparse = 1;
-    local $Storable::forgive_me = 1;
-    nfreeze($code_ref);
-  };
+  my $code = Dump($code_ref)
+    ->Purity(1)
+    ->Declare(1)
+    ->Out;
 
   $self->queue('Argon::Task', [$code, $args], $cb);
 }
