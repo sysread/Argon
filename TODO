@@ -1,5 +1,4 @@
 -File-backed storage for queue and manager state
 -Process management tooling
--Auto-retry tasks in Client
 -Better test coverage
 -POD

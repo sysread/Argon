@@ -32,11 +32,7 @@ use Argon::Util qw(param);
 
 use parent 'Exporter';
 
-our @EXPORT = qw(
-  Argon remote
-  sync async try_async
-  send
-);
+our @EXPORT = qw(Argon remote sync async try_async send);
 
 our $ARGON;
 

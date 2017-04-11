@@ -35,6 +35,8 @@ sub info  { $_[0]->{info} }
 sub failed { $_[0]->cmd eq $ERROR }
 sub denied { $_[0]->cmd eq $DENY }
 
+sub copy { $_[0]->reply(id => Data::UUID->new->create_str) }
+
 sub reply {
   my ($self, %param) = @_;
   Argon::Message->new(

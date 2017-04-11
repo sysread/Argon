@@ -26,6 +26,7 @@ sub new {
   my $closed  = param 'closed',  %param, undef;
   my $notify  = param 'notify',  %param, undef;
   my $keyfile = param 'keyfile', %param, undef;
+  my $retry   = param 'retry',   %param, undef;
 
   my $key = defined $keyfile
     ? path($keyfile)->slurp_raw
@@ -39,7 +40,9 @@ sub new {
     failed  => $failed,
     closed  => $closed,
     notify  => $notify,
+    retry   => $retry,
     channel => undef,
+    msg     => {},
     cb      => {},
   }, $class;
 
@@ -80,6 +83,7 @@ sub _connected {
 
 sub send {
   my ($self, $msg, $cb) = @_;
+  $self->{msg}{$msg->id} = $msg;
   $self->{cb}{$msg->id} = $cb;
   $self->{channel}->send($msg);
   return $msg->id;
@@ -137,7 +141,15 @@ sub _close {
 
 sub _notify {
   my ($self, $channel, $msg) = @_;
+  my $orig = delete $self->{msg}{$msg->id};
   my $cb = delete $self->{cb}{$msg->id};
+
+  if ($msg->denied && $self->{retry}) {
+    log_debug 'Retrying message %s', $orig->explain;
+    $self->send($orig->copy, $cb);
+    return;
+  }
+
   if ($cb) {
     $cb->($msg);
   } elsif ($self->{notify}) {

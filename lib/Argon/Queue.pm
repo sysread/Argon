@@ -6,6 +6,7 @@ use warnings;
 use Carp;
 use Argon::Constants ':priorities';
 use Argon::Tracker;
+use Argon::Log;
 
 sub new {
   my ($class, $max) = @_;
@@ -89,16 +90,19 @@ sub promote {
   my $max = $avg * 1.5;
 
   foreach my $pri ($LOW, $NORMAL) {
-    my $queue = $self->{msgs}[$pri];
+    my @stay;
+    my @move;
 
-    foreach my $i (0 .. scalar(@$queue) - 1) {
-      my $msg = $queue->[$i];
-
-      if ($self->{tracker}->age($msg) > $max) {
-        splice @$queue, $i, 1;
-        push @{$self->{msgs}[$pri - 1]}, $msg;
+    foreach (@{$self->{msgs}[$pri]}) {
+      if ($self->{tracker}->age($_) > $max) {
+        push @move, $_;
+      } else {
+        push @stay, $_;
       }
     }
+
+    @{$self->{msgs}[$pri]} = @move;
+    push @{$self->{msgs}[$pri - 1]}, @stay;
   }
 
   $self->{balanced} = time;
