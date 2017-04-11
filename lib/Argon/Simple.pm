@@ -46,8 +46,9 @@ sub Argon (&) {
   my $context = {
     _argon => 1,
     client => undef,
-    async  => {},
+    conn   => AnyEvent->condvar,
     sent   => AnyEvent->condvar,
+    async  => {},
   };
 
   local $ARGON = $context;
@@ -66,13 +67,23 @@ sub assert_context {
 sub assert_client {
   assert_context;
   croak 'not connected' unless defined $ARGON->{client};
+  $ARGON->{conn}->recv;
 }
 
 sub remote ($;%) {
   assert_context;
   my ($addr, %param) = @_;
   my ($host, $port) = $addr =~ /^(.+?):(\d+)$/;
-  $ARGON->{client} = Argon::Client->new(host => $host, port => $port, %param);
+
+  my $opened = delete $param{opened};
+  $ARGON->{conn}->cb($opened) if $opened;
+
+  $ARGON->{client} = Argon::Client->new(
+    host   => $host,
+    port   => $port,
+    opened => $ARGON->{conn},
+    %param,
+  );
 }
 
 sub async (\$&;@) {
