@@ -1,4 +1,6 @@
 -Process management tooling
+-Auto-retry tasks in Client
+-Promote msg priority by age in queue
 -Better test coverage
 -Auto-retry in Client
 -POD
