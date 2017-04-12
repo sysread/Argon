@@ -5,20 +5,33 @@ use strict;
 use warnings;
 use Carp;
 use Crypt::CBC;
-use JSON::XS qw(encode_json decode_json);
-use Scalar::Util 'weaken';
+use Scalar::Util qw(weaken);
+use Sereal::Decoder qw(sereal_decode_with_object);
+use Sereal::Encoder qw(SRL_SNAPPY sereal_encode_with_object);
 use Argon::Log;
 
 use parent 'Exporter';
 
 our %EXPORT_TAGS = (
-  'encoding' => [qw(encode decode)],
+  'encoding' => [qw(
+    encrypt
+    decrypt
+    encode
+    decode
+    encode_msg
+    decode_msg
+    token
+    cipher
+  )],
 );
 
 our @EXPORT_OK = (
-  qw(K param cipher),
+  qw(K param),
   map { @$_ } values %EXPORT_TAGS,
 );
+
+our $ENC = Sereal::Encoder->new({compress => SRL_SNAPPY});
+our $DEC = Sereal::Decoder->new();
 
 sub K {
   my ($fn, @args) = @_;
@@ -56,8 +69,44 @@ sub param ($\%;$) {
   }
 }
 
-sub decode ($) { goto \&decode_json }
-sub encode ($) { goto \&encode_json }
+sub token {
+  my $cipher = shift;
+  unpack 'H*', $cipher->random_bytes(8);
+}
+
+sub encrypt {
+  my ($cipher, $string) = @_;
+  $cipher->encrypt_hex($string);
+}
+
+sub decrypt {
+  my ($cipher, $string) = @_;
+  $cipher->decrypt_hex($string);
+}
+
+sub encode {
+  my ($cipher, $obj) = @_;
+  my $sereal = sereal_encode_with_object($ENC, $obj);
+  encrypt($cipher, $sereal);
+}
+
+sub decode {
+  my ($cipher, $line) = @_;
+  my $sereal = decrypt($cipher, $line);
+  sereal_decode_with_object($DEC, $sereal);
+}
+
+sub encode_msg {
+  my ($cipher, $msg) = @_;
+  my %data = %$msg;
+  encode($cipher, \%data);
+}
+
+sub decode_msg {
+  my ($cipher, $line) = @_;
+  my $data = decode($cipher, $line);
+  bless $data, 'Argon::Message';
+}
 
 my %ciphers;
 

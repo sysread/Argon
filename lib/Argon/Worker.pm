@@ -5,53 +5,40 @@ use strict;
 use warnings;
 use Carp;
 use Class::Load qw(load_class);
+use Path::Tiny qw(path);
 use AnyEvent;
 use AnyEvent::Util qw(fork_call);
 use Argon::Client;
 use Argon::Constants qw(:commands);
 use Argon::Log;
 use Argon::Message;
-use Argon::Server;
-use Argon::Util qw(:encoding K param);
-
-use parent 'Argon::Server';
+use Argon::Util qw(K param);
 
 sub new {
   my ($class, %param) = @_;
   my $capacity = param 'capacity', %param;
   my $mgr_host = param 'mgr_host', %param;
   my $mgr_port = param 'mgr_port', %param;
+  my $keyfile  = param 'keyfile',  %param, undef;
 
-  my $self = $class->SUPER::new(%param);
+  my $key = defined $keyfile
+    ? path($keyfile)->slurp_raw
+    : param 'key', %param;
 
-  $self->{capacity} = $AnyEvent::Util::MAX_FORKS = $capacity;
-  $self->{mgr_host} = $mgr_host;
-  $self->{mgr_port} = $mgr_port;
-  $self->{timer}    = undef;
-  $self->{tries}    = 0;
+  $AnyEvent::Util::MAX_FORKS = $capacity;
+
+  my $self = bless {
+    key      => $key,
+    capacity => $capacity,
+    mgr_host => $mgr_host,
+    mgr_port => $mgr_port,
+    timer    => undef,
+    tries    => 0,
+  }, $class;
 
   $self->connect;
 
-  $self->handles($QUEUE, K('_queue', $self));
-
   return $self;
-}
-
-sub token {
-  my $self = shift;
-  return $self->{token};
-}
-
-sub update_token {
-  my $self = shift;
-  $self->{token} = unpack('H*', $self->cipher->random_bytes(8));
-  log_info 'New identity: %s', $self->{token};
-  return $self->{token};
-}
-
-sub register_client {
-  my ($self, $addr, $fh) = @_;
-  $self->SUPER::register_client($addr, $fh);
 }
 
 sub connect {
@@ -63,6 +50,7 @@ sub connect {
     port   => $self->{mgr_port},
     opened => K('_connected', $self),
     closed => K('_disconnected', $self),
+    notify => K('_queue', $self),
   );
 }
 
@@ -91,13 +79,8 @@ sub register {
   log_trace 'Registering with manager';
 
   my $msg = Argon::Message->new(
-    token => $self->update_token,
-    cmd   => $HIRE,
-    info  => {
-      host     => $self->{host},
-      port     => $self->{port},
-      capacity => $self->{capacity},
-    },
+    cmd  => $HIRE,
+    info => { capacity => $self->{capacity} },
   );
 
   $self->{mgr}->send($msg, K('_mgr_registered', $self));
@@ -114,17 +97,9 @@ sub _mgr_registered {
 
 sub _queue {
   my ($self, $msg) = @_;
-  if ($msg->token ne $self->{token}) {
-    log_note 'Token mismatch for message %s', $msg->explain;
-    log_note 'Received: %s', $msg->token;
-    log_note 'My token: %s', $self->{token};
-    $self->send($msg->error('token mismatch'));
-  }
-  else {
-    my $payload = $msg->info;
-    my ($class, @args) = @$payload;
-    fork_call { _task($class, @args) } K('_result', $self, $msg);
-  }
+  my $payload = $msg->info;
+  my ($class, @args) = @$payload;
+  fork_call { _task($class, @args) } K('_result', $self, $msg);
 }
 
 sub _task {
@@ -141,7 +116,7 @@ sub _result {
     ? $msg->reply(cmd => $ERROR, info => $@ || "errno: $!")
     : $msg->reply(cmd => $DONE,  info => shift);
 
-  $self->send($reply);
+  $self->{mgr}->send($reply);
 }
 
 1;

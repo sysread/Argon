@@ -21,6 +21,7 @@ const our $LOW    => 2;
 #-------------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------------
+const our $ID    => 'ID';
 const our $PING  => 'PING';
 const our $ACK   => 'ACK';
 const our $ERROR => 'ERROR';
@@ -35,7 +36,7 @@ const our $HIRE  => 'HIRE';
 our %EXPORT_TAGS = (
   defaults   => [qw($EOL)],
   priorities => [qw($HIGH $NORMAL $LOW)],
-  commands   => [qw($PING $ACK $ERROR $QUEUE $DENY $DONE $HIRE)],
+  commands   => [qw($ID $PING $ACK $ERROR $QUEUE $DENY $DONE $HIRE)],
 );
 
 our @EXPORT_OK = map { @$_ } values %EXPORT_TAGS;

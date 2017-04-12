@@ -44,7 +44,7 @@ sub new {
 
 sub cipher {
   my $self = shift;
-  return Argon::Util::cipher($self->{key});
+  Argon::Util::cipher($self->{key});
 }
 
 sub handles {
@@ -130,7 +130,7 @@ sub _accept {
 sub _on_client_msg {
   my ($self, $addr, $channel, $msg) = @_;
   $self->{addr}{$msg->id} = $addr;
-  $_->($msg) foreach @{$self->{handlers}{$msg->cmd}};
+  $_->($addr, $msg) foreach @{$self->{handlers}{$msg->cmd}};
 }
 
 sub _on_client_err {
@@ -140,13 +140,13 @@ sub _on_client_err {
 }
 
 sub _on_client_close {
-  my ($self, $channel, $addr) = @_;
+  my ($self, $addr, $channel) = @_;
   log_debug '[client %s] disconnected', $addr;
   $self->unregister_client($addr);
 }
 
 sub _ping {
-  my ($self, $msg) = @_;
+  my ($self, $addr, $msg) = @_;
   $self->send($msg->reply(cmd => $ACK));
 }
 

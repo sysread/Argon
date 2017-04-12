@@ -38,7 +38,8 @@ my ($opt, $usage) = describe_options(
   ['key|k=s',     '(required) path to file containing encryption key', {required => 1}],
   ['host|h=s',    '(optional) hostname on which to listen (defaults to localhost)'],
   ['port|p=i',    '(optional) port on which to listen (defaults to OS-assigned port)', {callbacks => {'port number' => sub { shift > 0 }}}],
-  ['verbose|v=i', '(optional) level of verbosity (1 - 9; defaults to 5 [warn])'],
+  ['persist=s',   '(optional) maintain a persistent copy of the message queue'],
+  ['verbose|v=i', '(optional) level of verbosity (1 - 9; defaults to 5 [warn])', {default => 'warn'}],
   [],
   ['help|h',  'prints this help text and exits', {shortcircuit => 1}],
   ['usage|u', 'prints this help text and exits', {shortcircuit => 1}],
@@ -49,12 +50,21 @@ if ($opt->help) {
   exit;
 }
 
-log_level $opt->verbose || 5;
+log_level $opt->verbose;
 
 my $manager = Argon::Manager->new(
   host    => $opt->host,
   port    => $opt->port,
   keyfile => $opt->key,
+  persist => $opt->persist,
 );
+
+if ($opt->persist) {
+  use Data::Dumper;
+  local $Data::Dumper::Indent = 0;
+  local $Data::Dumper::Terse  = 1;
+  log_trace 'Queue: %s', Dumper($manager->{queue});
+  log_trace 'Tracker: %s', Dumper($manager->{tracker});
+}
 
 AnyEvent->condvar->recv;

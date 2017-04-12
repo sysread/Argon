@@ -27,12 +27,16 @@ sub new {
   my $notify  = param 'notify',  %param, undef;
   my $keyfile = param 'keyfile', %param, undef;
   my $retry   = param 'retry',   %param, undef;
+  my $token   = param 'token',   %param, undef;
+  my $remote  = param 'remote',  %param, undef;
 
   my $key = defined $keyfile
     ? path($keyfile)->slurp_raw
     : param 'key', %param;
 
   my $self = bless {
+    token   => $token,
+    remote  => $remote,
     key     => $key,
     host    => $host,
     port    => $port,
@@ -51,7 +55,9 @@ sub new {
   return $self;
 }
 
-sub addr { sprintf '%s:%d', $_[0]->{host}, $_[0]->{port} }
+sub addr   { sprintf '%s:%d', $_[0]->{host}, $_[0]->{port} }
+sub cipher { Argon::Util::cipher($_[0]->{key}) }
+sub token  { $_[0]->{token} || $_[0]->{channel}->token }
 
 sub connect {
   my $self = shift;
@@ -67,6 +73,8 @@ sub _connected {
     $self->{channel} = Argon::Channel->new(
       fh       => $fh,
       key      => $self->{key},
+      token    => $self->{token},
+      remote   => $self->{remote},
       on_msg   => K('_notify', $self),
       on_err   => K('_error', $self),
       on_close => K('_close', $self),
@@ -75,7 +83,7 @@ sub _connected {
     $self->{opened}->() if $self->{opened};
   }
   else {
-    log_debug '[%s] Connection attempt failed', $self->addr;
+    log_debug '[%s] Connection attempt failed: %s', $self->addr, $!;
     $self->cleanup;
     $self->{failed}->($!) if $self->{failed};
   }
@@ -123,6 +131,7 @@ sub cleanup {
   );
 
   foreach my $msg_id (keys %{$self->{cb}}) {
+    next unless $self->{cb}{$msg_id};
     $self->{cb}{$msg_id}->($msg->reply(id => $msg_id));
   }
 }

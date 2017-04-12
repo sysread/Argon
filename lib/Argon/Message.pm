@@ -12,10 +12,10 @@ use Argon::Util qw(param);
 sub new {
   my ($class, %param) = @_;
   my $id    = param 'id',    %param, sub { Data::UUID->new->create_str };
-  my $token = param 'token', %param, undef;
-  my $pri   = param 'pri',   %param, $NORMAL;
   my $cmd   = param 'cmd',   %param;
+  my $pri   = param 'pri',   %param, $NORMAL;
   my $info  = param 'info',  %param, undef;
+  my $token = param 'token', %param, undef;
 
   bless {
     id    => $id,
@@ -26,12 +26,11 @@ sub new {
   }, $class;
 }
 
-sub id    { $_[0]->{id} }
-sub token { $_[0]->{token} }
-sub pri   { $_[0]->{pri} }
-sub cmd   { $_[0]->{cmd} }
-sub info  { $_[0]->{info} }
-
+sub id     { $_[0]->{id} }
+sub token  { $_[0]->{token} }
+sub pri    { $_[0]->{pri} }
+sub cmd    { $_[0]->{cmd} }
+sub info   { $_[0]->{info} }
 sub failed { $_[0]->cmd eq $ERROR }
 sub denied { $_[0]->cmd eq $DENY }
 
@@ -61,7 +60,7 @@ sub result {
 
 sub explain {
   my $self = shift;
-  sprintf '[P%d %5s %s]', $self->pri, $self->cmd, $self->id;
+  sprintf '[P%d %5s %s %s]', $self->pri, $self->cmd, $self->token, $self->id;
 }
 
 1;

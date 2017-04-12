@@ -5,13 +5,14 @@ use strict;
 use warnings;
 use Carp;
 use Data::Dumper;
-use Argon::Constants ':priorities';
+use Argon::Constants qw(:priorities);
 use Argon::Tracker;
 use Argon::Log;
+use Argon::Util qw(param);
 
 sub new {
-  my ($class, $max) = @_;
-  defined $max or croak 'expected parameter $max';
+  my ($class, %param) = @_;
+  my $max = param 'max',  %param, 0;
 
   my $tracker = Argon::Tracker->new(
     capacity => $max,
@@ -48,7 +49,7 @@ sub is_full  { $_[0]->count >= $_[0]->max }
 sub put {
   my ($self, $msg) = @_;
 
-  croak 'usage: $queue->insert($msg)'
+  croak 'usage: $queue->put($msg)'
     unless defined $msg
         && (ref $msg || '') eq 'Argon::Message';
 
@@ -62,6 +63,8 @@ sub put {
 
   ++$self->{count};
 
+  log_trace 'put: %s', $msg->explain;
+
   $self->{count};
 }
 
@@ -71,21 +74,16 @@ sub get {
 
   --$self->{count};
 
-  local $Data::Dumper::Indent = 0;
-  local $Data::Dumper::Terse  = 1;
-
   foreach my $pri ($HIGH, $NORMAL, $LOW) {
     my $queue = $self->{msgs}[$pri];
 
     if (@$queue) {
       my $msg = shift @$queue;
       $self->{tracker}->finish($msg);
-      log_debug 'get: %s', $msg->explain;
+      log_trace 'get: %s', $msg->explain;
       return $msg;
     }
   }
-
-  croak 'get: is_empty is false but queue is empty! ' . Dumper($self);
 }
 
 sub promote {

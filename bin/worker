@@ -55,7 +55,7 @@ my ($opt, $usage) = describe_options(
   ['capacity|c=i', '(required) max number of worker processes permitted', {required => 1, callbacks => {'positive int' => sub { shift > 0 }}}],
   ['mgr|m=s',      '(required) address of Argon manager service (e.g. some.host.com:4242)', {required => 1, callbacks => {'host:port' => sub { shift =~ /^.+?:\d+$/ }}}],
   ['allow-eval|a', '(optional) permit execution of serialized code (warning: this is a security risk if not running in a safe environment)'],
-  ['verbose|v=i',  '(optional) level of verbosity (1 - 9; defaults to 5 [warn])'],
+  ['verbose|v=i',  '(optional) level of verbosity (1 - 9; defaults to 5 [warn])', {default => 'warn'}],
   [],
   ['help|h',  'prints this help text and exits', {shortcircuit => 1}],
   ['usage|u', 'prints this help text and exits', {shortcircuit => 1}],
@@ -73,7 +73,7 @@ unless ($mgr_host && $mgr_port) {
   exit;
 }
 
-log_level $opt->verbose || 5;
+log_level $opt->verbose;
 $Argon::ALLOW_EVAL = $opt->allow_eval ? 1 : 0;
 
 my $worker = Argon::Worker->new(

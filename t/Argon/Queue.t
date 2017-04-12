@@ -11,7 +11,7 @@ my $msg3 = Argon::Message->new(cmd => $ACK, pri => $LOW);
 my $msg4 = Argon::Message->new(cmd => $ACK, pri => $NORMAL);
 
 subtest 'basics' => sub {
-  ok my $q = Argon::Queue->new(4), 'new';
+  ok my $q = Argon::Queue->new(max => 4), 'new';
   $q->{balanced} = time + 100; # force to future value prevent rebalancing during testing
 
   is $q->count, 0, 'count';
@@ -43,7 +43,7 @@ subtest 'basics' => sub {
 };
 
 subtest 'promotion' => sub {
-  my $q = Argon::Queue->new(4);
+  my $q = Argon::Queue->new(max => 4);
   is $q->promote, 0, 'promote: no messages';
 
   $q->put($msg3);
