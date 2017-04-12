@@ -27,7 +27,7 @@ sub new {
     tracker  => $tracker,
     msgs     => $queue,
     count    => 0,
-    balanced => 0,
+    balanced => time,
   }, $class;
 }
 
@@ -40,11 +40,9 @@ sub max {
   $_[0]->{max};
 }
 
-sub count { $_[0]->{count} }
-
+sub count    { $_[0]->{count} }
 sub is_empty { $_[0]->count == 0 }
-
-sub is_full { $_[0]->count >= $_[0]->max }
+sub is_full  { $_[0]->count >= $_[0]->max }
 
 sub put {
   my ($self, $msg) = @_;
@@ -84,10 +82,12 @@ sub get {
 
 sub promote {
   my $self = shift;
-  return unless time - $self->{balanced} > 5;
+  my $avg  = $self->{tracker}->avg_time;
+  my $max  = $avg * 1.5;
+  return 0 unless time - $self->{balanced} >= $max;
 
-  my $avg = $self->{tracker}->avg_time;
-  my $max = $avg * 1.5;
+  my @queue = ([], [], []);
+  my $moved = 0;
 
   foreach my $pri ($LOW, $NORMAL) {
     my @stay;
@@ -96,16 +96,19 @@ sub promote {
     foreach (@{$self->{msgs}[$pri]}) {
       if ($self->{tracker}->age($_) > $max) {
         push @move, $_;
+        ++$moved;
       } else {
         push @stay, $_;
       }
     }
 
-    @{$self->{msgs}[$pri]} = @move;
-    push @{$self->{msgs}[$pri - 1]}, @stay;
+    push @{$queue[$pri]}, @stay;
+    push @{$queue[$pri - 1]}, @move;
   }
 
+  $self->{msgs} = [@queue];
   $self->{balanced} = time;
+  return $moved;
 }
 
 1;

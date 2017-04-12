@@ -61,11 +61,16 @@ sub result {
 
 sub explain {
   my $self = shift;
-  my $info = ref $self->info ? $self->info : [$self->info];
-  sprintf 'Message<%s %s: %s>',
+
+  my $info = ref $self->info     ? ': ' . encode_json($self->info)
+           : defined $self->info ? ": $self->{info}"
+           : undef;
+
+  sprintf 'MSG<P%d %s %s%s>',
+    $self->pri,
     $self->cmd,
     $self->id,
-    encode_json($info);
+    $info;
 }
 
 1;
