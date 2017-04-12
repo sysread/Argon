@@ -6,7 +6,6 @@ use warnings;
 use Carp;
 use AnyEvent;
 use AnyEvent::Handle;
-use Data::Dumper;
 use Argon::Constants ':defaults';
 use Argon::Log;
 use Argon::Message;
@@ -60,7 +59,7 @@ sub _read {
 sub _readline {
   my ($self, $handle, $line) = @_;
   my $msg = $self->decode($line);
-  log_trace 'received %s', sub { _dump($msg) };
+  log_trace 'recv %s', sub { $msg->explain };
   $self->{on_msg}->($self, $msg);
 }
 
@@ -74,14 +73,7 @@ sub send {
   my $line = $self->encode($msg);
   $self->{handle}->push_write($line);
   $self->{handle}->push_write($EOL);
-  log_trace 'sent %s', sub { _dump($msg) };
-}
-
-sub _dump {
-  my $msg = shift;
-  local $Data::Dumper::Indent  = 0;
-  local $Data::Dumper::Varname = 'MSG';
-  Dumper($msg);
+  log_trace 'sent %s', sub { $msg->explain };
 }
 
 sub encode {

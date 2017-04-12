@@ -75,7 +75,7 @@ sub _connected {
     $self->{opened}->() if $self->{opened};
   }
   else {
-    log_error '[%s] Connection attempt failed', $self->addr;
+    log_debug '[%s] Connection attempt failed', $self->addr;
     $self->cleanup;
     $self->{failed}->($!) if $self->{failed};
   }

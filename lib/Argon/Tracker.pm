@@ -56,6 +56,12 @@ sub finish {
   $self->_update_avg_time;
 }
 
+sub touch {
+  my ($self, $msg) = @_;
+  croak "msg id $msg->id is not tracked" unless $self->is_tracked($msg);
+  $self->{started}{$msg->id} = time;
+}
+
 sub _add_to_history {
   my ($self, $taken) = @_;
   push @{$self->{history}}, $taken;

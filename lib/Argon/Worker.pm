@@ -44,8 +44,8 @@ sub token {
 
 sub update_token {
   my $self = shift;
-  $self->{token} = unpack('H*', $self->cipher->random_bytes(32));
-  log_info 'Identity token is now %s', $self->{token};
+  $self->{token} = unpack('H*', $self->cipher->random_bytes(8));
+  log_info 'New identity: %s', $self->{token};
   return $self->{token};
 }
 
@@ -74,7 +74,7 @@ sub _connected {
 
 sub _disconnected {
   my $self = shift;
-  log_note 'Manager disconnected';
+  log_note 'Manager disconnected' unless $self->{tries};
   $self->reconnect;
 }
 

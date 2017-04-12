@@ -4,6 +4,7 @@ package Argon::Queue;
 use strict;
 use warnings;
 use Carp;
+use Data::Dumper;
 use Argon::Constants ':priorities';
 use Argon::Tracker;
 use Argon::Log;
@@ -55,7 +56,6 @@ sub put {
 
   croak 'queue full' if $self->is_full;
 
-  $self->{msgs}[$msg->pri] ||= [];
   push @{$self->{msgs}[$msg->pri]}, $msg;
 
   $self->{tracker}->start($msg);
@@ -71,13 +71,21 @@ sub get {
 
   --$self->{count};
 
-  for (0 .. $#{$self->{msgs}}) {
-    if (@{$self->{msgs}[$_]}) {
-      my $msg = shift @{$self->{msgs}[$_]};
+  local $Data::Dumper::Indent = 0;
+  local $Data::Dumper::Terse  = 1;
+
+  foreach my $pri ($HIGH, $NORMAL, $LOW) {
+    my $queue = $self->{msgs}[$pri];
+
+    if (@$queue) {
+      my $msg = shift @$queue;
       $self->{tracker}->finish($msg);
+      log_debug 'get: %s', $msg->explain;
       return $msg;
     }
   }
+
+  croak 'get: is_empty is false but queue is empty! ' . Dumper($self);
 }
 
 sub promote {
@@ -86,28 +94,24 @@ sub promote {
   my $max  = $avg * 1.5;
   return 0 unless time - $self->{balanced} >= $max;
 
-  my @queue = ([], [], []);
   my $moved = 0;
 
   foreach my $pri ($LOW, $NORMAL) {
-    my @stay;
-    my @move;
-
-    foreach (@{$self->{msgs}[$pri]}) {
-      if ($self->{tracker}->age($_) > $max) {
-        push @move, $_;
+    while (my $msg = shift @{$self->{msgs}[$pri]}) {
+      if ($self->{tracker}->age($msg) > $max) {
+        push @{$self->{msgs}[$pri - 1]}, $msg;
+        $self->{tracker}->touch($msg);
         ++$moved;
       } else {
-        push @stay, $_;
+        unshift @{$self->{msgs}[$pri]}, $msg;
+        last;
       }
     }
-
-    push @{$queue[$pri]}, @stay;
-    push @{$queue[$pri - 1]}, @move;
   }
 
-  $self->{msgs} = [@queue];
-  $self->{balanced} = time;
+  log_trace 'promoted %d msgs', $moved
+    if $moved;
+
   return $moved;
 }
 

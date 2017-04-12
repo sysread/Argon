@@ -53,6 +53,7 @@ sub process_queue {
     $self->{tracker}{$token}->start($msg);
     $self->{tracker}{self}->start($msg);
     $self->{assigned}{$msg->id} = $token;
+    log_debug 'worker %s assigned %s', $token, $msg->explain;
   }
 }
 
