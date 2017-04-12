@@ -4,6 +4,7 @@ package Argon::Channel;
 use strict;
 use warnings;
 use Carp;
+use Try::Tiny;
 use AnyEvent;
 use AnyEvent::Handle;
 use Argon::Constants ':defaults';
@@ -71,9 +72,16 @@ sub disconnect {
 sub send {
   my ($self, $msg) = @_;
   my $line = $self->encode($msg);
-  $self->{handle}->push_write($line);
-  $self->{handle}->push_write($EOL);
-  log_trace 'sent %s', sub { $msg->explain };
+  try {
+    $self->{handle}->push_write($line);
+    $self->{handle}->push_write($EOL);
+    log_trace 'sent %s', sub { $msg->explain };
+  }
+  catch {
+    log_error 'send: remote host disconnected';
+    log_debug 'error was: %s';
+    $self->_eof;
+  };
 }
 
 sub encode {

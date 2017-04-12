@@ -81,7 +81,7 @@ sub _disconnected {
 sub reconnect {
   my $self = shift;
   ++$self->{tries};
-  my $intvl = 3 + log($self->{tries}) / log(10);
+  my $intvl = 1 + log($self->{tries}) / log(10);
   log_debug 'Reconection attempt in %0.2fs', $intvl;
   $self->{timer} = AnyEvent->timer(after => $intvl, cb => K('connect', $self));
 }
