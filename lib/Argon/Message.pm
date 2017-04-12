@@ -60,7 +60,7 @@ sub result {
 
 sub explain {
   my $self = shift;
-  sprintf '[P%d %5s %s %s]', $self->pri, $self->cmd, $self->token, $self->id;
+  sprintf '[P%d %5s %s %s]', $self->pri, $self->cmd, $self->token || '-', $self->id;
 }
 
 1;
