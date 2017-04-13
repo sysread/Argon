@@ -30,7 +30,7 @@ sub new {
   $self->handles($HIRE,  K('_hire',  $self));
   $self->handles($QUEUE, K('_queue', $self));
 
-  $self->load_file;
+#  $self->load_file;
 
   return $self;
 }
@@ -105,7 +105,7 @@ sub _queue {
 }
 
 sub _collect {
-  my ($self, $channel, $msg) = @_;
+  my ($self, $msg) = @_;
   my $id = delete $self->{assigned}{$msg->id};
   $self->{tracker}{$id}->finish($msg);
   $self->{tracker}{self}->finish($msg);

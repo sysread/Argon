@@ -4,15 +4,16 @@ package Argon::Worker;
 use strict;
 use warnings;
 use Carp;
-use Class::Load qw(load_class);
 use Path::Tiny qw(path);
 use AnyEvent;
 use AnyEvent::Util qw(fork_call);
-use Argon::Client;
 use Argon::Constants qw(:commands);
 use Argon::Log;
-use Argon::Message;
 use Argon::Util qw(K param token cipher interval);
+require Argon::Client;
+require Argon::Message;
+
+use namespace::autoclean;
 
 sub new {
   my ($class, %param) = @_;
@@ -86,7 +87,8 @@ sub register {
     info => { capacity => $self->{capacity} },
   );
 
-  $self->{mgr}->send($msg, K('_mgr_registered', $self));
+  $self->{mgr}->send($msg);
+  $self->{mgr}->reply_cb($msg, K('_mgr_registered', $self));
 }
 
 sub _mgr_registered {
@@ -100,14 +102,14 @@ sub _mgr_registered {
 
 sub _queue {
   my ($self, $msg) = @_;
-  my $payload = $msg->info;
-  my ($class, @args) = @$payload;
+  my ($class, @args) = @{$msg->info};
   fork_call { _task($class, @args) } K('_result', $self, $msg);
 }
 
 sub _task {
+  require Class::Load;
   my ($class, @args) = @_;
-  load_class $class;
+  Class::Load::load_class($class);
   $class->new(@args)->run;
 }
 

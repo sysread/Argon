@@ -63,8 +63,6 @@ sub put {
 
   ++$self->{count};
 
-  log_trace 'put: %s', $msg->explain;
-
   $self->{count};
 }
 
@@ -80,7 +78,6 @@ sub get {
     if (@$queue) {
       my $msg = shift @$queue;
       $self->{tracker}->finish($msg);
-      log_trace 'get: %s', $msg->explain;
       return $msg;
     }
   }

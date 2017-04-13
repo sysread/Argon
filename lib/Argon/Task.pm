@@ -4,7 +4,6 @@ package Argon::Task;
 use strict;
 use warnings;
 use Argon;
-use Argon::Log;
 
 sub new {
   my ($class, $code, $args) = @_;
@@ -13,8 +12,8 @@ sub new {
 
 sub run {
   Argon::ASSERT_EVAL_ALLOWED;
-  my ($str_code, $args) = @{$_[0]};
-  log_trace 'Executing code: do { %s }', $str_code;
+  my $self = shift;
+  my ($str_code, $args) = @$self;
   my $code = eval "do { $str_code };";
   $code->(@$args);
 }

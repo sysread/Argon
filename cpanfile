@@ -7,7 +7,6 @@ requires 'Crypt::Rijndael'           => 0;
 requires 'Data::Dump::Streamer'      => 1.11;
 requires 'Data::UUID'                => 0;
 requires 'Getopt::Long::Descriptive' => 0;
-requires 'JSON::XS'                  => 0;
 requires 'List::Util'                => 0;
 requires 'MIME::Base64'              => 0;
 requires 'Path::Tiny'                => 0.097;

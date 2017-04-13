@@ -5,7 +5,6 @@ use strict;
 use warnings;
 use Carp;
 use Data::UUID;
-use JSON::XS;
 use Argon::Constants qw(:priorities :commands);
 use Argon::Util qw(param);
 

@@ -4,7 +4,6 @@ package Argon::Channel;
 use strict;
 use warnings;
 use Carp;
-use Try::Tiny;
 use AnyEvent;
 use AnyEvent::Handle;
 use Argon::Constants qw(:defaults :commands);
@@ -24,14 +23,16 @@ sub new {
   my $token  = param 'token',  %param, Argon::Util::token($cipher);
   my $remote = param 'remote', %param, undef;
 
-  my $self = bless {
+  my $channel = {
     cipher   => $cipher,
     token    => $token,
     remote   => $remote,
     on_msg   => $on_msg,
     on_close => $on_close,
     on_err   => $on_err,
-  }, $class;
+  };
+
+  my $self = bless $channel, $class;
 
   $self->{handle} = AnyEvent::Handle->new(
     fh       => $fh,
@@ -52,14 +53,14 @@ sub fh { $_[0]->{handle}->fh }
 
 sub _eof {
   my ($self, $handle) = @_;
-  $self->{on_close}->($self);
+  $self->{on_close}->();
   undef $self->{handle};
 }
 
 sub _error {
   my ($self, $handle, $fatal, $msg) = @_;
   log_debug 'Network error: %s', $msg;
-  $self->{on_err}->($self, $msg);
+  $self->{on_err}->($msg);
   $self->disconnect;
 }
 
@@ -82,12 +83,12 @@ sub _read {
 sub _readline {
   my ($self, $handle, $line) = @_;
   my $msg = $self->decode($line);
-  log_trace 'recv %s', sub { $msg->explain };
+  log_trace 'recv: %s', $msg->explain;
 
   if ($msg->cmd eq $ID) {
     $self->{remote} ||= $msg->token;
   } elsif ($self->_validate($msg)) {
-    $self->{on_msg}->($self, $msg);
+    $self->{on_msg}->($msg);
   }
 }
 
@@ -109,17 +110,18 @@ sub decode {
 sub send {
   my ($self, $msg) = @_;
   $msg->{token} = $self->{token};
+  log_trace 'send: %s', $msg->explain;
 
   my $line = $self->encode($msg);
 
-  try {
+  eval {
     $self->{handle}->push_write($line);
     $self->{handle}->push_write($EOL);
-    log_trace 'sent %s', sub { $msg->explain };
-  }
-  catch {
+  };
+
+  if (my $error = $@) {
     log_error 'send: remote host disconnected';
-    log_debug 'error was: %s', $_;
+    log_debug 'error was: %s', $error;
     $self->_eof;
   };
 }

@@ -35,20 +35,20 @@ our $ENC = Sereal::Encoder->new({compress => SRL_SNAPPY});
 our $DEC = Sereal::Decoder->new();
 
 sub K {
-  my ($fn, @args) = @_;
+  my $name = shift;
+  my $self = shift;
+  my @args = @_;
 
-  if (ref $fn && ref $fn eq 'CODE') {
-    return sub { $fn->(@args, @_) };
+  my $method = $self->can($name);
+
+  unless ($method) {
+    croak "method $name not found";
   }
-  else {
-    my $self = shift @args;
 
-    my $method = $self->can($fn)
-      or croak "method $fn not found";
+  weaken $self;
+  weaken $method;
 
-    weaken $self;
-    return sub { $method->($self, @args, @_) };
-  }
+  sub { $method->($self, @args, @_) };
 }
 
 sub param ($\%;$) {

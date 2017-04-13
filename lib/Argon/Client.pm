@@ -32,7 +32,7 @@ sub new {
 
   my $key = defined $keyfile
     ? path($keyfile)->slurp_raw
-    : param 'key', %param;
+    : param('key', %param);
 
   my $self = bless {
     token   => $token,
@@ -79,7 +79,7 @@ sub _connected {
       on_close => K('_close', $self),
     );
 
-    $self->{opened}->($self) if $self->{opened};
+    $self->{opened}->() if $self->{opened};
   }
   else {
     log_debug '[%s] Connection attempt failed: %s', $self->addr, $!;
@@ -88,8 +88,13 @@ sub _connected {
   }
 }
 
+sub send_msg {
+  my ($self, $msg) = @_;
+  return 1;
+}
+
 sub send {
-  my ($self, $msg, $cb) = @_;
+  my ($self, $msg) = @_;
 
   if (!$self->{channel}) {
     log_warn 'send: not connected';
@@ -97,30 +102,39 @@ sub send {
   }
 
   $self->{channel}->send($msg);
+  return 1;
+}
 
+sub reply_cb {
+  my ($self, $msg, $cb, $retry) = @_;
   $self->{msg}{$msg->id} ||= {
     orig  => $msg,
     cb    => $cb,
     intvl => interval(1),
+    retry => $retry,
   };
-
-  return $msg->id;
 }
 
 sub ping {
   my ($self, $cb) = @_;
-  $self->send(Argon::Message->new(cmd => $PING), $cb)
+  my $msg = Argon::Message->new(cmd => $PING);
+  $self->send($msg);
+  $self->reply_cb($msg, $cb);
 }
 
 sub queue {
   my ($self, $class, $args, $cb) = @_;
-  $self->send(Argon::Message->new(cmd => $QUEUE, info => [$class, @$args]), $cb);
+  my $msg = Argon::Message->new(cmd => $QUEUE, info => [$class, @$args]);
+  $self->send($msg);
+  $self->reply_cb($msg, $cb, $self->{retry});
 }
 
 sub process {
   Argon::ASSERT_EVAL_ALLOWED;
   my ($self, $code_ref, $args, $cb) = @_;
   $args ||= [];
+
+  my $dumper = Data::Dump::Streamer->new;
 
   my $code = Dump($code_ref)
     ->Purity(1)
@@ -147,39 +161,49 @@ sub cleanup {
 }
 
 sub _error {
-  my ($self, $channel, $error) = @_;
+  my ($self, $error) = @_;
   log_error '[%s] %s', $self->addr, $error;
   $self->cleanup;
 }
 
 sub _close {
-  my ($self, $channel) = @_;
+  my ($self) = @_;
   log_debug '[%s] Remote host disconnected', $self->addr;
   $self->cleanup;
 }
 
 sub _notify {
-  my ($self, $channel, $msg) = @_;
-  my $info = delete $self->{msg}{$msg->id};
+  my ($self, $msg) = @_;
 
-  if ($msg->denied && $self->{retry}) {
-    my $copy  = $info->{orig}->copy;
-    my $intvl = $info->{intvl}->();
-    log_debug 'Retrying message in %0.2fs: %s', $intvl, $info->{orig}->explain;
+  if (exists $self->{msg}{$msg->id}) {
+    my $info = delete $self->{msg}{$msg->id};
 
-    $self->{msg}{$copy->id} = {
-      orig  => $copy,
-      cb    => $info->{cb},
-      intvl => $info->{intvl},
-      timer => AnyEvent->timer(after => $intvl, cb => K('send', $self, $copy)),
-    };
+    if ($msg->denied && $info->{retry}) {
+      my $copy  = $info->{orig}->copy;
+      my $intvl = $info->{intvl}->();
+      log_debug 'Retrying message in %0.2fs: %s', $intvl, $info->{orig}->explain;
 
-    return;
+      $self->{msg}{$copy->id} = {
+        orig  => $copy,
+        cb    => $info->{cb},
+        intvl => $info->{intvl},
+        retry => 1,
+        timer => AnyEvent->timer(after => $intvl, cb => K('send', $self, $copy)),
+      };
+
+      return;
+    }
+
+    if ($info->{cb}) {
+      $info->{cb}->($msg);
+    }
+    elsif ($self->{notify}) {
+      $self->{notify}->($msg);
+    }
   }
-
-  $info->{cb}
-    ? $info->{cb}->($msg)
-    : $self->{notify}->($msg);
+  elsif ($self->{notify}) {
+    $self->{notify}->($msg);
+  }
 }
 
 1;
