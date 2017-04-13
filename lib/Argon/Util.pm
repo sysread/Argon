@@ -26,7 +26,7 @@ our %EXPORT_TAGS = (
 );
 
 our @EXPORT_OK = (
-  qw(K param),
+  qw(K param interval),
   map { @$_ } values %EXPORT_TAGS,
 );
 
@@ -67,6 +67,24 @@ sub param ($\%;$) {
   else {
     return $param->{$key};
   }
+}
+
+sub interval (;$) {
+  my $intvl = shift || 1;
+  my $count = 0;
+
+  return sub {
+    my $reset = shift;
+
+    if ($reset) {
+      $count = 0;
+      return;
+    }
+
+    my $inc = ($count * (log($intvl + $count) / log(10)));
+    ++$count;
+    return $intvl + $inc;
+  };
 }
 
 sub token {
