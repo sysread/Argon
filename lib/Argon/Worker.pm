@@ -12,7 +12,7 @@ use Argon::Client;
 use Argon::Constants qw(:commands);
 use Argon::Log;
 use Argon::Message;
-use Argon::Util qw(K param token cipher);
+use Argon::Util qw(K param token cipher interval);
 
 sub new {
   my ($class, %param) = @_;
@@ -35,6 +35,7 @@ sub new {
     token    => token(cipher($key)),
     timer    => undef,
     tries    => 0,
+    intvl    => interval(1),
   }, $class;
 
   $self->connect;
@@ -58,21 +59,21 @@ sub connect {
 
 sub _connected {
   my $self = shift;
-  $self->{tries} = 0;
+  undef $self->{timer};
+  $self->{intvl}->(1);
   $self->register;
 }
 
 sub _disconnected {
   my $self = shift;
-  log_note 'Manager disconnected' unless $self->{tries};
+  log_note 'Manager disconnected' unless $self->{timer};
   $self->reconnect;
 }
 
 sub reconnect {
   my $self = shift;
-  ++$self->{tries};
-  my $intvl = 1 + log($self->{tries}) / log(10);
-  log_debug 'Reconection attempt in %0.2fs', $intvl;
+  my $intvl = $self->{intvl}->();
+  log_debug 'Reconection attempt in %0.4fs', $intvl;
   $self->{timer} = AnyEvent->timer(after => $intvl, cb => K('connect', $self));
 }
 

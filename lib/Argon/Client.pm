@@ -15,7 +15,7 @@ use Argon::Constants qw(:commands :priorities);
 use Argon::Channel;
 use Argon::Log;
 use Argon::Message;
-use Argon::Util qw(K param);
+use Argon::Util qw(K param interval);
 
 sub new {
   my ($class, %param) = @_;
@@ -47,7 +47,6 @@ sub new {
     retry   => $retry,
     channel => undef,
     msg     => {},
-    cb      => {},
   }, $class;
 
   $self->connect;
@@ -91,16 +90,21 @@ sub _connected {
 
 sub send {
   my ($self, $msg, $cb) = @_;
-  if ($self->{channel}) {
-    $self->{msg}{$msg->id} = $msg;
-    $self->{cb}{$msg->id} = $cb;
-    $self->{channel}->send($msg);
-    return $msg->id;
-  }
-  else {
+
+  if (!$self->{channel}) {
     log_warn 'send: not connected';
     return;
   }
+
+  $self->{channel}->send($msg);
+
+  $self->{msg}{$msg->id} ||= {
+    orig  => $msg,
+    cb    => $cb,
+    intvl => interval(1),
+  };
+
+  return $msg->id;
 }
 
 sub ping {
@@ -156,20 +160,26 @@ sub _close {
 
 sub _notify {
   my ($self, $channel, $msg) = @_;
-  my $orig = delete $self->{msg}{$msg->id};
-  my $cb = delete $self->{cb}{$msg->id};
+  my $info = delete $self->{msg}{$msg->id};
 
   if ($msg->denied && $self->{retry}) {
-    log_debug 'Retrying message %s', $orig->explain;
-    $self->send($orig->copy, $cb);
+    my $copy  = $info->{orig}->copy;
+    my $intvl = $info->{intvl}->();
+    log_debug 'Retrying message in %0.2fs: %s', $intvl, $info->{orig}->explain;
+
+    $self->{msg}{$copy->id} = {
+      orig  => $copy,
+      cb    => $info->{cb},
+      intvl => $info->{intvl},
+      timer => AnyEvent->timer(after => $intvl, cb => K('send', $self, $copy)),
+    };
+
     return;
   }
 
-  if ($cb) {
-    $cb->($msg);
-  } elsif ($self->{notify}) {
-    $self->{notify}->($msg);
-  }
+  $info->{cb}
+    ? $info->{cb}->($msg)
+    : $self->{notify}->($msg);
 }
 
 1;

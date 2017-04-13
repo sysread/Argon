@@ -4,6 +4,7 @@ package Argon::Util;
 use strict;
 use warnings;
 use Carp;
+use AnyEvent;
 use Crypt::CBC;
 use Scalar::Util qw(weaken);
 use Sereal::Decoder qw(sereal_decode_with_object);
@@ -81,8 +82,9 @@ sub interval (;$) {
       return;
     }
 
-    my $inc = ($count * (log($intvl + $count) / log(10)));
+    my $inc = log($intvl * ($count + 1));
     ++$count;
+
     return $intvl + $inc;
   };
 }

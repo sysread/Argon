@@ -1,7 +1,7 @@
-- File-backed storage for queue and manager state
+- File-backed storage for queue
 - Process management tooling
 - Better test coverage
 - POD
 - Status reporting from manager
-? Persistent worker processes and execution sandboxes
-- Retry on timer in client
+? Persistent worker processes
+? Execution sandbox
