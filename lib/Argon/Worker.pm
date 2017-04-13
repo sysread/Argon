@@ -12,7 +12,7 @@ use Argon::Client;
 use Argon::Constants qw(:commands);
 use Argon::Log;
 use Argon::Message;
-use Argon::Util qw(K param);
+use Argon::Util qw(K param token cipher);
 
 sub new {
   my ($class, %param) = @_;
@@ -32,6 +32,7 @@ sub new {
     capacity => $capacity,
     mgr_host => $mgr_host,
     mgr_port => $mgr_port,
+    token    => token(cipher($key)),
     timer    => undef,
     tries    => 0,
   }, $class;
@@ -46,6 +47,7 @@ sub connect {
   ++$self->{tries};
   $self->{mgr} = Argon::Client->new(
     key    => $self->{key},
+    token  => $self->{token},
     host   => $self->{mgr_host},
     port   => $self->{mgr_port},
     opened => K('_connected', $self),

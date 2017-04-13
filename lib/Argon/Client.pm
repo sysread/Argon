@@ -80,7 +80,7 @@ sub _connected {
       on_close => K('_close', $self),
     );
 
-    $self->{opened}->() if $self->{opened};
+    $self->{opened}->($self) if $self->{opened};
   }
   else {
     log_debug '[%s] Connection attempt failed: %s', $self->addr, $!;
@@ -91,10 +91,16 @@ sub _connected {
 
 sub send {
   my ($self, $msg, $cb) = @_;
-  $self->{msg}{$msg->id} = $msg;
-  $self->{cb}{$msg->id} = $cb;
-  $self->{channel}->send($msg);
-  return $msg->id;
+  if ($self->{channel}) {
+    $self->{msg}{$msg->id} = $msg;
+    $self->{cb}{$msg->id} = $cb;
+    $self->{channel}->send($msg);
+    return $msg->id;
+  }
+  else {
+    log_warn 'send: not connected';
+    return;
+  }
 }
 
 sub ping {

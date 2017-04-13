@@ -150,7 +150,7 @@ sub _fire {
       foreach @msgids;
   }
 
-  log_info 'Worker %s disconnected; max capacity is down to %d',
+  log_info 'Worker %s disconnected; capacity is down to %d',
     $worker,
     $self->capacity;
 }
