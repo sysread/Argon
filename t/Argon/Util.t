@@ -48,7 +48,7 @@ subtest param => sub {
   is param('foo', %args), 'bar', 'key exists';
   is param('bar', %args, 'baz'), 'baz', 'key does not exist, default provided';
   is param('bar', %args, undef), U(), 'key does not exist, undef provided as default';
-  dies { param('bar', %args) }, 'dies if key not specified and no default provided';
+  ok dies { param('bar', %args) }, 'dies if key not specified and no default provided';
 };
 
 subtest interval => sub {
