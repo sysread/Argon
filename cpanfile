@@ -20,4 +20,5 @@ on test => sub {
   requires 'Test2::Bundle::Extended' => 0;
   requires 'Test::Pod'               => 1.41;
   requires 'Test::Refcount'          => 0;
+  requires 'Path::Tiny'              => 0.097;
 };

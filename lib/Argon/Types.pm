@@ -11,7 +11,7 @@ class_type 'AnyEvent::CondVar';
 
 union 'Ar::Callback', ['CodeRef', 'AnyEvent::CondVar'];
 
-subtype 'Ar::FilePath', as 'Str', where { $_ && path($_)->exists };
+subtype 'Ar::FilePath', as 'Str', where { $_ && path($_)->is_file };
 
 enum 'Ar::Command', [$ID, $PING, $ACK, $ERROR, $QUEUE, $DENY, $DONE, $HIRE];
 
