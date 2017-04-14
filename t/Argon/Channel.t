@@ -9,18 +9,18 @@ my @MSGS = map { Argon::Message->new(cmd => $QUEUE, info => $_) } 1 .. 4;
 
 ar_test 'positive path', 10, sub {
   my $cv = shift;
-  my (@msgs1, $closed1, $error1);
-  my (@msgs2, $closed2, $error2);
+  my (@msgs1, $ready1, $error1);
+  my (@msgs2, $ready2, $error2);
 
   my ($ch1, $ch2) = channel_pair(
     {
       on_msg   => sub { push @msgs1, $_[1] },
-      on_close => sub { $closed1 = 1; $cv->send },
-      on_err   => sub { $error1 = $_[1]; $cv->send },
+      on_ready => sub { $ready1 = 1 },
+      on_err   => sub { $error1 = $_[1] },
     },
     {
-      on_msg   => sub { push @msgs2, $_[1] },
-      on_close => sub { $closed2 = 1 },
+      on_msg   => sub { push @msgs2, $_[1]; $cv->end; },
+      on_ready => sub { $ready2 = 1 },
       on_err   => sub { $error2 = $_[1] },
     },
   );
@@ -31,17 +31,22 @@ ar_test 'positive path', 10, sub {
   ok my $line = $ch1->encode($MSGS[0]), 'encode';
   is $ch1->decode($line), $MSGS[0], 'decode';
 
-  $ch1->send($_) foreach @MSGS;
-  $ch1->disconnect;
+  foreach (@MSGS) {
+    $ch1->send($_);
+    $cv->begin;
+  }
 
   $cv->recv;
 
+  is $ch1->remote, $ch2->token, 'left: identify';
+  is $ch2->remote, $ch1->token, 'right: identify';
+
   is @msgs2, @MSGS, 'send/recv';
 
-  ok $closed1, 'left channel: closed';
+  ok $ready1,  'left channel: ready';
   ok !$error1, 'left channel: no error';
 
-  ok $closed2, 'right channel: closed';
+  ok $ready2,  'right channel: ready';
   ok !$error2, 'right channel: no error';
 };
 

@@ -73,6 +73,7 @@ sub start {
   croak 'no capacity' unless $self->has_capacity;
   croak "msg id $msg->id is already tracked" if $self->is_tracked($msg->id);
   $self->track($msg->id, time);
+  $self->assigned;
 }
 
 sub finish {

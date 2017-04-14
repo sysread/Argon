@@ -5,7 +5,7 @@ use Argon::Tracker;
 
 sub msg { Argon::Message->new(cmd => $PING) }
 
-ok my $t = Argon::Tracker->new(capacity => 0, history => 10), 'new';
+ok my $t = Argon::Tracker->new(capacity => 0, length => 10), 'new';
 
 subtest 'initial state' => sub {
   is $t->capacity, 0, 'capacity';
@@ -43,12 +43,12 @@ subtest 'tracking' => sub {
   is $t->start($msgs[0]), 1, 'start';
   is $t->available_capacity, 1, 'available_capacity';
   ok $t->has_capacity, 'has_capacity';
-  ok $t->is_tracked($msgs[0]), 'is_tracked';
+  ok $t->is_tracked($msgs[0]->id), 'is_tracked';
 
   is $t->start($msgs[1]), 2, 'start';
   is $t->available_capacity, 0, 'available_capacity';
   ok !$t->has_capacity, '!has_capacity';
-  ok $t->is_tracked($msgs[1]), 'is_tracked';
+  ok $t->is_tracked($msgs[1]->id), 'is_tracked';
 
   ok dies { $t->start($msgs[2]) }, 'start dies w/o available_capacity';
 
@@ -57,13 +57,13 @@ subtest 'tracking' => sub {
   ok $t->has_capacity, 'has_capacity';
   ok $t->avg_time > 0, 'avg_time';
   is $t->load, $t->avg_time * 2, 'load';
-  ok !$t->is_tracked($msgs[0]), '!is_tracked';
+  ok !$t->is_tracked($msgs[0]->id), '!is_tracked';
 
   ok $t->finish($msgs[1]), 'finish';
   is $t->available_capacity, 2, 'available_capacity';
   ok $t->has_capacity, 'has_capacity';
   is $t->load, $t->avg_time, 'load';
-  ok !$t->is_tracked($msgs[1]), '!is_tracked';
+  ok !$t->is_tracked($msgs[1]->id), '!is_tracked';
 
   for (1 .. 11) {
     my $msg = msg;

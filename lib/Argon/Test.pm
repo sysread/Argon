@@ -1,4 +1,5 @@
 package Argon::Test;
+# ABSTRACT: Utilities used by Argon's tests
 
 use strict;
 use warnings;
@@ -55,17 +56,19 @@ sub channel_pair {
   my $ch1 = Argon::Channel->new(
     key      => $KEY,
     fh       => $fh1,
-    on_msg   => $handlers1->{on_msg},
-    on_close => $handlers1->{on_close},
-    on_err   => $handlers1->{on_err},
+    on_msg   => $handlers1->{on_msg}   || sub {},
+    on_ready => $handlers1->{on_ready} || sub {},
+    on_close => $handlers1->{on_close} || sub {},
+    on_err   => $handlers1->{on_err}   || sub {},
   );
 
   my $ch2 = Argon::Channel->new(
     key      => $KEY,
     fh       => $fh2,
-    on_msg   => $handlers2->{on_msg},
-    on_close => $handlers2->{on_close},
-    on_err   => $handlers2->{on_err},
+    on_msg   => $handlers2->{on_msg}   || sub {},
+    on_ready => $handlers2->{on_ready} || sub {},
+    on_close => $handlers2->{on_close} || sub {},
+    on_err   => $handlers2->{on_err}   || sub {},
   );
 
   return ($ch1, $ch2);

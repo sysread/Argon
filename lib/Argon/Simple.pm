@@ -1,5 +1,5 @@
 package Argon::Simple;
-# ABSTRACT Utilities for concisely writing Argon client applications
+# ABSTRACT: Utilities for concisely writing Argon client applications
 
 =head1 DESCRIPTION
 

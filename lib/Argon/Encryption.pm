@@ -1,4 +1,5 @@
 package Argon::Encryption;
+# ABSTRACT: Role providing methods and attributes to encrypt Argon::Message traffic
 
 use strict;
 use warnings;

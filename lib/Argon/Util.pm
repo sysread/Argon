@@ -14,7 +14,7 @@ our @EXPORT_OK = (
   qw(K param interval),
 );
 
-sub K {
+sub K ($$;@) {
   my $name = shift;
   my $self = shift;
   my @args = @_;

@@ -1,4 +1,5 @@
 package Argon::Types;
+# ABSTRACT: TypeConstraints used by Argon classes
 
 use strict;
 use warnings;
