@@ -10,33 +10,37 @@ sub foo {
 package main;
 use Test2::Bundle::Extended;
 use Test::Refcount;
-use Scalar::Util qw(isweak);
+use Devel::Refcount qw(refcount);
 use Argon::Util qw(K param interval);
 
 subtest K => sub {
   my $obj = bless {}, 'TestClass';
   my $mtd = $obj->can('foo');
   my $one = 1;
-  my $ref = \$one;
+  my $arg = \$one;
 
-  is_oneref $obj, 'initial instance refcount is 1';
-  is_refcount $mtd, 2, 'initial method refcount is 2';
-  is_refcount $ref, 2, 'initial arg refcount is 2';
+  my $obj_refs = refcount $obj;
+  my $mtd_refs = refcount $mtd;
+  my $arg_refs = refcount $arg;
+
+  is_refcount $obj, $obj_refs, 'initial instance refcount';
+  is_refcount $mtd, $mtd_refs, 'initial method refcount';
+  is_refcount $arg, $arg_refs, 'initial arg refcount';
 
   ok my $cb = K('foo', $obj), 'call';
   is ref $cb, 'CODE', 'returns code ref';
 
-  is_oneref $obj, 'no new instance refs';
-  is_refcount $mtd, 2, 'no new method refs';
-  is_refcount $ref, 2, 'no new arg refs';
+  is_refcount $obj, $obj_refs, 'no new instance refs';
+  is_refcount $mtd, $mtd_refs, 'no new method refs';
+  is_refcount $arg, $arg_refs, 'no new arg refs';
 
-  ok my $ret = $cb->($ref), 'callback';
-  is $ret, ['foo was called', $ref], 'expected return values';
+  ok my $ret = $cb->($arg), 'callback';
+  is $ret, ['foo was called', $arg], 'expected return values';
   undef $ret;
 
-  is_oneref $obj, 'no new instance refs';
-  is_refcount $mtd, 2, 'no new method refs';
-  is_refcount $ref, 2, 'no new arg refs';
+  is_refcount $obj, $obj_refs, 'no new instance refs';
+  is_refcount $mtd, $mtd_refs, 'no new method refs';
+  is_refcount $arg, $arg_refs, 'no new arg refs';
 };
 
 subtest param => sub {
