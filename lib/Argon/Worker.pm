@@ -4,78 +4,98 @@ package Argon::Worker;
 use strict;
 use warnings;
 use Carp;
-use Path::Tiny qw(path);
+use Moose;
 use AnyEvent;
 use AnyEvent::Util qw(fork_call);
+use Argon;
 use Argon::Constants qw(:commands);
 use Argon::Log;
-use Argon::Util qw(K param token cipher interval);
+use Argon::Types;
+use Argon::Util qw(K param interval);
 require Argon::Client;
 require Argon::Message;
 
-use namespace::autoclean;
+with qw(Argon::Encryption);
 
-sub new {
-  my ($class, %param) = @_;
-  my $capacity = param 'capacity', %param;
-  my $mgr_host = param 'mgr_host', %param;
-  my $mgr_port = param 'mgr_port', %param;
-  my $keyfile  = param 'keyfile',  %param, undef;
+has capacity => (
+  is       => 'ro',
+  isa      => 'Int',
+  required => 1,
+);
 
-  my $key = defined $keyfile
-    ? path($keyfile)->slurp_raw
-    : param 'key', %param;
+has mgr_host => (
+  is       => 'ro',
+  isa      => 'Str',
+  required => 1,
+);
 
-  $AnyEvent::Util::MAX_FORKS = $capacity;
+has mgr_port => (
+  is       => 'ro',
+  isa      => 'Int',
+  required => 1,
+);
 
-  my $self = bless {
-    key      => $key,
-    capacity => $capacity,
-    mgr_host => $mgr_host,
-    mgr_port => $mgr_port,
-    token    => token(cipher($key)),
-    timer    => undef,
-    tries    => 0,
-    intvl    => interval(1),
-  }, $class;
+has timer => (
+  is  => 'rw',
+  isa => 'Any',
+);
 
-  $self->connect;
+has tries => (
+  is      => 'rw',
+  isa     => 'Int',
+  default => 0,
+);
 
-  return $self;
-}
+has intvl => (
+  is       => 'ro',
+  isa      => 'CodeRef',
+  default  => sub { interval(1) },
+  init_arg => undef,
+);
+
+has mgr => (
+  is  => 'rw',
+  isa => 'Argon::Client',
+);
 
 sub connect {
   my $self = shift;
-  ++$self->{tries};
-  $self->{mgr} = Argon::Client->new(
-    key    => $self->{key},
-    token  => $self->{token},
-    host   => $self->{mgr_host},
-    port   => $self->{mgr_port},
-    opened => K('_connected', $self),
+
+  $self->tries($self->tries + 1);
+
+  my $client = Argon::Client->new(
+    key    => $self->key,
+    token  => $self->token,
+    host   => $self->mgr_host,
+    port   => $self->mgr_port,
+    ready  => K('_connected', $self),
     closed => K('_disconnected', $self),
     notify => K('_queue', $self),
   );
+
+  $client->connect;
+
+  $self->mgr($client);
 }
 
 sub _connected {
   my $self = shift;
-  undef $self->{timer};
-  $self->{intvl}->(1);
+  $self->timer(undef);
+  $self->intvl->(1); # reset
   $self->register;
 }
 
 sub _disconnected {
   my $self = shift;
-  log_note 'Manager disconnected' unless $self->{timer};
+  log_note 'Manager disconnected' unless $self->timer;
   $self->reconnect;
 }
 
 sub reconnect {
   my $self = shift;
-  my $intvl = $self->{intvl}->();
+  my $intvl = $self->intvl->();
+  $self->timer(AnyEvent->timer(after => $intvl, cb => K('connect', $self)));
   log_debug 'Reconection attempt in %0.4fs', $intvl;
-  $self->{timer} = AnyEvent->timer(after => $intvl, cb => K('connect', $self));
 }
 
 sub register {
@@ -84,19 +104,22 @@ sub register {
 
   my $msg = Argon::Message->new(
     cmd  => $HIRE,
-    info => { capacity => $self->{capacity} },
+    info => {capacity => $self->capacity},
   );
 
-  $self->{mgr}->send($msg);
-  $self->{mgr}->reply_cb($msg, K('_mgr_registered', $self));
+  $self->mgr->send($msg);
+  $self->mgr->reply_cb($msg, K('_mgr_registered', $self));
 }
 
 sub _mgr_registered {
   my ($self, $msg) = @_;
-  if ($msg->cmd eq $ERROR) {
+  if ($msg->failed) {
     log_error 'Failed to register with manager: %s', $msg->info;
-  } else {
+  }
+  else {
     log_info 'Accepting tasks';
+    log_note 'Direct code execution is permitted'
+      if $Argon::ALLOW_EVAL;
   }
 }
 
@@ -121,7 +144,9 @@ sub _result {
     ? $msg->reply(cmd => $ERROR, info => $@ || "errno: $!")
     : $msg->reply(cmd => $DONE,  info => shift);
 
-  $self->{mgr}->send($reply);
+  $self->mgr->send($reply);
 }
+
+__PACKAGE__->meta->make_immutable;
 
 1;

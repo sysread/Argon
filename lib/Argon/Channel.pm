@@ -4,119 +4,132 @@ package Argon::Channel;
 use strict;
 use warnings;
 use Carp;
+use Moose;
 use AnyEvent;
 use AnyEvent::Handle;
 use Argon::Constants qw(:defaults :commands);
 use Argon::Log;
-use Argon::Message;
-use Argon::Util qw(K param encode_msg decode_msg);
+use Argon::Types;
+use Argon::Util qw(K);
+require Argon::Message;
 
-sub new {
-  my ($class, %param) = @_;
-  my $fh       = param 'fh',       %param;
-  my $key      = param 'key',      %param;
-  my $on_msg   = param 'on_msg',   %param;
-  my $on_close = param 'on_close', %param, sub {};
-  my $on_err   = param 'on_err',   %param, sub {};
+with qw(Argon::Encryption);
 
-  my $cipher = Argon::Util::cipher($key);
-  my $token  = param 'token',  %param, Argon::Util::token($cipher);
-  my $remote = param 'remote', %param, undef;
+has fh => (
+  is       => 'ro',
+  isa      => 'FileHandle',
+  required => 1,
+);
 
-  my $channel = {
-    cipher   => $cipher,
-    token    => $token,
-    remote   => $remote,
-    on_msg   => $on_msg,
-    on_close => $on_close,
-    on_err   => $on_err,
-  };
+has on_msg => (
+  is     => 'rw',
+  isa    => 'Ar::Callback',
+  default => sub { sub{} },
+);
 
-  my $self = bless $channel, $class;
+has on_ready => (
+  is      => 'rw',
+  isa     => 'Ar::Callback',
+  default => sub { sub{} },
+);
 
-  $self->{handle} = AnyEvent::Handle->new(
-    fh       => $fh,
+has on_close => (
+  is      => 'rw',
+  isa     => 'Ar::Callback',
+  default => sub { sub{} },
+);
+
+has on_err => (
+  is      => 'rw',
+  isa     => 'Ar::Callback',
+  default => sub { sub{} },
+);
+
+has remote => (
+  is  => 'rw',
+  isa => 'Maybe[Str]',
+);
+
+has handle => (
+  is      => 'ro',
+  isa     => 'Maybe[AnyEvent::Handle]',
+  lazy    => 1,
+  builder => '_build_handle',
+  handles => {
+    disconnect => 'push_shutdown',
+  },
+);
+
+sub _build_handle {
+  my $self = shift;
+  AnyEvent::Handle->new(
+    fh       => $self->fh,
     on_read  => K('_read',  $self),
     on_eof   => K('_eof',   $self),
     on_error => K('_error', $self),
   );
-
-  $self->identify;
-
-  return $self;
 }
 
-sub token  { $_[0]->{token}  }
-sub remote { $_[0]->{remote} }
-
-sub fh { $_[0]->{handle}->fh }
+sub BUILD {
+  my ($self, $args) = @_;
+  $self->identify;
+}
 
 sub _eof {
   my ($self, $handle) = @_;
-  $self->{on_close}->();
+  $self->on_close->();
   undef $self->{handle};
 }
 
 sub _error {
   my ($self, $handle, $fatal, $msg) = @_;
   log_debug 'Network error: %s', $msg;
-  $self->{on_err}->($msg);
+  $self->on_err->($msg);
   $self->disconnect;
 }
 
 sub _validate {
   my ($self, $msg) = @_;
-  return 1 unless defined $self->{remote};
-  return 1 if $self->{remote} eq $msg->token;
+  return 1 unless defined $self->remote;
+  return 1 if $self->remote eq $msg->token;
   log_error 'token mismatch';
-  log_error 'expected %s', $self->{remote};
+  log_error 'expected %s', $self->remote;
   log_error '  actual %s', $msg->token;
   $self->disconnect;
   return;
 }
 
 sub _read {
-  my ($self, $handle) = @_;
-  $handle->push_read(line => $EOL, K('_readline', $self));
+  my $self = shift;
+  $self->handle->push_read(line => $EOL, K('_readline', $self));
 }
 
 sub _readline {
   my ($self, $handle, $line) = @_;
-  my $msg = $self->decode($line);
+  my $msg = $self->decode_msg($line);
   log_trace 'recv: %s', $msg->explain;
 
   if ($msg->cmd eq $ID) {
-    $self->{remote} ||= $msg->token;
-  } elsif ($self->_validate($msg)) {
-    $self->{on_msg}->($msg);
+    if (!$self->remote || $self->_validate($msg)) {
+      $self->remote($msg->token);
+      $self->on_ready->();
+    }
   }
-}
-
-sub disconnect {
-  my $self = shift;
-  $self->{handle}->push_shutdown;
-}
-
-sub encode {
-  my ($self, $msg) = @_;
-  encode_msg($self->{cipher}, $msg);
-}
-
-sub decode {
-  my ($self, $line) = @_;
-  decode_msg($self->{cipher}, $line);
+  elsif ($self->_validate($msg)) {
+    $self->on_msg->($msg);
+  }
 }
 
 sub send {
   my ($self, $msg) = @_;
-  $msg->{token} = $self->{token};
+  $msg->token($self->token);
   log_trace 'send: %s', $msg->explain;
 
-  my $line = $self->encode($msg);
+  my $line = $self->encode_msg($msg);
 
   eval {
-    $self->{handle}->push_write($line);
-    $self->{handle}->push_write($EOL);
+    $self->handle->push_write($line);
+    $self->handle->push_write($EOL);
   };
 
   if (my $error = $@) {
@@ -130,5 +143,7 @@ sub identify {
   my $self = shift;
   $self->send(Argon::Message->new(cmd => $ID));
 }
+
+__PACKAGE__->meta->make_immutable;
 
 1;

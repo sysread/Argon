@@ -4,6 +4,7 @@ package Argon::Server;
 use strict;
 use warnings;
 use Carp;
+use Moose;
 use Try::Tiny;
 use AnyEvent;
 use AnyEvent::Socket qw(tcp_server);
@@ -14,58 +15,71 @@ use Argon::Log;
 use Argon::Message;
 use Argon::Util qw(K param);
 
-sub new {
-  my ($class, %param) = @_;
-  my $host    = param 'host', %param, undef;
-  my $port    = param 'port', %param, undef;
-  my $keyfile = param 'keyfile', %param, undef;
+with qw(Argon::Encryption);
 
-  my $key = defined $keyfile
-    ? path($keyfile)->slurp_raw
-    : param 'key', %param;
+has host => (
+  is  => 'rw',
+  isa => 'Maybe[Str]',
+);
 
-  my $self = bless {
-    key      => $key,
-    host     => $host,
-    port     => $port,
-    handlers => {},
-    client   => {},
-    addr     => {},
-  }, $class;
+has port => (
+  is  => 'rw',
+  isa => 'Maybe[Int]',
+);
 
-  $self->handles($PING, K('_ping', $self));
+has fh => (
+  is  => 'rw',
+  isa => 'FileHandle',
+  init_arg => undef,
+);
 
-  tcp_server $host, $port,
+has handler => (
+  is  => 'rw',
+  isa => 'HashRef',
+  default => sub {{}},
+);
+
+has client => (
+  is  => 'rw',
+  isa => 'HashRef',
+  default => sub {{}},
+);
+
+has addr => (
+  is  => 'rw',
+  isa => 'HashRef',
+  default => sub {{}},
+);
+
+sub listen {
+  my $self = shift;
+  $self->configure;
+
+  tcp_server $self->host, $self->port,
     K('_accept',  $self),
     K('_prepare', $self);
-
-  return $self;
 }
 
-sub cipher {
+sub configure {
   my $self = shift;
-  Argon::Util::cipher($self->{key});
+  $self->handles($PING, K('_ping', $self));
 }
 
 sub handles {
   my ($self, $cmd, $cb) = @_;
-  $self->{handlers}{$cmd} ||= [];
-  push @{$self->{handlers}{$cmd}}, $cb;
+  $self->handler->{$cmd} ||= [];
+  push @{$self->handler->{$cmd}}, $cb;
 }
 
-sub client {
-  my ($self, $addr) = @_;
-  $self->{client}{$addr};
-}
-
-sub addr {
+sub get_addr {
   my ($self, $msg) = @_;
-  exists $self->{addr}{$msg->id} && $self->{addr}{$msg->id};
+  exists $self->addr->{$msg->id}
+      && $self->addr->{$msg->id};
 }
 
 sub send {
   my ($self, $msg) = @_;
-  my $addr = exists $self->{addr}{$msg->id} && $self->{addr}{$msg->id};
+  my $addr = $self->get_addr($msg);
 
   unless ($addr) {
     log_debug 'message %s (%s) has no connected client', $msg->id, $msg->cmd;
@@ -73,21 +87,21 @@ sub send {
   }
 
   try {
-    $self->client($addr)->send($msg);
+    $self->client->{$addr}->send($msg);
   }
   catch {
     log_note 'unable to send message %s (%s) to %s: %s', $msg->id, $msg->cmd, $addr, $_;
     $self->unregister_client($addr);
   };
 
-  delete $self->{addr}{$msg->id};
+  delete $self->addr->{$msg->id};
 }
 
 sub register_client {
   my ($self, $addr, $fh) = @_;
-  $self->{client}{$addr} = Argon::Channel->new(
+  $self->client->{$addr} = Argon::Channel->new(
     fh       => $fh,
-    key      => $self->{key},
+    key      => $self->key,
     on_msg   => K('_on_client_msg',   $self, $addr),
     on_err   => K('_on_client_err',   $self, $addr),
     on_close => K('_on_client_close', $self, $addr),
@@ -96,11 +110,11 @@ sub register_client {
 
 sub unregister_client {
   my ($self, $addr) = @_;
-  delete $self->{client}{$addr};
+  delete $self->client->{$addr};
 
-  foreach (keys %{$self->{addr}}) {
-    if ($self->{addr}{$_} eq $addr) {
-      delete $self->{addr}{$_};
+  foreach (keys %{$self->addr}) {
+    if ($self->addr->{$_} eq $addr) {
+      delete $self->addr->{$_};
     }
   }
 }
@@ -108,10 +122,10 @@ sub unregister_client {
 sub _prepare {
   my ($self, $fh, $host, $port) = @_;
   if ($fh) {
-    log_debug 'Listening on %s:%d', $host, $port;
-    $self->{host} = $host;
-    $self->{port} = $port;
-    $self->{fh}   = $fh;
+    log_info 'Listening on %s:%d', $host, $port;
+    $self->host($host);
+    $self->port($port);
+    $self->fh($fh);
   } else {
     croak "socket error: $!";
   }
@@ -129,8 +143,8 @@ sub _accept {
 
 sub _on_client_msg {
   my ($self, $addr, $msg) = @_;
-  $self->{addr}{$msg->id} = $addr;
-  $_->($addr, $msg) foreach @{$self->{handlers}{$msg->cmd}};
+  $self->addr->{$msg->id} = $addr;
+  $_->($addr, $msg) foreach @{$self->handler->{$msg->cmd}};
 }
 
 sub _on_client_err {
@@ -149,5 +163,7 @@ sub _ping {
   my ($self, $addr, $msg) = @_;
   $self->send($msg->reply(cmd => $ACK));
 }
+
+__PACKAGE__->meta->make_immutable;
 
 1;

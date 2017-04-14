@@ -4,69 +4,96 @@ package Argon::Tracker;
 use strict;
 use warnings;
 use Carp;
+use Moose;
 use List::Util  qw(sum0);
 use Time::HiRes qw(time);
 use Argon::Util qw(param);
 
-sub new {
-  my ($class, %param) = @_;
-  my $capacity = param 'capacity', %param;
-  my $history  = param 'history',  %param, 20;
+has capacity => (
+  is      => 'rw',
+  isa     => 'Int',
+  default => 0,
+  traits  => ['Counter'],
+  handles => {
+    add_capacity    => 'inc',
+    remove_capacity => 'dec',
+  },
+);
 
-  return bless {
-    capacity => $capacity,
-    length   => $history,
-    assigned => 0,
-    started  => {},
-    history  => [],
-    avg_time => 0,
-  }, $class;
-}
+has length => (
+  is      => 'rw',
+  isa     => 'Int',
+  default => 20,
+);
 
-sub assigned { $_[0]->{assigned} }
-sub avg_time { $_[0]->{avg_time} }
-sub capacity { $_[0]->{capacity} }
-sub available_capacity  { $_[0]->capacity - $_[0]->assigned }
+has started => (
+  is      => 'rw',
+  isa     => 'HashRef[Num]',
+  default => sub {{}},
+  traits  => ['Hash'],
+  handles => {
+    track      => 'set',
+    untrack    => 'delete',
+    start_time => 'get',
+    is_tracked => 'exists',
+    assigned   => 'count',
+  },
+);
+
+has history => (
+  is      => 'rw',
+  isa     => 'ArrayRef[Num]',
+  default => sub {[]},
+  traits  => ['Array'],
+  handles => {
+    record        => 'push',
+    record_count  => 'count',
+    prune_records => 'shift',
+  },
+);
+
+has avg_time => (
+  is      => 'rw',
+  isa     => 'Num',
+  default => 0,
+);
+
+sub available_capacity { $_[0]->capacity - $_[0]->assigned }
 sub has_capacity { $_[0]->available_capacity > 0 }
-sub add_capacity { $_[0]->{capacity} += $_[1] }
-sub remove_capacity { $_[0]->{capacity} -= $_[1] }
 sub load { ($_[0]->assigned + 1) * $_[0]->avg_time }
-
-sub is_tracked { exists $_[0]->{started}{$_[1]->id} }
 
 sub age {
   my ($self, $msg) = @_;
-  return unless $self->is_tracked($msg);
-  time - $self->{started}{$msg->id};
+  return unless $self->is_tracked($msg->id);
+  time - $self->start_time($msg->id);
 }
 
 sub start {
   my ($self, $msg) = @_;
   croak 'no capacity' unless $self->has_capacity;
-  croak "msg id $msg->id is already tracked" if $self->is_tracked($msg);
-  $self->{started}{$msg->id} = time;
-  ++$self->{assigned};
+  croak "msg id $msg->id is already tracked" if $self->is_tracked($msg->id);
+  $self->track($msg->id, time);
 }
 
 sub finish {
   my ($self, $msg) = @_;
-  croak "msg id $msg->id is not tracked" unless $self->is_tracked($msg);
+  croak "msg id $msg->id is not tracked" unless $self->is_tracked($msg->id);
   --$self->{assigned};
-  $self->_add_to_history(time - delete $self->{started}{$msg->id});
+  $self->_add_to_history(time - $self->untrack($msg->id));
   $self->_update_avg_time;
 }
 
 sub touch {
   my ($self, $msg) = @_;
-  croak "msg id $msg->id is not tracked" unless $self->is_tracked($msg);
-  $self->{started}{$msg->id} = time;
+  croak "msg id $msg->id is not tracked" unless $self->is_tracked($msg->id);
+  $self->track($msg->id, time);
 }
 
 sub _add_to_history {
   my ($self, $taken) = @_;
-  push @{$self->{history}}, $taken;
-  while (@{$self->{history}} > $self->{length}) {
-    shift @{$self->{history}};
+  $self->record($taken);
+  while ($self->record_count > $self->length) {
+    $self->prune_records;
   }
 }
 
@@ -75,5 +102,7 @@ sub _update_avg_time {
   my $total = sum0 @{$self->{history}};
   $self->{avg_time} = $total == 0 ? 0 : $total / @{$self->{history}};
 }
+
+__PACKAGE__->meta->make_immutable;
 
 1;

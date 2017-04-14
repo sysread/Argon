@@ -4,63 +4,111 @@ package Argon::Client;
 use strict;
 use warnings;
 use Carp;
-use Storable 'nfreeze';
+use Moose;
 use AnyEvent;
 use AnyEvent::Socket qw(tcp_connect);
 use Data::Dump::Streamer;
-use Path::Tiny 'path';
 use Try::Tiny;
 use Argon;
 use Argon::Constants qw(:commands :priorities);
 use Argon::Channel;
 use Argon::Log;
 use Argon::Message;
+use Argon::Types;
 use Argon::Util qw(K param interval);
 
-sub new {
-  my ($class, %param) = @_;
-  my $host    = param 'host',    %param;
-  my $port    = param 'port',    %param;
-  my $opened  = param 'opened',  %param, undef;
-  my $failed  = param 'failed',  %param, undef;
-  my $closed  = param 'closed',  %param, undef;
-  my $notify  = param 'notify',  %param, undef;
-  my $keyfile = param 'keyfile', %param, undef;
-  my $retry   = param 'retry',   %param, undef;
-  my $token   = param 'token',   %param, undef;
-  my $remote  = param 'remote',  %param, undef;
+with qw(Argon::Encryption);
 
-  my $key = defined $keyfile
-    ? path($keyfile)->slurp_raw
-    : param('key', %param);
+has host => (
+  is       => 'ro',
+  isa      => 'Str',
+  required => 1,
+);
 
-  my $self = bless {
-    token   => $token,
-    remote  => $remote,
-    key     => $key,
-    host    => $host,
-    port    => $port,
-    opened  => $opened,
-    failed  => $failed,
-    closed  => $closed,
-    notify  => $notify,
-    retry   => $retry,
-    channel => undef,
-    msg     => {},
-  }, $class;
+has port => (
+  is       => 'ro',
+  isa      => 'Int',
+  required => 1,
+);
 
-  $self->connect;
+has retry => (
+  is      => 'ro',
+  isa     => 'Bool',
+  default => 0,
+);
 
-  return $self;
+has opened => (
+  is      => 'ro',
+  isa     => 'Ar::Callback',
+  default => sub { sub {} },
+);
+
+has ready => (
+  is      => 'ro',
+  isa     => 'Ar::Callback',
+  default => sub { sub {} },
+);
+
+has failed => (
+  is      => 'ro',
+  isa     => 'Ar::Callback',
+  default => sub { sub {} },
+);
+
+has closed => (
+  is      => 'ro',
+  isa     => 'Ar::Callback',
+  default => sub { sub {} },
+);
+
+has notify => (
+  is      => 'ro',
+  isa     => 'Ar::Callback',
+  default => sub { sub {} },
+);
+
+has remote => (
+  is  => 'rw',
+  isa => 'Maybe[Str]',
+);
+
+has msg => (
+  is      => 'rw',
+  isa     => 'HashRef',
+  default => sub {{}},
+  traits  => ['Hash'],
+  handles => {
+    has_msg => 'exists',
+    get_msg => 'get',
+    add_msg => 'set',
+    del_msg => 'delete',
+    msg_ids => 'keys',
+    msgs    => 'values',
+  },
+);
+
+has channel => (
+  is      => 'rw',
+  isa     => 'Maybe[Argon::Channel]',
+  handles => [qw(send)],
+);
+
+has addr => (
+  is      => 'ro',
+  isa     => 'Str',
+  lazy    => 1,
+  builder => '_build_addr',
+);
+
+sub _build_addr {
+  my $self = shift;
+  join ':', $self->host, $self->port;
 }
-
-sub addr   { sprintf '%s:%d', $_[0]->{host}, $_[0]->{port} }
-sub cipher { Argon::Util::cipher($_[0]->{key}) }
-sub token  { $_[0]->{token} || $_[0]->{channel}->token }
 
 sub connect {
   my $self = shift;
-  tcp_connect $self->{host}, $self->{port}, K('_connected',  $self);
+  log_debug 'Connecting to %s', $self->addr;
+  tcp_connect $self->host, $self->port, K('_connected', $self);
 }
 
 sub _connected {
@@ -69,50 +117,35 @@ sub _connected {
   if ($fh) {
     log_debug '[%s] Connection established', $self->addr;
 
-    $self->{channel} = Argon::Channel->new(
+    my $channel = Argon::Channel->new(
       fh       => $fh,
-      key      => $self->{key},
-      token    => $self->{token},
-      remote   => $self->{remote},
+      key      => $self->key,
+      token    => $self->token,
+      remote   => $self->remote,
       on_msg   => K('_notify', $self),
+      on_ready => K('_ready', $self),
       on_err   => K('_error', $self),
       on_close => K('_close', $self),
     );
 
-    $self->{opened}->() if $self->{opened};
+    $self->channel($channel);
+    $self->opened->();
   }
   else {
     log_debug '[%s] Connection attempt failed: %s', $self->addr, $!;
     $self->cleanup;
-    $self->{failed}->($!) if $self->{failed};
+    $self->failed->($!);
   }
-}
-
-sub send_msg {
-  my ($self, $msg) = @_;
-  return 1;
-}
-
-sub send {
-  my ($self, $msg) = @_;
-
-  if (!$self->{channel}) {
-    log_warn 'send: not connected';
-    return;
-  }
-
-  $self->{channel}->send($msg);
-  return 1;
 }
 
 sub reply_cb {
   my ($self, $msg, $cb, $retry) = @_;
-  $self->{msg}{$msg->id} ||= {
+  $self->add_msg($msg->id, {
     orig  => $msg,
     cb    => $cb,
     intvl => interval(1),
     retry => $retry,
-  };
+  });
 }
 
 sub ping {
@@ -126,15 +159,13 @@ sub queue {
   my ($self, $class, $args, $cb) = @_;
   my $msg = Argon::Message->new(cmd => $QUEUE, info => [$class, @$args]);
   $self->send($msg);
-  $self->reply_cb($msg, $cb, $self->{retry});
+  $self->reply_cb($msg, $cb, $self->retry);
 }
 
 sub process {
   Argon::ASSERT_EVAL_ALLOWED;
   my ($self, $code_ref, $args, $cb) = @_;
   $args ||= [];
-
-  my $dumper = Data::Dump::Streamer->new;
 
   my $code = Dump($code_ref)
     ->Purity(1)
@@ -146,19 +177,20 @@ sub process {
 
 sub cleanup {
   my $self = shift;
-  $self->{closed}->() if $self->{closed};
-  undef $self->{channel};
+  $self->closed->();
+  $self->channel(undef);
 
-  my $msg = Argon::Message->new(
-    cmd  => $ERROR,
-    info => 'Remote host was disconnected before task completed',
-  );
+  my $error = 'Remote host was disconnected before task completed';
 
-  foreach my $msg_id (keys %{$self->{cb}}) {
-    next unless $self->{cb}{$msg_id};
-    $self->{cb}{$msg_id}->($msg->reply(id => $msg_id));
+  foreach my $id ($self->msg_ids) {
+    my $info = $self->get_msg($id);
+    my $cb   = $info->{cb} or next;
+    my $msg  = $info->{orig};
+    $cb->($msg->error($error));
   }
 }
+
+sub _ready { shift->ready->() }
 
 sub _error {
   my ($self, $error) = @_;
@@ -175,21 +207,21 @@ sub _close {
 sub _notify {
   my ($self, $msg) = @_;
 
-  if (exists $self->{msg}{$msg->id}) {
-    my $info = delete $self->{msg}{$msg->id};
+  if ($self->has_msg($msg->id)) {
+    my $info = $self->del_msg($msg->id);
 
     if ($msg->denied && $info->{retry}) {
       my $copy  = $info->{orig}->copy;
       my $intvl = $info->{intvl}->();
       log_debug 'Retrying message in %0.2fs: %s', $intvl, $info->{orig}->explain;
 
-      $self->{msg}{$copy->id} = {
+      $self->add_msg($copy->id, {
         orig  => $copy,
         cb    => $info->{cb},
         intvl => $info->{intvl},
         retry => 1,
         timer => AnyEvent->timer(after => $intvl, cb => K('send', $self, $copy)),
-      };
+      });
 
       return;
     }
@@ -197,13 +229,15 @@ sub _notify {
     if ($info->{cb}) {
       $info->{cb}->($msg);
     }
-    elsif ($self->{notify}) {
-      $self->{notify}->($msg);
+    else {
+      $self->notify->($msg);
     }
   }
-  elsif ($self->{notify}) {
-    $self->{notify}->($msg);
+  else {
+    $self->notify->($msg);
   }
 }
+
+__PACKAGE__->meta->make_immutable;
 
 1;

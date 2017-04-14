@@ -5,3 +5,4 @@
 - Status reporting from manager
 ? Persistent worker processes
 ? Execution sandbox
+- Pre-load libraries in worker
