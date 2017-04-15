@@ -75,6 +75,11 @@ sub BUILD {
   $self->identify;
 }
 
+sub is_ready {
+  my $self = shift;
+  defined $self->remote;
+}
+
 sub _eof {
   my ($self, $handle) = @_;
   $self->on_close->();
@@ -110,7 +115,12 @@ sub _readline {
   log_trace 'recv: %s', $msg->explain;
 
   if ($msg->cmd eq $ID) {
-    if (!$self->remote || $self->_validate($msg)) {
+    if ($self->is_ready) {
+      my $error = 'Remote channel ID received out of sequence';
+      log_error $error;
+      $self->send($msg->error($error));
+    }
+    else {
       $self->remote($msg->token);
       $self->on_ready->();
     }

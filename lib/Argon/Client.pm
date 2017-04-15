@@ -38,31 +38,31 @@ has retry => (
 );
 
 has opened => (
-  is      => 'ro',
+  is      => 'rw',
   isa     => 'Ar::Callback',
   default => sub { sub {} },
 );
 
 has ready => (
-  is      => 'ro',
+  is      => 'rw',
   isa     => 'Ar::Callback',
   default => sub { sub {} },
 );
 
 has failed => (
-  is      => 'ro',
+  is      => 'rw',
   isa     => 'Ar::Callback',
   default => sub { sub {} },
 );
 
 has closed => (
-  is      => 'ro',
+  is      => 'rw',
   isa     => 'Ar::Callback',
   default => sub { sub {} },
 );
 
 has notify => (
-  is      => 'ro',
+  is      => 'rw',
   isa     => 'Ar::Callback',
   default => sub { sub {} },
 );
@@ -105,9 +105,41 @@ sub _build_addr {
   join ':', $self->host, $self->port;
 }
 
+around BUILDARGS => sub {
+  my $orig  = shift;
+  my $class = shift;
+  my %args  = @_;
+
+  if (exists $args{channel}) {
+    # Match encryption settings
+    $args{$_} = $args{channel}{$_}
+      foreach grep { exists $args{channel}{$_} }
+        qw(key keyfile cipher token);
+  }
+
+  $class->$orig(%args);
+};
+
 sub BUILD {
   my ($self, $args) = @_;
-  $self->connect unless $self->channel;
+
+  if ($self->channel) {
+    # Set callbacks
+    $self->channel->on_msg(K('_notify', $self));
+    $self->channel->on_err(K('_error', $self));
+    $self->channel->on_close(K('_close', $self));
+
+    if ($self->channel->is_ready) {
+      $self->opened->();
+      $self->ready->();
+    } else {
+      $self->channel->on_ready(K('_ready', $self));
+      $self->opened->();
+    }
+  }
+  else {
+    $self->connect;
+  }
 }
 
 sub connect {
@@ -128,9 +160,9 @@ sub _connected {
       token    => $self->token,
       remote   => $self->remote,
       on_msg   => K('_notify', $self),
-      on_ready => K('_ready', $self),
-      on_err   => K('_error', $self),
-      on_close => K('_close', $self),
+      on_ready => K('_ready',  $self),
+      on_err   => K('_error',  $self),
+      on_close => K('_close',  $self),
     );
 
     $self->channel($channel);
