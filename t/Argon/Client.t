@@ -10,6 +10,7 @@ sub client {
     host    => 'localhost',
     port    => 4242,
     channel => $left,
+    @_,
   );
 
   return ($client, $right);
@@ -18,7 +19,9 @@ sub client {
 ar_test 'send/recv' => sub {
   my $cv = shift;
 
-  my ($client, $channel) = client();
+  my ($client, $channel) = client(notify => $cv);
+
+  ok $client, 'client';
 
   my $request;
 
@@ -26,8 +29,6 @@ ar_test 'send/recv' => sub {
     $request = shift;
     $channel->send($request->reply(info => 'response content'));
   });
-
-  $client->notify($cv);
 
   my $msg = Argon::Message->new(cmd => $PING, info => 'request content');
 
