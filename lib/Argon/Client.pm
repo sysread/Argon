@@ -107,7 +107,7 @@ sub _build_addr {
 
 sub BUILD {
   my ($self, $args) = @_;
-  $self->connect;
+  $self->connect unless $self->channel;
 }
 
 sub connect {

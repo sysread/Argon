@@ -60,7 +60,7 @@ has mgr => (
 
 sub BUILD {
   my ($self, $args) = @_;
-  $self->connect;
+  $self->connect unless $self->mgr;
 }
 
 sub connect {

@@ -53,7 +53,7 @@ has addr => (
 
 sub BUILD {
   my ($self, $args) = @_;
-  $self->listen;
+  $self->listen unless $self->fh;
 }
 
 sub listen {
