@@ -105,6 +105,11 @@ sub _build_addr {
   join ':', $self->host, $self->port;
 }
 
+sub BUILD {
+  my ($self, $args) = @_;
+  $self->connect;
+}
+
 sub connect {
   my $self = shift;
   log_debug 'Connecting to %s', $self->addr;

@@ -58,6 +58,11 @@ has mgr => (
   isa => 'Argon::Client',
 );
 
+sub BUILD {
+  my ($self, $args) = @_;
+  $self->connect;
+}
+
 sub connect {
   my $self = shift;
 

@@ -51,6 +51,11 @@ has addr => (
   default => sub {{}},
 );
 
+sub BUILD {
+  my ($self, $args) = @_;
+  $self->listen;
+}
+
 sub listen {
   my $self = shift;
   $self->configure;

@@ -63,8 +63,6 @@ my $manager = Argon::Manager->new(
   persist => $opt->persist,
 );
 
-$manager->listen;
-
 $cv->recv;
 
 exit 0;
