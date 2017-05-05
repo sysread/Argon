@@ -11,7 +11,7 @@ use Data::Dump::Streamer;
 use Try::Tiny;
 use Argon;
 use Argon::Constants qw(:commands :priorities);
-use Argon::Channel;
+use Argon::SecureChannel;
 use Argon::Log;
 use Argon::Message;
 use Argon::Types;
@@ -89,7 +89,7 @@ has msg => (
 
 has channel => (
   is      => 'rw',
-  isa     => 'Maybe[Argon::Channel]',
+  isa     => 'Maybe[Argon::SecureChannel]',
   handles => [qw(send)],
 );
 
@@ -154,7 +154,7 @@ sub _connected {
   if ($fh) {
     log_debug '[%s] Connection established', $self->addr;
 
-    my $channel = Argon::Channel->new(
+    $self->channel(Argon::SecureChannel->new(
       fh       => $fh,
       key      => $self->key,
       token    => $self->token,
@@ -163,9 +163,8 @@ sub _connected {
       on_ready => K('_ready',  $self),
       on_err   => K('_error',  $self),
       on_close => K('_close',  $self),
-    );
+    ));
 
-    $self->channel($channel);
     $self->opened->();
   }
   else {

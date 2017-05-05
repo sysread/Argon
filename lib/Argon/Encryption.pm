@@ -8,12 +8,8 @@ use Moose::Role;
 use Moose::Util::TypeConstraints;
 use Crypt::CBC;
 use Path::Tiny qw(path);
-use Sereal::Decoder qw(sereal_decode_with_object);
-use Sereal::Encoder qw(SRL_SNAPPY sereal_encode_with_object);
 use Argon::Types;
 
-my $ENC = Sereal::Encoder->new({compress => SRL_SNAPPY});
-my $DEC = Sereal::Decoder->new();
 my %CIPHER;
 
 has keyfile => (
@@ -62,27 +58,12 @@ has token => (
   is      => 'ro',
   isa     => 'Str',
   lazy    => 1,
-  builder => '_build_token',
+  builder => 'create_token',
 );
 
-sub _build_token {
+sub create_token {
   my $self = shift;
   unpack 'H*', $self->cipher->random_bytes(8);
-}
-
-sub encode { $_[0]->encrypt(sereal_encode_with_object($ENC, $_[1])) }
-sub decode { sereal_decode_with_object($DEC, $_[0]->decrypt($_[1])) }
-
-sub encode_msg {
-  my ($self, $msg) = @_;
-  my %data = %$msg;
-  $self->encode(\%data);
-}
-
-sub decode_msg {
-  my ($self, $line) = @_;
-  my $data = $self->decode($line);
-  bless $data, 'Argon::Message';
 }
 
 1;

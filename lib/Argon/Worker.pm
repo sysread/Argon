@@ -6,12 +6,14 @@ use warnings;
 use Carp;
 use Moose;
 use AnyEvent;
-use AnyEvent::Util qw(fork_call);
+use AnyEvent::Util qw(fork_call portable_socketpair fh_nonblocking);
 use Argon;
-use Argon::Constants qw(:commands);
+use Argon::Constants qw(:commands :defaults);
 use Argon::Log;
+use Argon::Marshal;
 use Argon::Types;
 use Argon::Util qw(K param interval);
+require Argon::Channel;
 require Argon::Client;
 require Argon::Message;
 
@@ -58,41 +60,48 @@ has mgr => (
   isa => 'Argon::Client',
 );
 
+has workers => (
+  is  => 'rw',
+  isa => 'ArrayRef',
+  default => sub {[]},
+);
+
+has assigned => (
+  is  => 'rw',
+  isa => 'HashRef',
+  default => sub {{}},
+);
+
 sub BUILD {
   my ($self, $args) = @_;
+  $AnyEvent::Util::MAX_FORKS = $self->capacity;
+  $self->add_worker foreach 1 .. $self->capacity;
   $self->connect unless $self->mgr;
 }
 
 sub connect {
   my $self = shift;
-
+  $self->timer(undef);
   $self->tries($self->tries + 1);
 
-  my $client = Argon::Client->new(
+  log_trace 'Connecting to manager (attempt %d)', $self->tries;
+
+  $self->mgr(Argon::Client->new(
     key    => $self->key,
     token  => $self->token,
     host   => $self->mgr_host,
     port   => $self->mgr_port,
-    ready  => K('_connected', $self),
+    ready  => K('register', $self),
     closed => K('_disconnected', $self),
     notify => K('_queue', $self),
-  );
+  ));
 
-  $client->connect;
-
-  $self->mgr($client);
-}
-
-sub _connected {
-  my $self = shift;
-  $self->timer(undef);
   $self->intvl->(1); # reset
-  $self->register;
 }
 
 sub _disconnected {
   my $self = shift;
-  log_note 'Manager disconnected' unless $self->timer;
+  log_debug 'Manager disconnected' unless $self->timer;
   $self->reconnect;
 }
 
@@ -105,6 +114,7 @@ sub reconnect {
 
 sub register {
   my $self = shift;
+  log_note 'Connected to manager';
   log_trace 'Registering with manager';
 
   my $msg = Argon::Message->new(
@@ -130,26 +140,87 @@ sub _mgr_registered {
 
 sub _queue {
   my ($self, $msg) = @_;
-  my ($class, @args) = @{$msg->info};
-  fork_call { _task($class, @args) } K('_result', $self, $msg);
-}
-
-sub _task {
-  require Class::Load;
-  my ($class, @args) = @_;
-  Class::Load::load_class($class);
-  $class->new(@args)->run;
+  if (my $worker = shift @{$self->{workers}}) {
+    my ($id, $chan) = @$worker;
+    $chan->send($msg);
+    $self->{assigned}{$id} = $worker;
+  } else {
+    log_debug 'No available capacity';
+    $self->mgr->send($msg->reply(cmd => $DENY, info => "No available capacity. Please try again later."));
+  }
 }
 
 sub _result {
-  my $self = shift;
-  my $msg  = shift;
-
-  my $reply = @_ == 0
-    ? $msg->reply(cmd => $ERROR, info => $@ || "errno: $!")
-    : $msg->reply(cmd => $DONE,  info => shift);
-
+  my ($self, $id, $reply) = @_;
+  push @{$self->{workers}}, delete $self->{assigned}{$id};
   $self->mgr->send($reply);
+}
+
+sub _worker_closed {
+  my ($self, $id) = @_;
+  delete $self->assigned->{$id};
+  $self->{workers} = [ grep { $_->[0] ne $id } @{$self->{workers}} ];
+  $self->add_worker;
+}
+
+sub add_worker {
+  my $self = shift;
+  my $id = $self->create_token;
+  my $on_close = K('_worker_closed', $self, $id);
+
+  my ($left, $right) = portable_socketpair;
+
+  fork_call {
+    use Class::Load qw(load_class);
+    use Argon::Log;
+    use Argon::Marshal;
+
+    close $left;
+    $\ = $EOL;
+
+    log_trace 'subprocess: running';
+
+    eval {
+      while (defined(my $line = <$right>)) {
+        eval {
+          chomp $line;
+          my $msg = decode_msg($line);
+
+          my $result = eval {
+            my ($class, @args) = @{$msg->info};
+            load_class($class);
+            $class->new(@args)->run;
+          };
+
+          my $reply = $@
+            ? $msg->error($@)
+            : $msg->reply(cmd => $DONE, info => $result);
+
+          syswrite $right, encode_msg($reply);
+          syswrite $right, $EOL;
+        };
+
+        $@ && log_warn 'subprocess: %s', $@;
+      }
+    };
+
+    $@ && log_error 'subprocess: %s', $@;
+    exit 0;
+  };
+
+  close $right;
+  fh_nonblocking $left, 1;
+
+  my $channel = Argon::Channel->new(
+    fh       => $left,
+    on_close => $on_close,
+    on_err   => $on_close,
+    on_msg   => K('_result', $self, $id),
+  );
+
+  push @{$self->{workers}}, [$id, $channel];
+  log_trace 'subprocess started';
+  return $id;
 }
 
 __PACKAGE__->meta->make_immutable;

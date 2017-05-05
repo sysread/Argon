@@ -9,11 +9,10 @@ use AnyEvent;
 use AnyEvent::Handle;
 use Argon::Constants qw(:defaults :commands);
 use Argon::Log;
+use Argon::Marshal qw();
 use Argon::Types;
 use Argon::Util qw(K);
 require Argon::Message;
-
-with qw(Argon::Encryption);
 
 has fh => (
   is       => 'ro',
@@ -27,12 +26,6 @@ has on_msg => (
   default => sub { sub{} },
 );
 
-has on_ready => (
-  is      => 'rw',
-  isa     => 'Ar::Callback',
-  default => sub { sub{} },
-);
-
 has on_close => (
   is      => 'rw',
   isa     => 'Ar::Callback',
@@ -43,11 +36,6 @@ has on_err => (
   is      => 'rw',
   isa     => 'Ar::Callback',
   default => sub { sub{} },
-);
-
-has remote => (
-  is  => 'rw',
-  isa => 'Maybe[Str]',
 );
 
 has handle => (
@@ -72,12 +60,7 @@ sub _build_handle {
 
 sub BUILD {
   my ($self, $args) = @_;
-  $self->identify;
-}
-
-sub is_ready {
-  my $self = shift;
-  defined $self->remote;
+  $self->handle;
 }
 
 sub _eof {
@@ -93,17 +76,6 @@ sub _error {
   $self->disconnect;
 }
 
-sub _validate {
-  my ($self, $msg) = @_;
-  return 1 unless defined $self->remote;
-  return 1 if $self->remote eq $msg->token;
-  log_error 'token mismatch';
-  log_error 'expected %s', $self->remote;
-  log_error '  actual %s', $msg->token;
-  $self->disconnect;
-  return;
-}
-
 sub _read {
   my $self = shift;
   $self->handle->push_read(line => $EOL, K('_readline', $self));
@@ -112,27 +84,17 @@ sub _read {
 sub _readline {
   my ($self, $handle, $line) = @_;
   my $msg = $self->decode_msg($line);
-  log_trace 'recv: %s', $msg->explain;
+  $self->recv($msg);
+}
 
-  if ($msg->cmd eq $ID) {
-    if ($self->is_ready) {
-      my $error = 'Remote channel ID received out of sequence';
-      log_error $error;
-      $self->send($msg->error($error));
-    }
-    else {
-      $self->remote($msg->token);
-      $self->on_ready->();
-    }
-  }
-  elsif ($self->_validate($msg)) {
-    $self->on_msg->($msg);
-  }
+sub recv {
+  my ($self, $msg) = @_;
+  log_trace 'recv: %s', $msg->explain;
+  $self->on_msg->($msg);
 }
 
 sub send {
   my ($self, $msg) = @_;
-  $msg->token($self->token);
   log_trace 'send: %s', $msg->explain;
 
   my $line = $self->encode_msg($msg);
@@ -149,10 +111,8 @@ sub send {
   };
 }
 
-sub identify {
-  my $self = shift;
-  $self->send(Argon::Message->new(cmd => $ID));
-}
+sub encode_msg { Argon::Marshal::encode_msg($_[1]) }
+sub decode_msg { Argon::Marshal::decode_msg($_[1]) }
 
 __PACKAGE__->meta->make_immutable;
 

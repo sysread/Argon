@@ -5,7 +5,7 @@ use Argon::Message;
 use Argon::Client;
 
 sub client {
-  my ($left, $right) = channel_pair();
+  my ($left, $right) = secure_channel_pair();
   ok my $client = Argon::Client->new(
     host    => 'localhost',
     port    => 4242,

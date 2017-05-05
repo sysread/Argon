@@ -7,17 +7,15 @@ __PACKAGE__->meta->make_immutable;
 
 package main;
 use Test2::Bundle::Extended;
-use Argon::Message;
-use Argon::Constants qw(:commands :priorities);
 
-my $payload = [1, 2, 3];
+my $payload = 'how now brown bureaucrat';
 
 ok my $obj = TestClass->new(key => 'foo'), 'consumer';
-ok my $data = $obj->encode($payload), 'encode';
-is $obj->decode($data), $payload, 'decode';
+ok my $data = $obj->encrypt($payload), 'encrypt';
+is $obj->decrypt($data), $payload, 'decrypt';
+isnt $data, $payload, 'encrypted';
 
-my $msg = Argon::Message->new(cmd => $QUEUE, pri => $NORMAL, info => $payload);
-ok my $line = $obj->encode_msg($msg), 'encode_msg';
-is $obj->decode_msg($line), $msg, 'decode_msg';
+my $other = TestClass->new(key => 'bar');
+isnt $obj->encrypt($payload), $other->encrypt($payload), 'key incompatibility';
 
 done_testing;

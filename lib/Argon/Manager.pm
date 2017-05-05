@@ -10,6 +10,7 @@ use AnyEvent;
 use Argon::Client;
 use Argon::Constants qw(:commands);
 use Argon::Log;
+use Argon::Marshal;
 use Argon::Queue;
 use Argon::Tracker;
 use Argon::Util qw(K param);
@@ -24,7 +25,7 @@ has assigned => (
 
 has worker => (
   is      => 'rw',
-  isa     => 'HashRef[Argon::Channel]',
+  isa     => 'HashRef[Argon::SecureChannel]',
   default => sub {{}},
   traits  => ['Hash'],
   handles => {
@@ -109,12 +110,17 @@ sub save_queue {
     queue => $self->queue,
   };
 
-  my $data = $self->encode($saved);
+  my $data = encode($saved);
   $self->save_file($data);
 }
 
 sub capacity     { $_[0]->tracker->{self}->capacity }
 sub has_capacity { $_[0]->tracker->{self}->has_capacity }
+
+sub update_queue_capacity {
+  my $self = shift;
+  $self->queue->max($self->capacity * 3);
+}
 
 sub next_worker {
   my $self = shift;
@@ -181,7 +187,7 @@ sub _hire {
 
   $self->tracker->{$id} = Argon::Tracker->new(capacity => $cap);
   $self->tracker->{self}->add_capacity($cap);
-  $self->queue->max($self->capacity * 2);
+  $self->update_queue_capacity;
 
   log_info 'New worker with identity %s added %d capacity (%d total)',
     $id, $cap, $self->capacity;
@@ -193,7 +199,7 @@ sub _fire {
   $self->del_worker($worker);
   delete $self->tracker->{$worker};
 
-  $self->queue->max($self->capacity * 2);
+  $self->update_queue_capacity;
 
   my @msgids = grep { $self->assigned->{$_} eq $worker }
     keys %{$self->assigned};

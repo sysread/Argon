@@ -9,7 +9,7 @@ use Try::Tiny;
 use AnyEvent;
 use AnyEvent::Socket qw(tcp_server);
 use Path::Tiny 'path';
-use Argon::Channel;
+use Argon::SecureChannel;
 use Argon::Constants qw(:commands);
 use Argon::Log;
 use Argon::Message;
@@ -104,7 +104,7 @@ sub send {
 
 sub register_client {
   my ($self, $addr, $fh) = @_;
-  $self->client->{$addr} = Argon::Channel->new(
+  $self->client->{$addr} = Argon::SecureChannel->new(
     fh       => $fh,
     key      => $self->key,
     on_msg   => K('_on_client_msg',   $self, $addr),

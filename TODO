@@ -1,3 +1,4 @@
+- Automatic reconnection (client)
 - File-backed storage for queue
 - Process management tooling
 - Better test coverage
