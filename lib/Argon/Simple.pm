@@ -3,6 +3,9 @@ package Argon::Simple;
 
 =head1 DESCRIPTION
 
+This module is experimental (read: not done) and the API will likely change
+half a dozen times before I am anywhere near satisfied with it.
+
 =head1 SYNOPSIS
 
   use Argon::Simple;

@@ -108,7 +108,9 @@ degredation will never overflow onto neighborhing systems as a result.
 
 Another adavantage of having a bounded queue is that clients are aware of the
 backlog and may report this to callers. System administrators may effectively
-plan for and respond to increased load by spinning up new servers as needed.
+plan for and respond to increased load by spinning up new servers as needed
+because they can reliably predict the performance of the system under load
+given a reliable estimate of the cost imposed by the tasks being performed.
 
 =cut
 
