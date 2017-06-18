@@ -3,7 +3,6 @@
 - Process management tooling
 - Better test coverage
 - POD
-- Status reporting from manager
-? Persistent worker processes
-? Execution sandbox
-- Pre-load libraries in worker
+- Persistent worker processes
+  - Pre-load libraries in worker
+  - Execution sandbox

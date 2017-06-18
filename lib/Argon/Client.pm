@@ -10,6 +10,7 @@ use AnyEvent::Socket qw(tcp_connect);
 use Data::Dump::Streamer;
 use Try::Tiny;
 use Argon;
+use Argon::Async;
 use Argon::Constants qw(:commands :priorities);
 use Argon::SecureChannel;
 use Argon::Log;
@@ -209,6 +210,14 @@ sub process {
     ->Out;
 
   $self->queue('Argon::Task', [$code, $args], $cb);
+}
+
+sub async ($\[&$]\@) {
+  my ($self, $code_ref, $args) = @_;
+  my $cv = AnyEvent->condvar;
+  $self->process($code_ref, $args, $cv);
+  tie my $async, 'Argon::Async', $cv;
+  return $async;
 }
 
 sub cleanup {

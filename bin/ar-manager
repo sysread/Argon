@@ -38,7 +38,7 @@ my ($opt, $usage) = describe_options(
   ['key|k=s',     '(required) path to file containing encryption key', {required => 1}],
   ['host|h=s',    '(optional) hostname on which to listen (defaults to localhost)'],
   ['port|p=i',    '(optional) port on which to listen (defaults to OS-assigned port)', {callbacks => {'port number' => sub { shift > 0 }}}],
-  ['persist=s',   '(optional) maintain a persistent copy of the message queue'],
+  ['persist=s',   '(optional, also doesn\'t work yet) maintain a persistent copy of the message queue'],
   ['verbose|v=i', '(optional) level of verbosity (1 - 9; defaults to 5 [warn])', {default => 'warn'}],
   [],
   ['help|h',  'prints this help text and exits', {shortcircuit => 1}],
