@@ -1,4 +1,23 @@
 package Argon::Marshal;
+# ABSTRACT: routines for serializing messages
+
+=head1 DESCRIPTION
+
+Provides routines to serialize and deserialize data and L<Argon::Message>s.
+
+=head1 SYNOPSIS
+
+  use Argon::Marshal;
+
+  my $data = ['fnord'];
+  my $encoded = encode($data);
+  my $decoded = decode($encoded);
+
+  my $msg = Argon::Message->new(...);
+  my $encoded = encode_msg($msg);
+  my $decoded = decode_msg($encoded);
+
+=cut
 
 use strict;
 use warnings;

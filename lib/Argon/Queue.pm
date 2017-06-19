@@ -1,6 +1,27 @@
 package Argon::Queue;
 # ABSTRACT: Bounded, prioritized queue class
 
+=head1 DESCRIPTION
+
+The bounded priority queue used by the L<Argon::Manager> for L<Argon::Message>s
+submitted to the Ar network.
+
+=head1 SYNOPSIS
+
+  use Argon::Queue;
+
+  my $q = Argon::Queue->new(max => 32);
+
+  unless ($q->is_full) {
+    $q->put(...);
+  }
+
+  unless ($q->is_empty) {
+    my $msg = $q->get;
+  }
+
+=cut
+
 use strict;
 use warnings;
 use Carp;
@@ -8,6 +29,14 @@ use Moose;
 use Argon::Constants qw(:priorities);
 use Argon::Tracker;
 use Argon::Log;
+
+=head1 ATTRIBUTES
+
+=head2 max
+
+The maximum number of messages supported by the queue.
+
+=cut
 
 has max => (
   is      => 'rw',
@@ -63,8 +92,31 @@ after max => sub {
   }
 };
 
+=head1 METHODS
+
+=head2 is_empty
+
+Returns true if the queue is empty.
+
+=head2 is_full
+
+Returns true if there is at least one L<Argon::Message> in the queue.
+
+=cut
+
 sub is_empty { $_[0]->count == 0 }
 sub is_full  { $_[0]->count >= $_[0]->max }
+
+=head2 put
+
+Adds a message to the queue. Croaks if the supplied message is not an
+L<Argon::Message> or if the queue is full.
+
+Adding a message to the queue has the side effect of promoting any previously
+added messages that have been stuck at a lower level priority for an overly
+long time.
+
+=cut
 
 sub put {
   my ($self, $msg) = @_;
@@ -83,6 +135,13 @@ sub put {
   $self->inc_count;
   $self->count;
 }
+
+=head2 get
+
+Removes and returns the next L<Argon::Message> on the queue. Returns C<undef>
+if the queue is empty.
+
+=cut
 
 sub get {
   my $self = shift;

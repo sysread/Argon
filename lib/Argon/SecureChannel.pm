@@ -1,6 +1,14 @@
 package Argon::SecureChannel;
 # ABSTRACT: Encrypted Argon::Channel
 
+=head1 DESCRIPTION
+
+An L<Argon::Channel> which implements L<Argon::Encryption> to encrypt all
+messages sent. Additionally adds a unique identifier for the channel to assist
+with the tracking of message circuits in the Ar network.
+
+=cut
+
 use strict;
 use warnings;
 use Carp;
@@ -11,16 +19,39 @@ use Argon::Constants qw(:commands);
 extends qw(Argon::Channel);
 with qw(Argon::Encryption);
 
+=head1 ATTRIBUTES
+
+=head2 on_ready
+
+C<SecureChannel> adds an additional setup step during initialization. The
+C<on_ready> callback is triggered once that setup has completed and the channel
+is ready for use.
+
+=cut
+
 has on_ready => (
   is      => 'rw',
   isa     => 'Ar::Callback',
   default => sub { sub{} },
 );
 
+=head2 remote
+
+Holds the identifier for the speaker on the remote end of the channel. If not
+provided, the channel will not be ready (see L</on_ready>) until the remote
+side has identified itself. Any received messages whose L<Argon::Message/token>
+does not match the expected value are rejected.
+
+=cut
+
 has remote => (
   is  => 'rw',
   isa => 'Maybe[Str]',
 );
+
+=head1 METHODS
+
+=cut
 
 sub BUILD {
   my ($self, $args) = @_;
@@ -48,7 +79,10 @@ around recv => sub {
 
   if ($msg->cmd eq $ID) {
     if ($self->is_ready) {
-      my $error = 'Remote channel ID received out of sequence';
+      my $error = $self->remote ne $msg->token
+        ? 'Remote channel ID did not match expected value'
+        : 'Remote channel ID received out of sequence';
+
       log_error $error;
       $self->send($msg->error($error));
     }
@@ -62,6 +96,13 @@ around recv => sub {
     $self->$orig($msg);
   }
 };
+
+=head2 is_ready
+
+Returns true once the remote side has identified itself (C<remote> has been
+set).
+
+=cut
 
 sub is_ready {
   my $self = shift;
@@ -78,6 +119,13 @@ sub _validate {
   $self->disconnect;
   return;
 }
+
+=head2 identify
+
+Identifies this side of the channel to the remote end by sending its
+L<Argon::Encryption/token>.
+
+=cut
 
 sub identify {
   my $self = shift;

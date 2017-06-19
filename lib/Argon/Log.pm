@@ -1,6 +1,26 @@
 package Argon::Log;
 # ABSTRACT: Simple logging wrapper
 
+=head1 DESCRIPTION
+
+Simple wrapper around AnyEvent::Log.
+
+=head1 SYNOPSIS
+
+  use Argon::Log;
+
+  log_level 'trace';
+
+  log_trace 'something happened: %s', $msg;
+  log_debug 'something happened: %s', $msg;
+  log_info  'something happened: %s', $msg;
+  log_note  'something happened: %s', $msg;
+  log_warn  'something happened: %s', $msg;
+  log_error 'something happened: %s', $msg;
+  log_fatal 'something happened: %s', $msg;
+
+=cut
+
 use strict;
 use warnings;
 use Carp;

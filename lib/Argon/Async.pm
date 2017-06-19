@@ -1,6 +1,13 @@
 package Argon::Async;
 #ABSTRACT: A tied condvar that calls recv on FETCH
 
+=head1 DESCRIPTION
+
+A tied condvar (see L<AnyEvent/CONDITION VARIABLES>) that calls C<recv> on
+C<FETCH>.
+
+=cut
+
 use strict;
 use warnings;
 use Carp;

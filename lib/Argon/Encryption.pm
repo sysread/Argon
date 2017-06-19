@@ -1,6 +1,13 @@
 package Argon::Encryption;
 # ABSTRACT: Role providing methods and attributes to encrypt Argon::Message traffic
 
+=head1 DESCRIPTION
+
+Role that provides for encrypting messages in the Argon system. Notably
+provides the C<keyfile>, C<key>, and C<token> attributes.
+
+=cut
+
 use strict;
 use warnings;
 use Carp;
@@ -12,10 +19,26 @@ use Argon::Types;
 
 my %CIPHER;
 
+=head1 ATTRIBUTES
+
+=head2 keyfile
+
+The path to a file containing the encryption pass phrase. Either L</key> or
+C<keyfile> must be provided when instantiating a class implementing
+C<Argon::Encryption>.
+
+=cut
+
 has keyfile => (
   is  => 'ro',
   isa => 'Ar::FilePath',
 );
+
+=head2 key
+
+The encryption pass phrase.
+
+=cut
 
 has key => (
   is      => 'ro',
@@ -53,6 +76,12 @@ sub _build_cipher {
 
   $CIPHER{$self->key};
 }
+
+=head2 token
+
+A string of random bytes used as a channel or service identifier.
+
+=cut
 
 has token => (
   is      => 'ro',
