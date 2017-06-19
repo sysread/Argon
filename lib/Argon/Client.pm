@@ -1,6 +1,41 @@
 package Argon::Client;
 # ABSTRACT: Client-side connection class for Argon systems
 
+=head1 DESCRIPTION
+
+Provides the client connection to an L<Argon> network.
+
+=head1 SYNOPSIS
+
+  use Argon::Client;
+  use AnyEvent;
+
+  my $cv = AnyEvent->condvar;
+
+  my $ar = Argon::Client->new(
+    host   => 'some.host.net',
+    port   => 1234,
+    retry  => 1,
+    opened => $cv,
+    ready  => sub{},
+    failed => sub{},
+    closed => sub{},
+    notify => sub{},
+  );
+
+  $cv->recv;
+
+  while (my $task = get_next_task) {
+    $ar->process($task->class, $task->args, \&task_complete);
+  }
+
+  my $result = $ar->async(sub{ ... });
+  if ($result eq 'fnord') {
+    ...
+  }
+
+=cut
+
 use strict;
 use warnings;
 use Carp;
@@ -20,11 +55,26 @@ use Argon::Util qw(K param interval);
 
 with qw(Argon::Encryption);
 
+=head1 ATTRIBUTES
+
+=head2 host
+
+The hostname of the L<Argon::Manager> serving as the entry point for the
+Argon network.
+
+=cut
+
 has host => (
   is       => 'ro',
   isa      => 'Str',
   required => 1,
 );
+
+=head2 port
+
+The port number for the L<Argon::Manager>.
+
+=cut
 
 has port => (
   is       => 'ro',
@@ -32,11 +82,26 @@ has port => (
   required => 1,
 );
 
+=head2 retry
+
+By default, when the network is at capacity, new tasks may be rejected, causing
+L<Argon::Message/result> to croak. If C<retry> is set, the C<Argon::Client>
+will instead retry the task on a logarithmic backoff timer until the task is
+accepted by the manager.
+
+=cut
+
 has retry => (
   is      => 'ro',
   isa     => 'Bool',
   default => 0,
 );
+
+=head2 opened
+
+A code ref that is triggered when the connection is initially opened.
+
+=cut
 
 has opened => (
   is      => 'rw',
@@ -44,11 +109,25 @@ has opened => (
   default => sub { sub {} },
 );
 
+=head2 ready
+
+A code ref that is triggered when the connection has been opened and the
+client is ready to begin sending tasks.
+
+=cut
+
 has ready => (
   is      => 'rw',
   isa     => 'Ar::Callback',
   default => sub { sub {} },
 );
+
+=head2 failed
+
+A code ref that is triggered when the connection fails. The value of C<$!> is
+passed as an argument.
+
+=cut
 
 has failed => (
   is      => 'rw',
@@ -56,11 +135,26 @@ has failed => (
   default => sub { sub {} },
 );
 
+=head2 closed
+
+A code ref that is triggered when the connection to the remote host is
+closed.
+
+=cut
+
 has closed => (
   is      => 'rw',
   isa     => 'Ar::Callback',
   default => sub { sub {} },
 );
+
+=head2 notify
+
+When tasks are created without a callback (see L<Argon::Client/process>),
+the C<notify> callback is used in its place. The L<Argon::Message> reply
+is passed as an argument.
+
+=cut
 
 has notify => (
   is      => 'rw',
@@ -105,6 +199,10 @@ sub _build_addr {
   my $self = shift;
   join ':', $self->host, $self->port;
 }
+
+=head1 METHODS
+
+=cut
 
 around BUILDARGS => sub {
   my $orig  = shift;
@@ -185,6 +283,15 @@ sub reply_cb {
   });
 }
 
+=head2 ping
+
+Pings the L<Argon::Manager> and calls the supplied callback with the manager's
+reply.
+
+  $ar->ping(sub{ my $reply = shift; ... });
+
+=cut
+
 sub ping {
   my ($self, $cb) = @_;
   my $msg = Argon::Message->new(cmd => $PING);
@@ -192,12 +299,41 @@ sub ping {
   $self->reply_cb($msg, $cb);
 }
 
+=head2 queue
+
+Queues a task with the Ar manager. Accepts the name of a class accessible to
+the workers defining a C<new> and C<run> method, an array of arguments to be
+passed to C<new>, and an optional code ref to be called when the task is
+complete. If not supplied, the L<Argon::Client/notify> method will be called in
+its place.
+
+  $ar->queue('Task::Class', $args_list, sub{
+    my $reply = shift;
+    ...
+  });
+
+=cut
+
 sub queue {
   my ($self, $class, $args, $cb) = @_;
   my $msg = Argon::Message->new(cmd => $QUEUE, info => [$class, @$args]);
   $self->send($msg);
   $self->reply_cb($msg, $cb, $self->retry);
 }
+
+=head2 process
+
+If the Ar workers were started with C<--allow-eval> and if the client process
+itself has C<$Argon::ALLOW_EVAL> set to a true value, a code ref may be passed
+in place of a task class. The code ref will be serialized using
+L<Data::Dump::Streamer> and has limited support for closures.
+
+  $ar->process(sub{ ... }, $args_list, sub{
+    my $reply = shift;
+    ...
+  });
+
+=cut
 
 sub process {
   Argon::ASSERT_EVAL_ALLOWED;
@@ -211,6 +347,23 @@ sub process {
 
   $self->queue('Argon::Task', [$code, $args], $cb);
 }
+
+=head2 async
+
+As an alternative to passing a callback or using a default callback, the
+C<async> method returns a tied scalar that, when accessed, blocks until the
+result is available. Note that if the task resulted in an error, it is thrown
+when the async is fetched.
+
+  my $async = $ar->async(sub{ ... }, $arg_list);
+
+  if ($async eq 'slood') {
+    ...
+  }
+
+See L<Argon::Async>.
+
+=cut
 
 sub async ($\[&$]\@) {
   my ($self, $code_ref, $args) = @_;

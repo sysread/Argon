@@ -39,6 +39,14 @@ and executed in the forked worker process.
 This is obviously a security risk and therefore should only be permitted when
 running in a secure environment.
 
+=head2 key
+
+Path to the file containing the encryption key.
+
+=head2 verbose
+
+Level of verbosity (1-9; defaults to 5/warn).
+
 =cut
 
 use strict;

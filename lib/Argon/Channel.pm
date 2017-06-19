@@ -1,6 +1,24 @@
 package Argon::Channel;
 # ABSTRACT: Line protocol API for non-blocking sockets
 
+=head1 DESCRIPTION
+
+Internal class implementing the line protocol API used for non-blocking socket
+connections.
+
+=head1 SYNOPSIS
+
+  my $ch = Argon::Channel->new(
+    fh => $socket,
+    on_msg => sub {...},
+    on_close => sub {...},
+    on_err => sub {...}
+  );
+
+  $ch->send(Argon::Message->new(...));
+
+=cut
+
 use strict;
 use warnings;
 use Carp;
@@ -14,11 +32,26 @@ use Argon::Types;
 use Argon::Util qw(K);
 require Argon::Message;
 
+=head1 ATTRIBUTES
+
+=head2 fh
+
+File handle for the connected socket. Assumed to be non-blocking.
+
+=cut
+
 has fh => (
   is       => 'ro',
   isa      => 'FileHandle',
   required => 1,
 );
+
+=head2 on_msg
+
+A code ref that is called when a new L<Argon::Message> arrives. The message is
+passed as the only argument.
+
+=cut
 
 has on_msg => (
   is     => 'rw',
@@ -26,11 +59,24 @@ has on_msg => (
   default => sub { sub{} },
 );
 
+=head2 on_close
+
+A code ref that is called when the connection is closed.
+
+=cut
+
 has on_close => (
   is      => 'rw',
   isa     => 'Ar::Callback',
   default => sub { sub{} },
 );
+
+=head2 on_err
+
+A code ref that is called when an error occurs during socket communication. The
+error message is passed as the only argument.
+
+=cut
 
 has on_err => (
   is      => 'rw',
@@ -57,6 +103,10 @@ sub _build_handle {
     on_error => K('_error', $self),
   );
 }
+
+=head1 METHODS
+
+=cut
 
 sub BUILD {
   my ($self, $args) = @_;
@@ -92,6 +142,12 @@ sub recv {
   log_trace 'recv: %s', $msg->explain;
   $self->on_msg->($msg);
 }
+
+=head2 send
+
+Sends an L<Argon::Message> over the socket.
+
+=cut
 
 sub send {
   my ($self, $msg) = @_;

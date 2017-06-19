@@ -23,8 +23,15 @@ Optionally specifies the port to listen on. Defaults to an OS-assigned port.
 Optionally specifies the device address to listen on. Defaults to an
 OS-assigned address.
 
-=cut
+=head2 key
 
+Path to the file containing the encryption key.
+
+=head2 verbose
+
+Level of verbosity (1-9; defaults to 5/warn).
+
+=cut
 
 use strict;
 use warnings;
