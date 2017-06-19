@@ -3,6 +3,7 @@
 - Message protocol is now encrypted with Rijndael
 - Workers now authenticate message source as from manager to which it is
   registered
+- Remove dependency on Coro
 
 0.16 2014-12-24
 - Argon::Client->queue now supports task classes
