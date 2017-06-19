@@ -21,4 +21,6 @@ on test => sub {
   requires 'Test::Pod'               => 1.41;
   requires 'Path::Tiny'              => 0.097;
   requires 'Devel::Cover'            => 0;
+  requires 'Test::Refcount'          => 0;
+  requires 'Devel::Refcount'         => 0;
 };
