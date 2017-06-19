@@ -16,7 +16,7 @@ sub client {
   return ($client, $right);
 }
 
-#subtest 'callbacks' => sub {
+subtest 'callbacks' => sub {
   ar_test 'positive path' => sub {
     my $cv = shift;
     my ($opened, $ready, $closed, $failed, $notify) = @_;
@@ -48,7 +48,7 @@ sub client {
     );
     is $cv->recv, 'failed', 'failed callback triggered';
   };
-#};
+};
 
 ar_test 'send/recv' => sub {
   my $cv = shift;
