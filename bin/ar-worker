@@ -16,10 +16,6 @@ manager.
 
 =head1 OPTIONS
 
-=head2 port
-
-Optionally specifies the port to listen on. Defaults to an OS-assigned port.
-
 =head2 capacity
 
 Specifies the maximum number of concurrent, forked processes to be made
@@ -59,7 +55,6 @@ use Getopt::Long::Descriptive;
 my ($opt, $usage) = describe_options(
   'worker %o',
   ['key|k=s',      '(required) path to file containing encryption key', {required => 1}],
-  ['port|p=i',     '(optional) port on which to listen (defaults to OS-assigned port)', {callbacks => {'port number' => sub { shift > 0 }}}],
   ['capacity|c=i', '(required) max number of worker processes permitted', {required => 1, callbacks => {'positive int' => sub { shift > 0 }}}],
   ['mgr|m=s',      '(required) address of Argon manager service (e.g. some.host.com:4242)', {required => 1, callbacks => {'host:port' => sub { shift =~ /^.+?:\d+$/ }}}],
   ['allow-eval|a', '(optional) permit execution of serialized code (warning: this is a security risk if not running in a safe environment)'],
@@ -91,7 +86,6 @@ my $sigterm = AnyEvent->signal(signal => 'TERM', cb => sub { log_info 'Caught SI
 my $worker = Argon::Worker->new(
   keyfile  => $opt->key,
   capacity => $opt->capacity,
-  port     => $opt->port,
   mgr_host => $mgr_host,
   mgr_port => $mgr_port,
 );

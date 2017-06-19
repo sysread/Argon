@@ -65,9 +65,9 @@ is called, making the connection blocking.
 =head1 RUNNING TASKS
 
 Once connected, there are a number of ways to schedule tasks with the manager,
-the most basic being the C<process> method.
+the most basic being the L<Argon::Client/queue> method.
 
-  $client->process('My::Task::Class', $arg_list, sub {
+  $client->queue('My::Task::Class', $arg_list, sub {
     my $reply = shift;
     my $result = $reply->result;
   });
@@ -82,7 +82,8 @@ logarithmic backoff until the server has the capacity to process the task
 (see L<Argon/PREDICTABLE PERFORMANCE DEGREDATION>).
 
 If the workers were started with the C<--allow-eval> switch, the client may
-pass code references directly to be evaluated by the workers.
+pass code references directly to be evaluated by the workers using the
+L<Argon::Client/process> method.
 
   local $Argon::ALLOW_EVAL = 1;
 

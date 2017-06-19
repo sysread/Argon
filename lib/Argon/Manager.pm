@@ -1,6 +1,36 @@
 package Argon::Manager;
 # ABSTRACT: Entry-point Argon service providing intelligent task routing
 
+=head1 DESCRIPTION
+
+The entry point service with which workers are registered, to which clients
+connect, and which provides task queueing services for the system.
+
+For most use cases, this class need not be access directly; instead,
+L<bin/ar-manager> provides a command-line interface to control the manager
+process.
+
+=head1 PUBLIC INTERFACE
+
+Most relevant attributes and methods are documented in L<Argon::Server>.
+
+=head1 SYNOPSIS
+
+  use Argon::Manager;
+  use AnyEvent;
+
+  my $cv = AnyEvent->condvar;
+
+  my $mgr = Argon::Manager->new(
+    host    => 'localhost',
+    port    => 8000,
+    keyfile => 'path/to/secret',
+  );
+
+  $cv->recv;
+
+=cut
+
 use strict;
 use warnings;
 use Carp;

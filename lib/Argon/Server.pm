@@ -1,6 +1,25 @@
 package Argon::Server;
 # ABSTRACT: Base class for Argon server objects
 
+=head1 DESCRIPTION
+
+Provides TCP listener services for Ar classes.
+
+=head1 SYNOPSIS
+
+  use Moose;
+  use Argon::Constants ':commands';
+  use Argon::Server;
+
+  extends 'Argon::Server';
+
+  after configure => sub{
+    my $self = shift;
+    $self->handles($SOME_COMMAND, K('_handler_method_name', $self));
+  };
+
+=cut
+
 use strict;
 use warnings;
 use Carp;
@@ -17,10 +36,31 @@ use Argon::Util qw(K param);
 
 with qw(Argon::Encryption);
 
+=head1 ATTRIBUTES
+
+=head2 keyfile
+
+Path to the file containing the encryption pass phrase. Inherited from
+L<Argon::Encryption>.
+
+=head2 host
+
+The hostname or interface on which to listen. Defaults to C<127.0.0.1>.
+
+=cut
+
 has host => (
   is  => 'rw',
   isa => 'Maybe[Str]',
 );
+
+=head2 port
+
+The port on which the server should listen. If not specified, an OS-assigned
+port is used and the attribute is set once the listening socket has been
+configured.
+
+=cut
 
 has port => (
   is  => 'rw',
@@ -51,10 +91,21 @@ has addr => (
   default => sub {{}},
 );
 
+=head1 METHODS
+
+=cut
+
 sub BUILD {
   my ($self, $args) = @_;
   $self->listen unless $self->fh;
 }
+
+=head2 listen
+
+Creates the listener socket and starts the server. This method is called
+automatically when the manager is instantiated.
+
+=cut
 
 sub listen {
   my $self = shift;
@@ -65,10 +116,33 @@ sub listen {
     K('_prepare', $self);
 }
 
+=head2 configure
+
+Classes inheriting C<Argon::Server> register protocol verb handlers with
+the L<Argon::Server/handles> method. The C<configure> method provides a
+trigger for registering actions during start up.
+
+  after configure => sub{
+    my $self = shift;
+    $self->handles($ACTION, K('_handler', $self));
+  };
+
+=cut
+
 sub configure {
   my $self = shift;
   $self->handles($PING, K('_ping', $self));
 }
+
+=head2 handles
+
+Registers a handler for a protocol command verb.
+
+  $self->handles($ACTION, K('_handler_method'), $self));
+
+See L<Argon::Constants/:commands>.
+
+=cut
 
 sub handles {
   my ($self, $cmd, $cb) = @_;
@@ -81,6 +155,13 @@ sub get_addr {
   exists $self->addr->{$msg->id}
       && $self->addr->{$msg->id};
 }
+
+=head2 send
+
+Sends a reply L<Argon::Message>. Emits a warning and returns early if the
+message's id does not match one sent by an existing client.
+
+=cut
 
 sub send {
   my ($self, $msg) = @_;

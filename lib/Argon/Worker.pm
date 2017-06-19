@@ -1,6 +1,33 @@
 package Argon::Worker;
 # ABSTRACT: Argon worker node providing capacity to an Argon::Manager
 
+=head1 DESCRIPTION
+
+Workers do the actual work of executing the tasks assigned to them by
+the L<Argon::Manager>.
+
+For most use cases, this class need not be access directly; instead,
+L<bin/ar-worker> provides a command-line interface to control the manager
+process.
+
+=head1 SYNOPSIS
+
+  use Argon::Worker;
+  use AnyEvent;
+
+  my $cv = AnyEvent->condvar;
+
+  my $worker = Argon::Worker->new(
+    keyfile  => 'path/to/secret',
+    capacity => 4,
+    mgr_host => 'some.host-addr.com',
+    mgr_port => 8000,
+  );
+
+  $cv->recv;
+
+=cut
+
 use strict;
 use warnings;
 use Carp;
@@ -19,17 +46,42 @@ require Argon::Message;
 
 with qw(Argon::Encryption);
 
+=head1 ATTRIBUTES
+
+=head2 keyfile
+
+Path to the file containing the encryption pass phrase. Inherited from
+L<Argon::Encryption>.
+
+=head2 capacity
+
+The number of tasks which this worker can handle concurrently.
+
+=cut
+
 has capacity => (
   is       => 'ro',
   isa      => 'Int',
   required => 1,
 );
 
+=head2 mgr_hsot
+
+The host name or IP of the manager process.
+
+=cut
+
 has mgr_host => (
   is       => 'ro',
   isa      => 'Str',
   required => 1,
 );
+
+=head2 mgr_port
+
+The port number on which the manager is listening.
+
+=cut
 
 has mgr_port => (
   is       => 'ro',
@@ -71,6 +123,15 @@ has assigned => (
   isa => 'HashRef',
   default => sub {{}},
 );
+
+=head1 METHODS
+
+=head2 connect
+
+Connects to the manager service. This method is called automatically when the
+manager is instantiated.
+
+=cut
 
 sub BUILD {
   my ($self, $args) = @_;
