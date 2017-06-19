@@ -26,12 +26,5 @@ install:
    - cpanm --quiet --notest Devel::Cover::Report::Coveralls
    - cpanm --quiet --notest --installdeps .
 
-script:
-   - PERL5OPT=-MDevel::Cover=-coverage,statement,branch,condition,path,subroutine prove -lrsv t
-   - cover
-
-after_success:
-  - cover -report coveralls
-
 notifications:
   email: false
