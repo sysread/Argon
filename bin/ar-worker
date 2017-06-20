@@ -90,6 +90,8 @@ my $worker = Argon::Worker->new(
   mgr_port => $mgr_port,
 );
 
+$worker->start;
+
 $cv->recv;
 
 exit 0;

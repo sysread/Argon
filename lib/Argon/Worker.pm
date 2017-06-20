@@ -126,19 +126,31 @@ has assigned => (
 
 =head1 METHODS
 
-=head2 connect
-
-Connects to the manager service. This method is called automatically when the
-manager is instantiated.
-
 =cut
 
 sub BUILD {
   my ($self, $args) = @_;
   $AnyEvent::Util::MAX_FORKS = $self->capacity;
   $self->add_worker foreach 1 .. $self->capacity;
-  $self->connect unless $self->mgr;
 }
+
+=head2 start
+
+Starts the worker.
+
+=cut
+
+sub start {
+  my $self = shift;
+  $self->connect;
+}
+
+=head2 connect
+
+Connects to the manager service. This method is called automatically when the
+manager is instantiated.
+
+=cut
 
 sub connect {
   my $self = shift;

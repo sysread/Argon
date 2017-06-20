@@ -93,17 +93,20 @@ has addr => (
 
 =head1 METHODS
 
+=head2 start
+
+Starts the manager.
+
 =cut
 
-sub BUILD {
-  my ($self, $args) = @_;
-  $self->listen unless $self->fh;
+sub start {
+  my $self = shift;
+  $self->listen;
 }
 
 =head2 listen
 
-Creates the listener socket and starts the server. This method is called
-automatically when the manager is instantiated.
+Creates the listener socket and starts the server.
 
 =cut
 

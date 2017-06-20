@@ -70,6 +70,8 @@ my $manager = Argon::Manager->new(
   persist => $opt->persist,
 );
 
+$manager->start;
+
 $cv->recv;
 
 exit 0;
