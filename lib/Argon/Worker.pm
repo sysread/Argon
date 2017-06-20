@@ -147,8 +147,7 @@ sub start {
 
 =head2 connect
 
-Connects to the manager service. This method is called automatically when the
-manager is instantiated.
+Connects to the manager service. Called by L</start>.
 
 =cut
 

@@ -106,7 +106,7 @@ sub start {
 
 =head2 listen
 
-Creates the listener socket and starts the server.
+Creates the listener socket. Called by L</start>.
 
 =cut
 
