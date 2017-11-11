@@ -1,3 +1,5 @@
+requires 'perl', '5.010';
+
 requires 'AnyEvent'                  => 0;
 requires 'Carp'                      => 0;
 requires 'Class::Load'               => 0;
