@@ -1,5 +1,5 @@
 {{NEXT}}
-- Complete rewrite to remove dependency on Coro (NOT backward compatible)
+- Complete rewrite (NOT backward compatible)
 - Message protocol is now encrypted with Rijndael
 - Workers now authenticate message source as from manager to which it is
   registered

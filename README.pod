@@ -34,7 +34,7 @@ encryption).
 Workers are started with C<ar-worker> and must use the same C<key> as the
 manager.
 
-  ar-worker --manager mgrhost:8000 --capacity 8 --key path/to/secret --verbose 7
+  ar-worker --mgr mgrhost:8000 --capacity 8 --key path/to/secret --verbose 7
 
 =head2 CLIENT
 
