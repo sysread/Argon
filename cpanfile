@@ -17,6 +17,8 @@ requires 'Sereal::Encoder'           => 0;
 requires 'Sereal::Decoder'           => 0;
 requires 'Time::HiRes'               => 0;
 requires 'Try::Tiny'                 => 0;
+requires 'Test2::Bundle::Extended'   => 0;
+requires 'parent'                    => 0;
 
 on test => sub {
   requires 'Test2::Bundle::Extended' => 0;
