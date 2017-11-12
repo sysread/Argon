@@ -1,7 +1,7 @@
 requires 'perl', '5.010';
 
 requires 'AnyEvent'                  => '7.14';
-requires 'Carp'                      => '1.40';
+requires 'Carp'                      => '1.38';
 requires 'Class::Load'               => '0.24';
 requires 'Const::Fast'               => '0.014';
 requires 'Crypt::CBC'                => '2.33';
