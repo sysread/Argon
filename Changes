@@ -1,4 +1,9 @@
-{{NEXT}}
+{{$NEXT}}
+- Add minimum version for dependencies
+- Adds missing dependencies to cpanfile
+- Switch from Try::Tiny to Try::Catch
+
+0.17 2017-11-12
 - Complete rewrite (NOT backward compatible)
 - Message protocol is now encrypted with Rijndael
 - Workers now authenticate message source as from manager to which it is

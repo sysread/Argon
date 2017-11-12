@@ -43,7 +43,6 @@ use Moose;
 use AnyEvent;
 use AnyEvent::Socket qw(tcp_connect);
 use Data::Dump::Streamer;
-use Try::Tiny;
 use Argon;
 use Argon::Async;
 use Argon::Constants qw(:commands :priorities);

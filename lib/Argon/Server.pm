@@ -24,7 +24,7 @@ use strict;
 use warnings;
 use Carp;
 use Moose;
-use Try::Tiny;
+use Try::Catch;
 use AnyEvent;
 use AnyEvent::Socket qw(tcp_server);
 use Path::Tiny 'path';

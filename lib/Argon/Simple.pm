@@ -26,7 +26,7 @@ use strict;
 use warnings;
 use Carp;
 use AnyEvent;
-use Try::Tiny;
+use Try::Catch;
 use Argon;
 use Argon::Client;
 use Argon::Constants qw(:commands);
