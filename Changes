@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.18 2017-11-14
 - Add minimum version for dependencies
 - Adds missing dependencies to cpanfile
 - Switch from Try::Tiny to Try::Catch
