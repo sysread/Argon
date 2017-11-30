@@ -54,6 +54,8 @@ use Argon::Util qw(K param interval);
 
 with qw(Argon::Encryption);
 
+my $DUMP = Dump->Purity(1)->Declare(1)->Indent(0)->RLE(1);
+
 =head1 ATTRIBUTES
 
 =head2 host
@@ -338,12 +340,7 @@ sub process {
   Argon::ASSERT_EVAL_ALLOWED;
   my ($self, $code_ref, $args, $cb) = @_;
   $args ||= [];
-
-  my $code = Dump($code_ref)
-    ->Purity(1)
-    ->Declare(1)
-    ->Out;
-
+  my $code = $DUMP->Data($code_ref)->Out;
   $self->queue('Argon::Task', [$code, $args], $cb);
 }
 

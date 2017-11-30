@@ -25,10 +25,12 @@ use strict;
 use warnings;
 use Carp;
 use Moose;
-use Data::UUID;
+use Data::UUID::MT;
 use Argon::Constants qw(:priorities :commands);
 use Argon::Types;
 use Argon::Util qw(param);
+
+my $UUIDS = Data::UUID::MT->new;
 
 =head1 ATTRIBUTES
 
@@ -42,7 +44,7 @@ the client to the manager to the worker and back.
 has id => (
   is  => 'ro',
   isa => 'Str',
-  default => sub { Data::UUID->new->create_str },
+  default => sub { $UUIDS->create_string },
 );
 
 =head2 cmd
